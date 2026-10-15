@@ -64,12 +64,15 @@ proxy on.
 ## 4. Download the website
 
 ```bash
-git clone -b claude/exciting-shannon-tr0xle https://github.com/kelvinsonatech/ios.git /opt/ios
-cd /opt/ios/vpn-platform
+git clone https://github.com/kelvinsonatech/vpn-site.git /opt/vpn-site
+cd /opt/vpn-site
 cp .env.example .env
 ```
 
-(Once the work is merged, clone the default branch instead of `claude/exciting-shannon-tr0xle`.)
+If the repository is private, the VPS needs read access first: create an SSH key on the VPS
+(`ssh-keygen -t ed25519 -f ~/.ssh/vpn-site -N ""`), add the contents of `~/.ssh/vpn-site.pub` in
+GitHub under the repository's **Settings → Deploy keys** (read-only), then clone with
+`GIT_SSH_COMMAND="ssh -i ~/.ssh/vpn-site" git clone git@github.com:kelvinsonatech/vpn-site.git /opt/vpn-site`.
 
 ## 5. Settings and secrets
 
@@ -151,8 +154,8 @@ web traffic, so SSH, SlowDNS and UDP protocols would break behind it.
 ## 10. Updating
 
 ```bash
-cd /opt/ios && git pull
-cd vpn-platform && docker compose up -d --build
+cd /opt/vpn-site && git pull
+docker compose up -d --build
 ```
 
 `migrate` runs again on every `up` and applies new migrations before `web` and `worker` start.
@@ -160,7 +163,7 @@ cd vpn-platform && docker compose up -d --build
 ## 11. Backups
 
 ```bash
-cd /opt/ios/vpn-platform
+cd /opt/vpn-site
 docker compose exec -T postgres pg_dump -U vaultline vaultline | gzip > /root/vaultline-$(date +%F).sql.gz
 ```
 

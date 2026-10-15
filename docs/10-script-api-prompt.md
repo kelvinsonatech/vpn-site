@@ -670,7 +670,7 @@ zivpn, dnstt ...) from before and after the run: **no service may have restarted
 
 ### From the website side: `npm run node:check`
 
-Run it in the website's project folder (`vpn-platform/`, after `npm ci`) on a machine the server's
+Run it in the website's project folder (the root of the `vpn-site` repository, after `npm ci`) on a machine the server's
 firewall lets through to the API port, normally the website server itself:
 
 ```bash

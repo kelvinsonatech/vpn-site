@@ -143,7 +143,7 @@ worker / web ─▶ HTTPS (signed) ─▶ VPN servers (provisioning API port, fi
 ## Folder structure
 
 ```
-vpn-platform/
+vpn-site/
 ├── docs/                       Design documents (this folder)
 ├── drizzle/                    SQL migrations (generated, committed)
 ├── deploy/Caddyfile            Reverse proxy / TLS
