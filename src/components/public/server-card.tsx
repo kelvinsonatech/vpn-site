@@ -47,7 +47,7 @@ export function ServerCard({
     <article
       style={style}
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-3xl border bg-card shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10 motion-reduce:hover:translate-y-0",
+        "group relative flex flex-col overflow-hidden rounded-[1.75rem] border bg-card shadow-[0_1px_2px_rgb(15_30_90/0.05),0_12px_32px_-18px_rgb(15_30_120/0.25)] before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-1.5 before:bg-gradient-to-r before:from-[var(--hero-from)] before:to-[var(--hero-to)] transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10 motion-reduce:hover:translate-y-0",
         available ? "hover:border-primary/30" : "opacity-95",
         className,
       )}

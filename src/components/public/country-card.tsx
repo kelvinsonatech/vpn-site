@@ -29,11 +29,11 @@ export function CountryCard({
     <article
       style={style}
       className={cn(
-        "group relative isolate flex flex-col overflow-hidden rounded-3xl border bg-card shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 motion-reduce:hover:translate-y-0",
+        "group relative isolate flex flex-col overflow-hidden rounded-[1.75rem] border bg-card shadow-[0_1px_2px_rgb(15_30_90/0.05),0_12px_32px_-18px_rgb(15_30_120/0.25)] transition-all duration-300 hover:-translate-y-1.5 hover:border-primary/30 hover:shadow-xl hover:shadow-primary/10 motion-reduce:hover:translate-y-0",
         className,
       )}
     >
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-28 bg-gradient-to-b from-accent/70 to-transparent" />
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-32 bg-[radial-gradient(90%_100%_at_50%_0%,color-mix(in_oklch,var(--primary)_16%,transparent),transparent)] before:absolute before:inset-x-0 before:top-0 before:h-1.5 before:bg-gradient-to-r before:from-[var(--hero-from)] before:to-[var(--hero-to)]" />
       {/* Badge row from 480 px; phones show the server count next to the region instead. */}
       <div className="hidden items-center justify-between gap-2 p-4 pb-0 min-[480px]:flex">
         <span className="max-w-[60%] truncate rounded-full bg-card/80 px-2.5 py-1 text-[11px] font-semibold text-accent-foreground ring-1 ring-primary/15">{protocolName}</span>
