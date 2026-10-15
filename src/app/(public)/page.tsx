@@ -32,7 +32,6 @@ import { HeroWave } from "@/components/public/hero-wave";
 import { JsonLd } from "@/components/public/json-ld";
 import { Latency } from "@/components/public/latency";
 import { HeroDecor } from "@/components/public/page-header";
-import { ProtocolPicker } from "@/components/public/protocol-picker";
 import { ServiceCatalog } from "@/components/public/service-catalog";
 import { Container, EmptyState, SectionHeading } from "@/components/public/section";
 import { absoluteUrl, pageMetadata } from "@/lib/seo";
@@ -189,10 +188,6 @@ export default async function HomePage() {
                 </li>
               ))}
             </ul>
-            <Link href="/#choose" className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-white underline decoration-white/40 underline-offset-4 hover:decoration-white">
-              Not sure which protocol? Get a suggestion
-              <ArrowRightIcon className="size-4" />
-            </Link>
             {stats ? (
               <dl className="mx-auto mt-10 grid max-w-lg grid-cols-3 gap-2 sm:gap-3 lg:mx-0">
                 {[
@@ -255,25 +250,6 @@ export default async function HomePage() {
           ) : (
             <ServiceCatalog protocols={protocols} />
           )}
-        </Container>
-      </section>
-
-      {/* Protocol guidance (static advice; links only to services that really exist) */}
-      <section id="choose" className="mt-24 scroll-mt-24 sm:mt-32" aria-labelledby="choose-title">
-        <Container>
-          <SectionHeading
-            id="choose-title"
-            eyebrow={
-              <>
-                <LayersIcon /> Not sure?
-              </>
-            }
-            title="Find the right protocol in one tap"
-            description="Tell us what matters most and we will point you to a protocol family. The advice works even when no server is online."
-          />
-          <ProtocolPicker
-            protocols={protocols.map((p) => ({ slug: p.slug, name: p.name, category: p.category, href: p.href, availableCount: p.availableCount, serverCount: p.serverCount }))}
-          />
         </Container>
       </section>
 
