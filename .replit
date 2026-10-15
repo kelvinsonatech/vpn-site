@@ -7,25 +7,3 @@ stack = "PNPM_WORKSPACE"
 router = "application"
 
 [workflows]
-runButton = "Project"
-
-[[workflows.workflow]]
-name = "Project"
-mode = "parallel"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Temporary UI Preview"
-
-[[workflows.workflow]]
-name = "Temporary UI Preview"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "PORT=24945 bash .local/vaultline-preview/start.sh"
-waitForPort = 24945
-
-[workflows.workflow.metadata]
-outputType = "webview"

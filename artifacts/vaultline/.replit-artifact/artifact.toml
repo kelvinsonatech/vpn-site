@@ -1,0 +1,19 @@
+kind = "web"
+previewPath = "/"
+title = "Vaultline UI Preview"
+description = "Temporary, local-only preview of the original Next.js UI. Database, Redis, and API mutations are disconnected; the original repository remains unchanged."
+version = "1.0.0"
+id = "artifacts/vaultline"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/", "/_next/hmr" ]
+localPort = 24945
+
+[services.development]
+run = "bash ../../.local/vaultline-preview/start.sh"
+
+[services.env]
+PORT = "24945"
+BASE_PATH = "/"
