@@ -38,12 +38,12 @@ export function SiteHeader({ siteName, protocols }: { siteName: string; protocol
           : "border-transparent bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/80",
       )}
     >
-      <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">
+      <div className="mx-auto flex h-[4.5rem] max-w-6xl items-center gap-3 px-4 sm:px-6">
         <Link href="/" className="mr-auto min-w-0 rounded-lg outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50" aria-label={`${siteName} home`}>
           <Brand name={siteName} className="text-lg" markClassName="size-8" />
         </Link>
 
-        <nav aria-label="Main" className="hidden items-center gap-1 lg:flex">
+        <nav aria-label="Main" className="hidden items-center gap-0.5 rounded-full border border-border/70 bg-card/70 p-1 shadow-sm lg:flex">
           <Link href="/" aria-current={pathname === "/" ? "page" : undefined} className={navItemClass(pathname === "/")}>
             <HomeIcon />
             Home

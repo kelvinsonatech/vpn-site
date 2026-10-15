@@ -271,3 +271,86 @@
     @apply rounded bg-muted px-1.5 py-0.5 font-mono text-[0.85em] text-foreground;
   }
 }
+
+/*
+ * Public site palette (scoped to the public layout wrapper, admin keeps the tokens above).
+ * Royal ocean blue on pale-blue paper with protocol-specific accents.
+ */
+.vl-public {
+  --radius: 0.85rem;
+  --background: oklch(0.982 0.008 255);
+  --foreground: oklch(0.22 0.05 265);
+  --card: oklch(0.997 0.003 255);
+  --card-foreground: oklch(0.22 0.05 265);
+  --popover: oklch(0.997 0.003 255);
+  --popover-foreground: oklch(0.22 0.05 265);
+  --primary: oklch(0.5 0.24 265);
+  --primary-foreground: oklch(0.985 0.01 260);
+  --secondary: oklch(0.955 0.02 258);
+  --secondary-foreground: oklch(0.28 0.08 265);
+  --muted: oklch(0.958 0.014 258);
+  --muted-foreground: oklch(0.5 0.04 262);
+  --accent: oklch(0.94 0.035 262);
+  --accent-foreground: oklch(0.4 0.2 265);
+  --border: oklch(0.905 0.025 260);
+  --input: oklch(0.88 0.03 260);
+  --ring: oklch(0.55 0.22 265);
+  --hero-from: oklch(0.42 0.2 268);
+  --hero-via: oklch(0.5 0.24 265);
+  --hero-to: oklch(0.6 0.17 240);
+  --hero-foreground: oklch(0.99 0.01 255);
+  --bar-from: oklch(0.26 0.1 268);
+  --bar-via: oklch(0.36 0.17 265);
+  --bar-to: oklch(0.45 0.2 255);
+  --footer: oklch(0.22 0.09 268);
+  --footer-foreground: oklch(0.96 0.01 255);
+  --footer-muted: oklch(0.76 0.05 260);
+  --footer-border: oklch(0.32 0.09 268);
+  --tone-ssh: oklch(0.52 0.23 265);
+  --tone-v2ray: oklch(0.56 0.2 300);
+  --tone-vpn: oklch(0.58 0.14 175);
+  --tone-proxy: oklch(0.64 0.17 50);
+  --tone-udp: oklch(0.57 0.21 15);
+  background-color: var(--background);
+  background-image:
+    radial-gradient(60rem 30rem at 100% 0%, color-mix(in oklch, var(--primary) 6%, transparent), transparent 70%),
+    radial-gradient(50rem 30rem at 0% 60%, color-mix(in oklch, var(--hero-to) 5%, transparent), transparent 70%);
+}
+.dark .vl-public {
+  --background: oklch(0.17 0.035 266);
+  --foreground: oklch(0.96 0.01 255);
+  --card: oklch(0.21 0.045 266);
+  --card-foreground: oklch(0.96 0.01 255);
+  --popover: oklch(0.22 0.045 266);
+  --popover-foreground: oklch(0.96 0.01 255);
+  --primary: oklch(0.68 0.18 262);
+  --primary-foreground: oklch(0.16 0.05 266);
+  --secondary: oklch(0.26 0.05 266);
+  --secondary-foreground: oklch(0.93 0.01 255);
+  --muted: oklch(0.25 0.045 266);
+  --muted-foreground: oklch(0.72 0.04 260);
+  --accent: oklch(0.29 0.08 265);
+  --accent-foreground: oklch(0.88 0.08 262);
+  --border: oklch(0.3 0.05 266);
+  --input: oklch(0.33 0.05 266);
+  --ring: oklch(0.68 0.18 262);
+  --hero-from: oklch(0.3 0.14 270);
+  --hero-via: oklch(0.36 0.17 266);
+  --hero-to: oklch(0.42 0.13 240);
+  --footer: oklch(0.13 0.03 266);
+  --footer-border: oklch(0.24 0.045 266);
+  --tone-ssh: oklch(0.7 0.17 262);
+  --tone-v2ray: oklch(0.72 0.15 300);
+  --tone-vpn: oklch(0.74 0.12 175);
+  --tone-proxy: oklch(0.76 0.14 60);
+  --tone-udp: oklch(0.72 0.16 15);
+}
+
+/* Faint blueprint grid for public section backdrops. */
+@utility bg-ocean-grid {
+  background-image:
+    linear-gradient(color-mix(in oklch, var(--primary) 7%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklch, var(--primary) 7%, transparent) 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: radial-gradient(ellipse 60% 70% at 50% 40%, black 20%, transparent 75%);
+}

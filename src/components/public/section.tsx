@@ -38,9 +38,9 @@ export function SectionHeading({
   return (
     <div className={cn("mb-8 sm:mb-10", align === "center" ? "mx-auto max-w-2xl text-center" : "max-w-3xl", className)}>
       {eyebrow ? (
-        <p className={cn("mb-2 inline-flex items-center gap-1.5 text-xs font-semibold tracking-wider text-primary uppercase [&_svg]:size-3.5")}>{eyebrow}</p>
+        <p className={cn("mb-3 inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 text-xs font-semibold tracking-wider text-accent-foreground uppercase ring-1 ring-primary/15 [&_svg]:size-3.5")}>{eyebrow}</p>
       ) : null}
-      <h2 id={id} className="scroll-mt-28 text-2xl font-bold tracking-tight text-balance sm:text-3xl">
+      <h2 id={id} className="scroll-mt-28 text-3xl font-extrabold tracking-tight text-balance sm:text-4xl">
         {title}
       </h2>
       {description ? <p className="mt-3 text-pretty text-muted-foreground">{description}</p> : null}
@@ -64,7 +64,7 @@ export function EmptyState({
   className?: string;
 }) {
   return (
-    <div className={cn("flex flex-col items-center rounded-2xl border border-dashed bg-card/60 px-6 py-14 text-center", className)}>
+    <div className={cn("flex flex-col items-center rounded-3xl border border-dashed border-primary/25 bg-card/70 px-6 py-14 text-center", className)}>
       {icon ? (
         <span className="mb-4 flex size-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground [&_svg]:size-7">{icon}</span>
       ) : null}

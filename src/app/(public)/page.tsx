@@ -162,7 +162,7 @@ export default async function HomePage() {
               </span>
               {stats ? `${stats.serversOnline} servers online in ${countries} ${countries === 1 ? "country" : "countries"}` : "Free VPN & SSH accounts"}
             </p>
-            <h1 id="hero-title" className="mt-6 text-4xl font-bold tracking-tight text-balance drop-shadow-sm sm:text-5xl lg:text-6xl">
+            <h1 id="hero-title" className="mt-6 text-4xl font-extrabold tracking-tight text-balance drop-shadow-sm sm:text-5xl lg:text-6xl">
               {settings.tagline || "Private tunnels, provisioned in seconds."}
             </h1>
             <p className="mx-auto mt-5 max-w-xl text-base text-pretty text-white/85 sm:text-lg lg:mx-0">
@@ -216,7 +216,8 @@ export default async function HomePage() {
       </section>
 
       {/* Protocols */}
-      <section id="protocols" className="scroll-mt-24 pt-6 sm:pt-10" aria-labelledby="protocols-title">
+      <section id="protocols" className="relative isolate scroll-mt-24 pt-6 sm:pt-10" aria-labelledby="protocols-title">
+        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-ocean-grid" />
         <Container>
           <SectionHeading
             id="protocols-title"
@@ -269,7 +270,7 @@ export default async function HomePage() {
           <ol className="relative grid gap-5 md:grid-cols-3">
             <span aria-hidden className="absolute top-12 right-[16%] left-[16%] hidden h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent md:block" />
             {STEPS.map((s, i) => (
-              <li key={s.title} className="relative rounded-3xl border bg-card p-6 text-center shadow-sm">
+              <li key={s.title} className="relative rounded-[1.75rem] border bg-card p-7 text-center shadow-[0_12px_32px_-20px_rgb(15_30_120/0.3)]">
                 <span className="relative mx-auto flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/25 [&_svg]:size-6">
                   {s.icon}
                   <span className="absolute -top-2 -right-2 flex size-6 items-center justify-center rounded-full bg-card text-xs font-bold text-primary ring-1 ring-border tabular-nums">
@@ -326,7 +327,7 @@ export default async function HomePage() {
       {/* DiceBear profiles */}
       <section className="mt-24 sm:mt-32" aria-labelledby="profiles-title">
         <Container>
-          <div className="grid items-center gap-10 overflow-hidden rounded-[2rem] border bg-card p-6 shadow-sm sm:p-10 lg:grid-cols-2">
+          <div className="grid items-center gap-10 overflow-hidden rounded-[2rem] border bg-gradient-to-br from-card to-accent/60 p-6 shadow-[0_20px_50px_-30px_rgb(15_30_120/0.35)] sm:p-10 lg:grid-cols-2">
             <div>
               <p className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold tracking-wider text-primary uppercase">
                 <UserRoundIcon className="size-3.5" /> Profiles

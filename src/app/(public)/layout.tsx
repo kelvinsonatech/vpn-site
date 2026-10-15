@@ -40,7 +40,7 @@ export default async function PublicLayout({ children }: { children: React.React
   }));
 
   return (
-    <div className="flex min-h-dvh flex-col overflow-x-clip">
+    <div className="vl-public flex min-h-dvh flex-col overflow-x-clip">
       <a
         href="#main"
         className="sr-only z-[60] rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
