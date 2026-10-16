@@ -96,7 +96,7 @@ The matrix lives in `src/server/auth/rbac.ts`. At least one active Super Admin i
 
 ## UI conventions
 
-* Original "Vaultline" identity: slate surfaces, signal-green primary, keyhole-shield mark. The public site and page titles use the site name from **Site settings**; the admin header uses the build-time default `NEXT_PUBLIC_SITE_NAME`. Light, dark and system themes; responsive sidebar → slide-over navigation on mobile.
+* LitronSSH identity: keyhole-shield mark; the admin uses slate surfaces with a signal-green primary, the public site its own blue palette. The public site, page titles, admin panel, login page and the 2FA issuer use the site name from **Site settings** (default `NEXT_PUBLIC_SITE_NAME`, "LitronSSH"). Light, dark and system themes; responsive sidebar → slide-over navigation on mobile.
 * Every administrator and every VPN account has a DiceBear avatar generated on the server (style chosen in **Site settings → Avatars**).
 * Forms keep typed values on validation errors (submitted via `useServerAction`, not React's auto-resetting form actions). Secrets are write-only: inputs never echo stored values.
 * Destructive actions use dialogs; deletion requires typing the server name.

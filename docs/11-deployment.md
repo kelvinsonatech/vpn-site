@@ -164,7 +164,7 @@ docker compose up -d --build
 
 ```bash
 cd /opt/vpn-site
-docker compose exec -T postgres pg_dump -U vaultline vaultline | gzip > /root/vaultline-$(date +%F).sql.gz
+docker compose exec -T postgres pg_dump -U litronssh litronssh | gzip > /root/litronssh-$(date +%F).sql.gz
 ```
 
 Copy the file and `.env` off the server regularly. To restore on a fresh install (same `.env`),
@@ -172,7 +172,7 @@ start only the database first, load the backup, then start the rest:
 
 ```bash
 docker compose up -d postgres
-gunzip -c /root/vaultline-DATE.sql.gz | docker compose exec -T postgres psql -U vaultline vaultline
+gunzip -c /root/litronssh-DATE.sql.gz | docker compose exec -T postgres psql -U litronssh litronssh
 docker compose up -d --build
 ```
 

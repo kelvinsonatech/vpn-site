@@ -6,7 +6,7 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Vaultline design tokens. Neutral slate surfaces with a signal-green primary; every colour has a
+ * LitronSSH design tokens. Neutral slate surfaces with a signal-green primary; every colour has a
  * light and dark value. Components only use the semantic tokens below.
  */
 :root {

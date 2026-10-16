@@ -1,13 +1,13 @@
 # Production-style stack. Copy .env.example to .env and fill in secrets first.
 #   docker compose up -d --build
 #   docker compose run --rm migrate node dist/scripts/create-admin.mjs --email you@example.com --role super_admin
-name: vaultline
+name: litronssh
 
 x-app: &app
   build: .
   env_file: .env
   environment:
-    DATABASE_URL: postgres://vaultline:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/vaultline
+    DATABASE_URL: postgres://litronssh:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/litronssh
     REDIS_URL: redis://redis:6379
     # 1 = Caddy only; 2 when Cloudflare proxies the domain (see deploy/Caddyfile.cloudflare).
     TRUSTED_PROXY_HOPS: ${TRUSTED_PROXY_HOPS:-1}
@@ -20,12 +20,12 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: vaultline
+      POSTGRES_USER: litronssh
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
-      POSTGRES_DB: vaultline
+      POSTGRES_DB: litronssh
     volumes: [pgdata:/var/lib/postgresql/data]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U vaultline"]
+      test: ["CMD-SHELL", "pg_isready -U litronssh"]
       interval: 5s
       retries: 10
     restart: unless-stopped

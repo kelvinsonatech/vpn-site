@@ -89,7 +89,7 @@ export type SiteSettings = z.infer<typeof siteSettingsSchema>;
 export type SiteSettingsInput = z.input<typeof siteSettingsSchema>;
 
 export const DEFAULT_SITE_SETTINGS: SiteSettings = {
-  siteName: process.env.NEXT_PUBLIC_SITE_NAME || "Vaultline",
+  siteName: process.env.NEXT_PUBLIC_SITE_NAME || "LitronSSH",
   tagline: "Private tunnels, provisioned in seconds.",
   seoDescription: "Free SSH, SSH SSL, SlowDNS, VMess, VLESS, Trojan, Hysteria and ZIVPN UDP accounts on fast servers worldwide.",
   announcement: { enabled: false, text: "", tone: "info", linkLabel: null, linkUrl: null },

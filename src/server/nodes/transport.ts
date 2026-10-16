@@ -49,7 +49,7 @@ export interface NodeResponse {
   latencyMs: number;
 }
 
-const USER_AGENT = "vaultline-control/1.0";
+const USER_AGENT = "litronssh-control/1.0";
 
 // ---------------------------------------------------------------------------
 // HTTP agents (one per server + credential version + TLS settings)

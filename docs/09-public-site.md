@@ -1,6 +1,6 @@
 # 9. Public site, quotas, monitoring and avatars
 
-The public website is where visitors pick a protocol, a country and a server and create a free account on it. It follows the same page flow as typical free SSH/VPN account sites (protocol → country → server → form → one-time result, plus a live server status page) with the site's own brand, wording and artwork. The brand name and texts come from **Admin → Site settings** (default "Vaultline").
+The public website is where visitors pick a protocol, a country and a server and create a free account on it. It follows the same page flow as typical free SSH/VPN account sites (protocol → country → server → form → one-time result, plus a live server status page) with the site's own brand, wording and artwork. The brand name and texts come from **Admin → Site settings** (default "LitronSSH").
 
 Code: pages in `src/app/(public)`, components in `src/components/public`, data in `src/server/public/catalog.ts`, JSON API in `src/app/api/public`, the data contract between them in `src/lib/public/types.ts`.
 

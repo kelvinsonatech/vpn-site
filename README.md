@@ -1,4 +1,4 @@
-# Vaultline — VPN/SSH account platform
+# LitronSSH — VPN/SSH account platform
 
 A website + admin panel that turns servers prepared with **your existing installation script** into publicly available SSH / V2Ray / WireGuard / OpenVPN / … account generators — with no code change per server.
 
