@@ -664,6 +664,9 @@ It checks: unsigned, wrong-secret, 10-minute-old and replayed requests are refus
 with `VALIDATION_FAILED`; per protocol: create, retry with the same request id (same account,
 `replayed: true`), the same request id with other details (`IDEMPOTENCY_CONFLICT`), lookup by request
 id, the `config` keys from section 8, known share-link schemes, delete, and a second delete (404).
+Expiry: `expires_at` must be a full timestamp exactly 1 day after creation (not rounded to
+midnight), and for SSH-family Linux users `chage -l` must show the day **after** that date, so Linux
+never disables a user early (the website removes the account at the exact time).
 Finally it compares the start times of the VPN services (sshd, dropbear, stunnel, xray, hysteria,
 zivpn, dnstt ...) from before and after the run: **no service may have restarted**. It ends with
 `N/M checks passed`.

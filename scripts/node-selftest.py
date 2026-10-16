@@ -15,10 +15,14 @@ What it checks:
   4. Per protocol: create a 1-day test account, retry with the same request id (must return the same
      account), reuse the request id with other details (must be refused), look it up by request id,
      check the config keys the website reads, delete it, delete again (must be 404).
-  5. No VPN service restarted during the test, i.e. no connected user was disconnected.
+  5. Expiry: expires_at is exactly 1 day after creation (not rounded to midnight), and for SSH-family
+     Linux users the account expiry date (chage -l) is the day AFTER that, so Linux never cuts a
+     user off early.
+  6. No VPN service restarted during the test, i.e. no connected user was disconnected.
 Secrets in responses (passwords, UUIDs, keys, share links) are masked in the output.
 """
 import argparse
+import datetime
 import hashlib
 import hmac
 import http.client
@@ -186,6 +190,59 @@ def services_snapshot():
     return snap
 
 
+def parse_iso(value):
+    """ISO 8601 timestamp → aware datetime (accepts a trailing Z), or None."""
+    if not isinstance(value, str):
+        return None
+    try:
+        return datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def linux_expiry_date(username):
+    """The 'Account expires' date from chage -l: a date, "never", or None when there is no such user."""
+    try:
+        out = subprocess.run(["chage", "-l", username], capture_output=True, text=True, timeout=10, env=dict(os.environ, LC_ALL="C"))
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if out.returncode != 0:
+        return None
+    for line in out.stdout.splitlines():
+        if line.lower().startswith("account expires"):
+            value = line.split(":", 1)[1].strip()
+            if value.lower() == "never":
+                return "never"
+            try:
+                return datetime.datetime.strptime(value, "%b %d, %Y").date()
+            except ValueError:
+                return None
+    return None
+
+
+def expiry_checks(protocol, acc, started, finished, days=1):
+    exp = parse_iso(acc.get("expires_at"))
+    if exp is None or exp.tzinfo is None:
+        record("expires_at is a full timestamp with time zone", False, f"got {acc.get('expires_at')!r}")
+        return
+    # Allow two minutes either side of the request for clock and processing time.
+    low, high = started + days * 86400 - 120, finished + days * 86400 + 120
+    offset_h = (exp.timestamp() - started) / 3600
+    record(f"expires_at is exactly {days} day after creation (not rounded)", low <= exp.timestamp() <= high,
+           f"{exp.astimezone(datetime.timezone.utc).isoformat()}, {offset_h:.2f} h after creation")
+    if protocol not in SSH_FAMILY:
+        return
+    user = acc.get("username") or ""
+    linux = linux_expiry_date(user) if user else None
+    want = (exp.astimezone(datetime.timezone.utc) + datetime.timedelta(days=1)).date()
+    if linux is None:
+        print(f"    (no Linux user {user!r} found with chage -l; Linux expiry date not checked. Run as root on the VPN server.)")
+    elif linux == "never":
+        record("Linux account expiry is set (safety net)", False, "chage -l says 'never'")
+    else:
+        record("Linux expiry date is the day after expires_at", linux == want, f"chage -l: {linux}, expected {want}")
+
+
 def account_test(c, protocol):
     print(f"\nAccount test: {protocol}")
     username = "chk" + secrets.token_hex(3)
@@ -193,7 +250,9 @@ def account_test(c, protocol):
     if protocol in SSH_FAMILY:
         body["password"] = "Chk" + secrets.token_urlsafe(10).replace("-", "a").replace("_", "b")
     rid = body["request_id"]
+    started = time.time()
     r = c.call("POST", "/accounts", body, idem=rid)
+    finished = time.time()
     d = data_of(r)
     acc = (d or {}).get("account") if isinstance(d, dict) else None
     if r["status"] != 201 or not isinstance(acc, dict) or not acc.get("account_id"):
@@ -203,6 +262,7 @@ def account_test(c, protocol):
     for k in ("account_id", "protocol", "status", "expires_at", "config"):
         if k not in acc:
             record(f"account has '{k}'", False)
+    expiry_checks(protocol, acc, started, finished)
 
     again = c.call("POST", "/accounts", body, idem=rid)
     a2 = (data_of(again) or {}).get("account") or {}
