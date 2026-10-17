@@ -135,6 +135,17 @@ describe("node transport TLS modes", () => {
     expect(e.delivery).toBe("not_sent");
   });
 
+  it("keeps accepting a pinned fingerprint on new connections to the same server", async ({ skip }) => {
+    if (!available) skip();
+    // A new connection may resume the earlier TLS session; the pin must still be checked and pass.
+    const driver = contractV1Driver(conn(node.port, { tls: { mode: "pinned_fingerprint", pinnedFingerprintSha256: fingerprint } }));
+    for (let i = 0; i < 3; i++) {
+      await expect(driver.getInfo()).resolves.toBeTruthy();
+      node.dropConnections();
+      await new Promise((r) => setTimeout(r, 20));
+    }
+  });
+
   it("rejects an untrusted certificate with the system CA store", async ({ skip }) => {
     if (!available) skip();
     const e = await expectNodeError(contractV1Driver(conn(node.port, { tls: { mode: "system_ca" } })).getInfo());

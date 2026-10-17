@@ -108,7 +108,8 @@ function getAgent(c: NodeConnection): Agent {
       break;
     case "pinned_fingerprint": {
       const expected = normalizeFingerprint(c.tls.pinnedFingerprintSha256 ?? "");
-      const inner = buildConnector({ ...base, rejectUnauthorized: false });
+      // No TLS session reuse: a resumed session has no peer certificate, so the pin could not be checked.
+      const inner = buildConnector({ ...base, rejectUnauthorized: false, maxCachedSessions: 0 });
       connect = (opts, cb) =>
         inner(opts, (err, socket) => {
           if (err || !socket) return cb(err ?? new Error("connect failed"), null);

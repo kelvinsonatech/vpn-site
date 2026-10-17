@@ -512,6 +512,8 @@ export async function startMockNode(opts: MockNodeOptions) {
   return {
     port,
     state,
+    /** Close open keep-alive connections so the next request has to connect again. */
+    dropConnections: () => server.closeAllConnections(),
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),
   };
 }
