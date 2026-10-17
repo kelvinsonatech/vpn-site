@@ -1,7 +1,7 @@
 "use client";
 
-import { useId, useState, useSyncExternalStore } from "react";
-import { ChevronDownIcon, DicesIcon, EyeIcon, EyeOffIcon, SlidersHorizontalIcon } from "lucide-react";
+import { useId, useState } from "react";
+import { ChevronDownIcon, DicesIcon, SlidersHorizontalIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
@@ -15,14 +15,6 @@ import { generatePassword, isAdvancedField, normalizeInput } from "./form-valida
  */
 
 export const fieldId = (key: string) => `f-${key}`;
-
-const noSubscription = () => () => {};
-/**
- * Browsers that can hide the characters of a plain text box (Safari, Chrome, Edge...). There the
- * password field is a text box instead of type="password", so iPhone Safari and Chrome don't pop up
- * "Save password?" over the new account's details: this is a VPN account, not a login to this site.
- */
-const canMaskTextBox = () => typeof CSS !== "undefined" && CSS.supports("-webkit-text-security", "disc");
 
 /** Friendly copy for the VMess/VLESS/Trojan "bug host" mode choice. */
 const SNI_TYPE_COPY: Record<string, { title: string; body: string }> = {
@@ -183,6 +175,12 @@ function RadioCards({
   );
 }
 
+/**
+ * The VPN account's password (server connection credentials, not a login to this site): a masked
+ * password box with a text Show/Hide control and the generator. autoComplete="off" here and on the
+ * form tells password managers it isn't a site login; "new-password" would invite saving it.
+ * Browsers may still offer to save it: Safari decides that prompt itself.
+ */
 function PasswordInput({
   field,
   value,
@@ -199,7 +197,6 @@ function PasswordInput({
   disabled?: boolean;
 }) {
   const [visible, setVisible] = useState(false);
-  const maskTextBox = useSyncExternalStore(noSubscription, canMaskTextBox, () => false);
   return (
     <FieldShell
       field={field}
@@ -223,7 +220,7 @@ function PasswordInput({
         <Input
           id={fieldId(field.key)}
           name={field.key}
-          type={visible || maskTextBox ? "text" : "password"}
+          type={visible ? "text" : "password"}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onBlur={onBlur}
@@ -231,7 +228,7 @@ function PasswordInput({
           required={field.required}
           minLength={field.validation.minLength}
           maxLength={field.validation.maxLength}
-          autoComplete={maskTextBox ? "off" : "new-password"}
+          autoComplete="off"
           data-1p-ignore=""
           data-lpignore="true"
           data-bwignore=""
@@ -242,7 +239,7 @@ function PasswordInput({
           disabled={disabled}
           aria-invalid={!!error || undefined}
           aria-describedby={describedBy(field, error)}
-          className={cn("h-11 rounded-xl pr-11 font-mono text-base sm:text-sm", !visible && maskTextBox && "[-webkit-text-security:disc]")}
+          className="h-11 rounded-xl pr-17 font-mono text-base sm:text-sm"
         />
         <button
           type="button"
@@ -250,9 +247,9 @@ function PasswordInput({
           disabled={disabled}
           aria-label={visible ? "Hide password" : "Show password"}
           aria-pressed={visible}
-          className="absolute top-1/2 right-1 flex size-9 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+          className="absolute top-1/2 right-1 flex h-9 min-w-14 -translate-y-1/2 items-center justify-center rounded-lg px-2.5 text-xs font-medium text-primary transition-colors hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none disabled:opacity-50"
         >
-          {visible ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
+          {visible ? "Hide" : "Show"}
         </button>
       </div>
     </FieldShell>

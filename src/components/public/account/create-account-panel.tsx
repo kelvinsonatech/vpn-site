@@ -215,7 +215,8 @@ export function CreateAccountPanel({
             </div>
           </div>
         ) : (
-          <form noValidate onSubmit={onSubmit} className="grid gap-5" aria-describedby={unavailable ? "server-unavailable" : undefined}>
+          <form noValidate autoComplete="off" onSubmit={onSubmit} className="grid gap-5" aria-describedby={unavailable ? "server-unavailable" : undefined}>
+            {/* Creates VPN/SSH server credentials, not a login to this site: no autofill or saving. */}
             {unavailable ? (
               <div id="server-unavailable">
                 <UnavailableNotice

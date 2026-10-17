@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { BookOpenIcon, DownloadIcon, EyeIcon, EyeOffIcon, FileTextIcon, PlusIcon, TriangleAlertIcon } from "lucide-react";
+import { BookOpenIcon, DownloadIcon, EyeIcon, FileTextIcon, PlusIcon, TriangleAlertIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Flag } from "@/components/public/flag";
 import { cn } from "@/lib/utils";
@@ -42,19 +42,19 @@ function SuccessCheck() {
   );
 }
 
+/** Text Show/Hide for a masked value; the accessible name says which value. */
 function RevealButton({ revealed, onToggle, label }: { revealed: boolean; onToggle: () => void; label: string }) {
   return (
     <Button
       type="button"
       variant="ghost"
-      size="icon-sm"
-      className="size-9"
+      size="sm"
+      className="h-9 min-w-14 px-2.5 text-xs font-medium text-primary hover:text-primary"
       aria-pressed={revealed}
       aria-label={revealed ? `Hide ${label}` : `Show ${label}`}
-      title={revealed ? "Hide" : "Show"}
       onClick={onToggle}
     >
-      {revealed ? <EyeOffIcon aria-hidden /> : <EyeIcon aria-hidden />}
+      {revealed ? "Hide" : "Show"}
     </Button>
   );
 }
