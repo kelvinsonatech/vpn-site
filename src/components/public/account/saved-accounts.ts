@@ -5,8 +5,9 @@ import type { SavedAccountSummary } from "@/lib/public/types";
 
 /**
  * "My accounts": non-secret summaries of accounts created in this browser, kept only in
- * localStorage under "vl:my-accounts" (newest first, at most 50). Never passwords, UUIDs, keys,
- * links or configs. Every read is validated, so corrupted or tampered storage is ignored.
+ * localStorage under "vl:my-accounts" (newest first, at most 50), with their non-secret connection
+ * details (host, IP, ports, SNI, payload). Never passwords, UUIDs, keys, links or config files.
+ * Every read is validated, so corrupted or tampered storage is ignored.
  *
  * Other components (e.g. a header badge) can use `useSavedAccounts()` or listen for
  * MY_ACCOUNTS_EVENT on window.
@@ -17,6 +18,15 @@ const MAX_ITEMS = 50;
 
 const isStr = (v: unknown, max = 200): v is string => typeof v === "string" && v.length > 0 && v.length <= max;
 const isDate = (v: unknown): v is string => isStr(v, 64) && !Number.isNaN(Date.parse(v));
+const MAX_DETAILS = 30;
+
+function isDetails(v: unknown): v is { label: string; value: string }[] {
+  return (
+    Array.isArray(v) &&
+    v.length <= MAX_DETAILS &&
+    v.every((d) => !!d && typeof d === "object" && isStr((d as Record<string, unknown>).label, 80) && isStr((d as Record<string, unknown>).value, 4000))
+  );
+}
 
 function isSummary(x: unknown): x is SavedAccountSummary {
   if (!x || typeof x !== "object") return false;
@@ -37,7 +47,8 @@ function isSummary(x: unknown): x is SavedAccountSummary {
     isStr(o.avatar, 200_000) &&
     o.avatar.startsWith("data:image/svg+xml") &&
     isDate(o.createdAt) &&
-    isDate(o.expiresAt)
+    isDate(o.expiresAt) &&
+    (o.details === undefined || isDetails(o.details))
   );
 }
 
@@ -51,6 +62,7 @@ function pick(s: SavedAccountSummary): SavedAccountSummary {
     avatar: s.avatar,
     createdAt: s.createdAt,
     expiresAt: s.expiresAt,
+    ...(s.details?.length ? { details: s.details.map((d) => ({ label: d.label, value: d.value })) } : {}),
   };
 }
 

@@ -10,6 +10,7 @@ import { UnavailableNotice } from "@/components/public/server/unavailable-notice
 import { cn } from "@/lib/utils";
 import type { PublicAccountResult, PublicCountry, PublicProtocolDetail, PublicServerCard } from "@/lib/public/types";
 import { AccountResult } from "./account-result";
+import { publicDetails } from "./account-sections";
 import { claimCelebration } from "./celebration";
 import { CreationProgress } from "./creation-progress";
 import { normalizeFieldErrors } from "./errors";
@@ -66,6 +67,7 @@ export function CreateAccountPanel({
         avatar: account.avatar,
         createdAt,
         expiresAt: account.expiresAt,
+        details: publicDetails(account),
       });
       if (claimCelebration(requestId)) setCelebrateId(requestId);
       // Refresh the server-rendered slot counts next to the result.

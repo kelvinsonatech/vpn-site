@@ -10,6 +10,7 @@ import {
   EraserIcon,
   HistoryIcon,
   KeyRoundIcon,
+  ListIcon,
   PlusIcon,
   ShieldCheckIcon,
   SparklesIcon,
@@ -26,13 +27,15 @@ import { EmptyState } from "@/components/public/section";
 import { cn } from "@/lib/utils";
 import type { SavedAccountSummary } from "@/lib/public/types";
 import { CopyAction } from "./copy-action";
+import { DetailRow } from "./detail-row";
 import { readSavedAccounts, removeSavedAccounts, restoreSavedAccounts, useSavedAccounts, clearSavedAccounts } from "./saved-accounts";
 import { ExpiryCountdown, LocalDateTime } from "./time";
 
 /**
  * /my-accounts: the accounts created in this browser as DiceBear profile cards (non-secret
  * summaries from localStorage only). Active accounts first with a live expiry countdown and a
- * lifetime bar, expired ones below. Removing is instant with an "Undo" toast.
+ * lifetime bar, expired ones below; "Details" shows the saved non-secret connection details.
+ * Removing is instant with an "Undo" toast.
  */
 
 /** Removes summaries and offers to put them back where they were. */
@@ -63,6 +66,67 @@ function lifeLeft(a: SavedAccountSummary, now: number) {
   const end = Date.parse(a.expiresAt);
   if (!(end > start)) return now < end ? 1 : 0;
   return Math.max(0, Math.min(1, (end - now) / (end - start)));
+}
+
+/** The saved non-secret details in the same "Label  value" format as the one-time result. */
+function DetailsDialog({ account: a, expired }: { account: SavedAccountSummary; expired: boolean }) {
+  const details = a.details ?? [];
+  if (!details.length) return null;
+  const text = () =>
+    [
+      `${a.protocol.name} account on ${a.server.name}`,
+      ...details.map((d) => (d.value.includes("\n") ? `${d.label}:\n${d.value}` : `${d.label}: ${d.value}`)),
+      `Expires: ${a.expiresAt}`,
+    ].join("\n");
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button type="button" variant="ghost" size="sm" className="h-10" aria-label={`Details of ${displayName(a)}`}>
+          <ListIcon aria-hidden />
+          Details
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle className="font-mono">{displayName(a)}</DialogTitle>
+          <DialogDescription>
+            {a.protocol.name} on {a.server.name}. Kept on this device without the password, UUID or import links: those were shown only once.
+          </DialogDescription>
+        </DialogHeader>
+        <ul className="divide-y divide-border/70 overflow-hidden rounded-xl border bg-muted/35">
+          <DetailRow label="Location">
+            <span className="inline-flex items-center gap-1.5 font-sans font-medium">
+              <span aria-hidden className="inline-flex">
+                <Flag code={a.server.countryCode} className="h-3 w-4 shrink-0" />
+              </span>
+              {a.server.name}
+            </span>
+          </DetailRow>
+          <DetailRow label="Protocol">
+            <span className="font-sans font-medium">{a.protocol.name}</span>
+          </DetailRow>
+          {details.map((d, i) => (
+            <DetailRow key={`${i}-${d.label}`} label={d.label} actions={<CopyAction value={d.value} label={`Copy ${d.label}`} />}>
+              {d.value}
+            </DetailRow>
+          ))}
+          <DetailRow label="Created">
+            <span className="font-sans">
+              <LocalDateTime iso={a.createdAt} />
+            </span>
+          </DetailRow>
+          <DetailRow label={expired ? "Expired" : "Expires"}>
+            <span className="font-sans">
+              <LocalDateTime iso={a.expiresAt} />
+            </span>
+          </DetailRow>
+        </ul>
+        <CopyAction value={text} label="Copy all details" variant="outline" size="lg" successMessage="Details copied" className="h-11 w-full rounded-xl">
+          Copy all details
+        </CopyAction>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 function ProfileCard({ account: a, now, onRemove }: { account: SavedAccountSummary; now: number; onRemove: () => void }) {
@@ -175,6 +239,7 @@ function ProfileCard({ account: a, now, onRemove }: { account: SavedAccountSumma
             {expired ? "Create a new one" : "Create another"}
           </Link>
         </Button>
+        <DetailsDialog account={a} expired={expired} />
         <Button
           type="button"
           variant="ghost"
@@ -280,7 +345,7 @@ export function MyAccountsList() {
         <EmptyState
           icon={<UserRoundPlusIcon />}
           title="No accounts on this device yet"
-          description="Accounts you create here show up as profile cards with their own avatar, so you always know when they expire. Passwords and configs are never saved in this list."
+          description="Accounts you create here show up as profile cards with their own avatar, so you always know when they expire. Passwords, keys and links are never saved in this list."
         >
           <Button asChild className="h-11">
             <Link href="/#protocols">
@@ -415,8 +480,8 @@ export function MyAccountsList() {
             What this page keeps
           </h2>
           <p className="text-pretty text-muted-foreground">
-            This list lives only in this browser. It holds each account&apos;s avatar, username, service, server and dates, so you can see
-            what&apos;s still running. Clearing your browser data removes it.
+            This list lives only in this browser. It holds each account&apos;s avatar, username, service, server, dates and connection
+            details such as host, ports and payload, so you can look them up again. Clearing your browser data removes it.
           </p>
           <p className="flex items-start gap-2 text-pretty text-muted-foreground">
             <KeyRoundIcon className="mt-0.5 size-4 shrink-0 text-warning-strong" aria-hidden />

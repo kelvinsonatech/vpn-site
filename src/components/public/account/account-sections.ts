@@ -77,6 +77,16 @@ export function groupItems(items: ResultItem[]): { key: GroupKey; items: ResultI
   return GROUP_ORDER.filter((g) => map.has(g)).map((g) => ({ key: g, items: map.get(g)! }));
 }
 
+/**
+ * The details "My accounts" may keep after the one-time result is gone: plain, non-sensitive text
+ * and payloads (host, IP, ports, SNI, payload...). Never secrets, share links or files.
+ */
+export function publicDetails(account: PublicAccountResult): { label: string; value: string }[] {
+  return resultItems(account)
+    .filter((it) => !it.sensitive && (it.kind === "text" || it.kind === "multiline"))
+    .map((it) => ({ label: it.label, value: it.value }));
+}
+
 /** Plain-text summary of the whole account. Files are included in full only when `withFiles`. */
 export function accountText(
   account: PublicAccountResult,

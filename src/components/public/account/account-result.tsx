@@ -12,6 +12,7 @@ import { downloadText, safeFilename } from "./browser-actions";
 import { prefersReducedMotion } from "./celebration";
 import { launchConfetti } from "./confetti";
 import { CopyAction } from "./copy-action";
+import { DetailRow } from "./detail-row";
 import { QrDialog } from "./qr-dialog";
 import { ExpiryCountdown, formatLocalDateTime, formatUtcDateTime, LocalDateTime, useExpired } from "./time";
 
@@ -62,17 +63,6 @@ function useMask(item: ResultItem) {
   const maskable = item.sensitive || item.kind === "secret";
   const [revealed, setRevealed] = useState(!maskable);
   return { maskable, revealed, hidden: maskable && !revealed, toggle: () => setRevealed((v) => !v), reveal: () => setRevealed(true) };
-}
-
-/** Row of the details block. `value` is plain text; `children` replaces it for rich rows. */
-function DetailRow({ label, children, actions }: { label: string; children: React.ReactNode; actions?: React.ReactNode }) {
-  return (
-    <li className="grid min-h-11 grid-cols-[5.25rem_minmax(0,1fr)_auto] items-center gap-x-2 py-0.5 pr-1 pl-3 sm:grid-cols-[9.5rem_minmax(0,1fr)_auto] sm:pl-3.5">
-      <span className="text-xs text-muted-foreground sm:text-sm">{label}</span>
-      <span className="min-w-0 py-1.5 font-mono text-[13px] [overflow-wrap:anywhere] sm:text-sm">{children}</span>
-      <span className="flex shrink-0 items-center gap-0.5">{actions}</span>
-    </li>
-  );
 }
 
 function ItemDetailRow({ item, filenameBase }: { item: ResultItem; filenameBase: string }) {

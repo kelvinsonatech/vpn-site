@@ -265,4 +265,6 @@ export interface SavedAccountSummary {
   avatar: string;
   createdAt: string;
   expiresAt: string;
+  /** Non-secret connection details (host, IP, ports, SNI, payload...) in display order. Never secrets. */
+  details?: { label: string; value: string }[];
 }
