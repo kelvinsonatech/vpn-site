@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRightIcon, CircleCheckIcon, ClockIcon } from "lucide-react";
 import { ProtocolIcon } from "@/components/protocol-icon";
 import { guideFor } from "@/lib/protocol-guides";
-import { isImageProtocolIcon } from "@/lib/protocol-icons";
+import { isImageProtocolIcon, isRoundProtocolIcon } from "@/lib/protocol-icons";
 import { cn } from "@/lib/utils";
 import type { PublicProtocolSummary } from "@/lib/public/types";
 import { FlagStack } from "./flag-stack";
@@ -18,6 +18,7 @@ export function ProtocolCard({ protocol: p, className, style }: { protocol: Publ
   const available = p.availableCount > 0;
   const tone = `var(--tone-${p.category}, var(--primary))`;
   const imageIcon = isImageProtocolIcon(p.icon);
+  const roundIcon = isRoundProtocolIcon(p.icon);
   return (
     <article
       style={{ ...style, "--tone": tone } as React.CSSProperties}
@@ -46,12 +47,14 @@ export function ProtocolCard({ protocol: p, className, style }: { protocol: Publ
       <div className="mt-5 text-center">
         <span
           className={cn(
-            "mx-auto flex size-16 items-center justify-center rounded-2xl rotate-3 shadow-lg ring-8 ring-[color-mix(in_oklch,var(--tone)_10%,transparent)] group-hover:rotate-0 transition-transform duration-300 group-hover:scale-110 motion-reduce:group-hover:scale-100",
-            // A picture icon is the tile itself; a line icon sits on the protocol's colour.
-            imageIcon ? "shadow-black/15" : "bg-[var(--tone)] shadow-[color-mix(in_oklch,var(--tone)_35%,transparent)]",
+            "mx-auto flex size-16 items-center justify-center rounded-2xl shadow-lg ring-8 ring-[color-mix(in_oklch,var(--tone)_10%,transparent)] transition-transform duration-300 group-hover:scale-110 motion-reduce:group-hover:scale-100",
+            // A picture icon is the tile itself (kept straight so its lettering isn't tilted); a line
+            // icon sits on the protocol's colour with a playful tilt.
+            imageIcon ? "shadow-black/15" : "rotate-3 bg-[var(--tone)] shadow-[color-mix(in_oklch,var(--tone)_35%,transparent)] group-hover:rotate-0",
+            roundIcon && "rounded-full",
           )}
         >
-          <ProtocolIcon name={p.icon} className={imageIcon ? "size-full rounded-2xl" : "size-7 -rotate-3 text-white group-hover:rotate-0"} />
+          <ProtocolIcon name={p.icon} className={imageIcon ? "size-full" : "size-7 -rotate-3 text-white group-hover:rotate-0"} />
         </span>
         <h3 className="mt-5 text-xl font-bold tracking-tight">
           {/* Stretched link: the whole card is clickable. z-10 keeps it above hover effects (transforms and
