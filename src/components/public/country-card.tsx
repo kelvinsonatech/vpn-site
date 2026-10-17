@@ -53,7 +53,9 @@ export function CountryCard({
         </span>
         <div className="min-w-0 flex-1 min-[480px]:mt-4 min-[480px]:w-full">
           <h3 className="truncate text-lg font-bold tracking-wide uppercase">
-            <Link href={c.href} className="outline-none after:absolute after:inset-0 after:rounded-3xl focus-visible:after:ring-[3px] focus-visible:after:ring-ring/50">
+            {/* Stretched link: the whole card is clickable. z-10 keeps it above hover effects (transforms and
+                filters lift the decorative button's arrow above it otherwise). */}
+            <Link href={c.href} className="outline-none after:absolute after:inset-0 after:z-10 after:rounded-3xl focus-visible:after:ring-[3px] focus-visible:after:ring-ring/50">
               {c.name}
             </Link>
           </h3>

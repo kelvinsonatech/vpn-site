@@ -46,7 +46,9 @@ export function ProtocolCard({ protocol: p, className, style }: { protocol: Publ
           <ProtocolIcon name={p.icon} className="size-7 -rotate-3 text-white group-hover:rotate-0" />
         </span>
         <h3 className="mt-5 text-xl font-bold tracking-tight">
-          <Link href={p.href} className="outline-none after:absolute after:inset-0 after:rounded-3xl focus-visible:after:ring-[3px] focus-visible:after:ring-ring/50">
+          {/* Stretched link: the whole card is clickable. z-10 keeps it above hover effects (transforms and
+              filters lift the decorative "Create account" button and arrow above it otherwise). */}
+          <Link href={p.href} className="outline-none after:absolute after:inset-0 after:z-10 after:rounded-3xl focus-visible:after:ring-[3px] focus-visible:after:ring-ring/50">
             {p.name}
           </Link>
         </h3>
