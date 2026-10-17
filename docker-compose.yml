@@ -55,6 +55,10 @@ services:
   worker:
     <<: *app
     command: ["node", "dist/src/worker/index.mjs"]
+    # The image's health check probes the web server on :3000, which the worker does not run.
+    # The worker is restarted if it exits (restart: unless-stopped).
+    healthcheck:
+      disable: true
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
