@@ -2,6 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 
 /**
  * Edge of the app:
+ *  0. One public address: pages requested on the "www." twin of APP_URL's host (or the bare host
+ *     when APP_URL uses www.) are redirected to APP_URL's host, so browser storage (My accounts),
+ *     Safari's per-site choices such as "Never for This Website" and search engines see one site.
  *  1. Content-Security-Policy with a per-request nonce for every page.
  *  2. Optimistic admin gate: requests to /admin/* without a session cookie go to the login page.
  *     Real authentication/authorization happens in the layouts, pages and actions (guards.ts).
@@ -35,7 +38,24 @@ function csp(nonce: string) {
   ].join("; ");
 }
 
+function canonicalHostRedirect(request: NextRequest): NextResponse | null {
+  let app: URL;
+  try {
+    app = new URL(process.env.APP_URL ?? "");
+  } catch {
+    return null;
+  }
+  const canonical = app.hostname.toLowerCase();
+  const host = (request.headers.get("host") ?? "").toLowerCase().replace(/:\d+$/, "");
+  if (!host || host === canonical) return null;
+  if (host !== `www.${canonical}` && `www.${host}` !== canonical) return null;
+  return NextResponse.redirect(new URL(`${request.nextUrl.pathname}${request.nextUrl.search}`, app.origin), 308);
+}
+
 export function proxy(request: NextRequest) {
+  const redirect = canonicalHostRedirect(request);
+  if (redirect) return redirect;
+
   const { pathname } = request.nextUrl;
 
   if (pathname.startsWith("/admin") && !PUBLIC_ADMIN_PATHS.some((p) => pathname.startsWith(p))) {

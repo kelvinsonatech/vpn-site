@@ -86,3 +86,40 @@ describe("proxy: admin gate", () => {
     expect(run("/admin", { cookie: "other=abc" }).status).toBe(307);
   });
 });
+
+describe("proxy: one public address", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const at = (url: string) => {
+    const u = new URL(url);
+    return proxy(new NextRequest(u, { headers: new Headers({ host: u.host }) }));
+  };
+
+  it("sends the www. twin to APP_URL's host, keeping path and query", () => {
+    vi.stubEnv("APP_URL", "https://litronssh.com");
+    const res = at("https://www.litronssh.com/ssh/canada/ca1?x=1");
+    expect(res.status).toBe(308);
+    expect(res.headers.get("location")).toBe("https://litronssh.com/ssh/canada/ca1?x=1");
+  });
+
+  it("works the other way round when APP_URL uses www.", () => {
+    vi.stubEnv("APP_URL", "https://www.example.com");
+    expect(at("https://example.com/").headers.get("location")).toBe("https://www.example.com/");
+  });
+
+  it("leaves the canonical host and unrelated hosts alone", () => {
+    vi.stubEnv("APP_URL", "https://litronssh.com");
+    for (const url of ["https://litronssh.com/", "https://other.example/", "http://localhost:3000/"]) {
+      const res = at(url);
+      expect(res.headers.get("location")).toBeNull();
+      expect(res.headers.get("content-security-policy")).toBeTruthy();
+    }
+  });
+
+  it("does nothing without a valid APP_URL", () => {
+    vi.stubEnv("APP_URL", "");
+    expect(at("https://www.litronssh.com/").headers.get("location")).toBeNull();
+  });
+});
