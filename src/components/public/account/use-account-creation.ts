@@ -20,7 +20,6 @@ export type CreationState =
   | { phase: "pending"; requestId: string; step: "received" | "creating"; connectionIssue: boolean }
   | { phase: "timeout"; requestId: string }
   | { phase: "result"; requestId: string; account: PublicAccountResult; createdAt: string }
-  | { phase: "expired" }
   | { phase: "failed"; error: FriendlyError };
 
 interface PendingCreation {
@@ -121,9 +120,14 @@ export function useAccountCreation(options: CreationOptions) {
     abortRef.current = null;
   }, []);
 
-  /** `firstDelay` 0 asks right away (a recovered or re-checked request is usually ready already). */
+  /**
+   * `firstDelay` 0 asks right away (a recovered or re-checked request is usually ready already).
+   * `recovered`: a request remembered from an earlier visit. Until it shows as still being created,
+   * the form stays on screen, and if it turns out to be over (failed, unknown, or its details already
+   * erased) it is dropped silently: the visitor just sees a fresh form.
+   */
   const poll = useCallback(
-    async (pending: PendingCreation, key: string, firstDelay = POLL_START_MS) => {
+    async (pending: PendingCreation, key: string, firstDelay = POLL_START_MS, recovered = false) => {
       stop();
       const run = runRef.current;
       const ac = new AbortController();
@@ -132,6 +136,15 @@ export function useAccountCreation(options: CreationOptions) {
       let delay = POLL_START_MS;
       let wait = firstDelay;
       let failures = 0;
+      let quiet = recovered;
+      const showPending = (connectionIssue: boolean) => {
+        quiet = false;
+        setState({ phase: "pending", requestId: pending.requestId, step: "creating", connectionIssue });
+      };
+      const dropSilently = () => {
+        clearPending(key);
+        setState({ phase: "idle" });
+      };
 
       while (run === runRef.current) {
         if (!(await sleep(wait, ac.signal))) return;
@@ -149,12 +162,13 @@ export function useAccountCreation(options: CreationOptions) {
               setState({ phase: "result", requestId: pending.requestId, account: data.account, createdAt: pending.createdAt });
               optsRef.current.onReady?.(pending.requestId, data.account, pending.createdAt);
             } else {
-              clearPending(key);
-              setState({ phase: "expired" });
+              // The one-time details were already erased: nothing to show, start fresh.
+              dropSilently();
             }
             return;
           }
           if (data.status === "failed") {
+            if (quiet) return dropSilently();
             clearPending(key);
             const message = data.error?.message?.trim() || "The server couldn't create the account.";
             setState({
@@ -163,10 +177,11 @@ export function useAccountCreation(options: CreationOptions) {
             });
             return;
           }
-          setState({ phase: "pending", requestId: pending.requestId, step: "creating", connectionIssue: false });
+          showPending(false);
         } catch (err) {
           if (isAbortError(err) || run !== runRef.current) return;
           if (err instanceof ApiError && (err.status === 404 || err.status === 403 || err.status === 400)) {
+            if (quiet) return dropSilently();
             clearPending(key);
             setState({
               phase: "failed",
@@ -178,9 +193,7 @@ export function useAccountCreation(options: CreationOptions) {
             delay = Math.max(delay, Math.min((err.details.retryAfterSeconds ?? 5) * 1000, 30_000));
           }
           failures++;
-          if (failures >= 2) {
-            setState({ phase: "pending", requestId: pending.requestId, step: "creating", connectionIssue: true });
-          }
+          if (failures >= 2) showPending(true);
         }
         if (Date.now() - started > POLL_GIVE_UP_MS) {
           setState({ phase: "timeout", requestId: pending.requestId });
@@ -193,15 +206,12 @@ export function useAccountCreation(options: CreationOptions) {
     [stop],
   );
 
-  // Recover an in-flight or just-finished creation after a reload (this tab only).
+  // Pick up an account that was still being created when the visitor left or reloaded (this tab only).
   useEffect(() => {
     const saved = readPending(storageKey);
     let t: ReturnType<typeof setTimeout> | undefined;
     if (saved) {
-      t = setTimeout(() => {
-        setState({ phase: "pending", requestId: saved.requestId, step: "creating", connectionIssue: false });
-        void poll(saved, storageKey, 0);
-      }, 0);
+      t = setTimeout(() => void poll(saved, storageKey, 0, true), 0);
     }
     return () => {
       if (t) clearTimeout(t);
@@ -267,7 +277,7 @@ export function useAccountCreation(options: CreationOptions) {
   const checkAgain = useCallback(() => {
     const saved = readPending(storageKey);
     if (!saved) {
-      setState({ phase: "expired" });
+      setState({ phase: "idle" });
       return;
     }
     setState({ phase: "pending", requestId: saved.requestId, step: "creating", connectionIssue: false });

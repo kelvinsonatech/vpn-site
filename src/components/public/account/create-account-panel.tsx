@@ -198,18 +198,6 @@ export function CreateAccountPanel({
               resetForm();
             }}
           />
-        ) : state.phase === "expired" ? (
-          <div className="grid justify-items-center gap-3 py-6 text-center">
-            <p className="text-lg font-semibold">These details are no longer available</p>
-            <p className="max-w-md text-sm text-muted-foreground">
-              For your security, account details are only kept for a short time after creation. If you didn&apos;t save them, please create a new
-              account.
-            </p>
-            <Button type="button" className="mt-2 h-11" onClick={() => { creation.reset(); resetForm(); }}>
-              <RotateCcwIcon aria-hidden />
-              Create a new account
-            </Button>
-          </div>
         ) : state.phase === "failed" ? (
           <div className="grid gap-4">
             <FormErrorAlert error={state.error} />
