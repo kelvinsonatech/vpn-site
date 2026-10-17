@@ -4,18 +4,20 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   BookOpenIcon,
-  CheckIcon,
   DownloadIcon,
   EyeIcon,
   EyeOffIcon,
   FileTextIcon,
   KeyRoundIcon,
+  Layers3Icon,
   Link2Icon,
+  MapPinIcon,
   NetworkIcon,
   PlusIcon,
   TerminalIcon,
   TimerIcon,
   TriangleAlertIcon,
+  UserRoundIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Flag } from "@/components/public/flag";
@@ -23,14 +25,17 @@ import { cn } from "@/lib/utils";
 import type { PublicAccountResult } from "@/lib/public/types";
 import { accountText, GROUP_TITLES, groupItems, resultItems, type GroupKey, type ResultItem } from "./account-sections";
 import { downloadText, safeFilename } from "./browser-actions";
+import { prefersReducedMotion } from "./celebration";
+import { launchConfetti } from "./confetti";
 import { CopyAction } from "./copy-action";
 import { QrDialog } from "./qr-dialog";
 import { ExpiryCountdown, formatLocalDateTime, formatUtcDateTime, LocalDateTime, useExpired } from "./time";
 
 /**
- * The one-time account result, shown in place of the form as a "profile card": DiceBear avatar,
- * username, protocol and server, live expiry countdown, then every connection detail with copy
- * buttons, QR codes and downloads. The data lives only in memory and is never sent anywhere.
+ * The one-time account result, shown in place of the form as a "profile card": success heading,
+ * DiceBear avatar, username, protocol, server location and live expiry countdown, then every
+ * connection detail with copy buttons, QR codes and downloads. The data lives only in memory and is
+ * never sent anywhere. `celebrate` (a newly created account, once) adds the confetti bursts.
  */
 
 const GROUP_ICONS: Record<GroupKey, React.ReactNode> = {
@@ -40,6 +45,32 @@ const GROUP_ICONS: Record<GroupKey, React.ReactNode> = {
   config: <TerminalIcon />,
   files: <FileTextIcon />,
 };
+
+/** Green check that pops in and draws itself; static under reduced motion. */
+function SuccessCheck() {
+  return (
+    <span className="absolute -right-2 -bottom-2 flex size-8 items-center justify-center" aria-hidden>
+      <span className="absolute inset-0 rounded-full bg-success opacity-0 motion-safe:animate-check-ring" />
+      <span className="relative flex size-8 items-center justify-center rounded-full bg-success text-white shadow-sm ring-4 ring-card motion-safe:animate-check-pop">
+        <svg viewBox="0 0 24 24" className="size-4.5" fill="none" stroke="currentColor" strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5.5 12.5l4.2 4.2L18.5 7.8" pathLength={1} strokeDasharray={1} className="motion-safe:animate-check-draw" />
+        </svg>
+      </span>
+    </span>
+  );
+}
+
+function SummaryTile({ icon, label, children, className }: { icon: React.ReactNode; label: string; children: React.ReactNode; className?: string }) {
+  return (
+    <div className={cn("min-w-0 rounded-xl border bg-background/70 px-3.5 py-3 text-left backdrop-blur-sm", className)}>
+      <dt className="flex items-center gap-1.5 text-xs text-muted-foreground [&_svg]:size-3.5 [&_svg]:shrink-0">
+        {icon}
+        {label}
+      </dt>
+      <dd className="mt-1 min-w-0 text-sm font-medium break-words">{children}</dd>
+    </div>
+  );
+}
 
 function RevealButton({ revealed, onToggle, label }: { revealed: boolean; onToggle: () => void; label: string }) {
   return (
@@ -171,14 +202,19 @@ export function AccountResult({
   siteName,
   countryCode,
   countryName,
+  city,
   guideHref,
+  celebrate = false,
   onCreateAnother,
 }: {
   account: PublicAccountResult;
   siteName: string;
   countryCode: string;
   countryName: string;
+  city?: string | null;
   guideHref: string;
+  /** Play the confetti: only for a newly created account, once (see celebration.ts). */
+  celebrate?: boolean;
   onCreateAnother: () => void;
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -197,11 +233,26 @@ export function AccountResult({
     el.closest("[data-result-card]")?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
   }, []);
 
+  useEffect(() => {
+    if (!celebrate || prefersReducedMotion()) return;
+    return launchConfetti();
+  }, [celebrate]);
+
+  // Filled after mount so screen readers announce it (a live region present from the start is often skipped).
+  const [announced, setAnnounced] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setAnnounced(true), 150);
+    return () => clearTimeout(t);
+  }, []);
+
   const text = (withFiles: boolean) =>
     accountText(account, { siteName, expiresLabel: formatLocalDateTime(account.expiresAt) || formatUtcDateTime(account.expiresAt), withFiles });
 
   return (
     <div data-result-card className="scroll-mt-24 overflow-hidden rounded-2xl border bg-card shadow-sm animate-in fade-in-0 slide-in-from-bottom-2 duration-500 motion-reduce:animate-none">
+      <p role="status" className="sr-only">
+        {announced ? "Account created. Copy your details below and connect securely." : ""}
+      </p>
       <div className="relative overflow-hidden px-5 pt-6 pb-5 sm:px-6">
         <div
           aria-hidden
@@ -222,40 +273,45 @@ export function AccountResult({
             ) : (
               <span className="flex size-21 items-center justify-center rounded-2xl bg-muted ring-4 ring-card" />
             )}
-            <span className="absolute -right-1.5 -bottom-1.5 flex size-7 items-center justify-center rounded-full bg-success text-white ring-4 ring-card">
-              <CheckIcon className="size-4" strokeWidth={3} aria-hidden />
-            </span>
+            <SuccessCheck />
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-medium tracking-wide text-primary uppercase">Account ready</p>
-            <h2 ref={headingRef} tabIndex={-1} className="mt-0.5 truncate font-mono text-2xl font-semibold tracking-tight outline-none">
-              {account.username ?? `${account.protocol.name} account`}
+          <div className="min-w-0 flex-1 animate-in fade-in-0 slide-in-from-bottom-1 fill-mode-both delay-100 duration-500 motion-reduce:animate-none">
+            <h2 ref={headingRef} tabIndex={-1} className="text-xl font-semibold tracking-tight text-balance outline-none sm:text-2xl">
+              Your account is ready!
             </h2>
-            <p className="mt-1 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm text-muted-foreground sm:justify-start">
-              <span className="rounded-md bg-accent px-1.5 py-0.5 text-xs font-medium text-accent-foreground">{account.protocol.name}</span>
-              <span className="inline-flex items-center gap-1.5">
-                <Flag code={countryCode} className="h-3 w-4" title={countryName} />
-                {account.server.name}
-              </span>
-            </p>
-          </div>
-          <div className="w-full shrink-0 rounded-xl border bg-background/70 px-4 py-3 text-left backdrop-blur sm:w-auto sm:min-w-52">
-            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <TimerIcon className="size-3.5" aria-hidden />
-              {expired ? "Expired" : "Expires"}
-            </p>
-            <p className="mt-0.5 text-sm font-medium">
-              <LocalDateTime iso={account.expiresAt} />
-            </p>
-            {expired ? (
-              <p className="text-xs font-medium text-destructive">This account has expired.</p>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                <ExpiryCountdown iso={account.expiresAt} className="font-medium text-foreground" />
+            <p className="mt-1 text-sm text-muted-foreground">Copy your details below and connect securely.</p>
+            {account.username ? (
+              <p className="mt-2.5 inline-flex max-w-full items-center gap-1.5 rounded-lg border bg-background/70 px-2.5 py-1 text-sm">
+                <UserRoundIcon className="size-3.5 shrink-0 text-primary" aria-hidden />
+                <span className="sr-only">Username: </span>
+                <span className="truncate font-mono font-medium">{account.username}</span>
               </p>
-            )}
+            ) : null}
           </div>
         </div>
+
+        <dl className="relative mt-5 grid grid-cols-2 gap-2 animate-in fade-in-0 slide-in-from-bottom-1 fill-mode-both delay-200 duration-500 motion-reduce:animate-none sm:grid-cols-3">
+          <SummaryTile icon={<Layers3Icon />} label="Protocol">
+            {account.protocol.name}
+          </SummaryTile>
+          <SummaryTile icon={<MapPinIcon />} label="Server location">
+            <span className="flex items-center gap-1.5">
+              <Flag code={countryCode} className="h-3 w-4 shrink-0" title={countryName} />
+              <span className="min-w-0">{account.server.name}</span>
+            </span>
+            <span className="mt-0.5 block text-xs font-normal text-muted-foreground">{[city, countryName].filter(Boolean).join(", ")}</span>
+          </SummaryTile>
+          <SummaryTile icon={<TimerIcon />} label={expired ? "Expired" : "Expires"} className="col-span-2 sm:col-span-1">
+            <LocalDateTime iso={account.expiresAt} />
+            {expired ? (
+              <span className="mt-0.5 block text-xs font-medium text-destructive">This account has expired.</span>
+            ) : (
+              <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                <ExpiryCountdown iso={account.expiresAt} className="font-medium text-foreground" />
+              </span>
+            )}
+          </SummaryTile>
+        </dl>
       </div>
 
       <div className="mx-5 flex items-start gap-3 rounded-xl border border-warning/40 bg-warning-soft px-4 py-3 sm:mx-6" role="note">

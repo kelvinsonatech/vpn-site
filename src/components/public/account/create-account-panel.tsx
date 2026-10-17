@@ -9,6 +9,7 @@ import { UnavailableNotice } from "@/components/public/server/unavailable-notice
 import { cn } from "@/lib/utils";
 import type { PublicAccountResult, PublicCountry, PublicProtocolDetail, PublicServerCard } from "@/lib/public/types";
 import { AccountResult } from "./account-result";
+import { claimCelebration } from "./celebration";
 import { CreationProgress } from "./creation-progress";
 import { normalizeFieldErrors } from "./errors";
 import { FormErrorAlert } from "./form-error";
@@ -51,6 +52,8 @@ export function CreateAccountPanel({
   const [captchaMissing, setCaptchaMissing] = useState(false);
   const turnstileRef = useRef<TurnstileHandle>(null);
   const errorRef = useRef<HTMLDivElement>(null);
+  /** Request whose result gets the confetti: a newly created account, once per tab (not a recovered one). */
+  const [celebrateId, setCelebrateId] = useState<string | null>(null);
 
   const onReady = useCallback(
     (requestId: string, account: PublicAccountResult, createdAt: string) => {
@@ -63,6 +66,7 @@ export function CreateAccountPanel({
         createdAt,
         expiresAt: account.expiresAt,
       });
+      if (claimCelebration(requestId)) setCelebrateId(requestId);
       // Refresh the server-rendered slot counts next to the result.
       router.refresh();
     },
@@ -127,7 +131,9 @@ export function CreateAccountPanel({
         siteName={siteName}
         countryCode={country.code}
         countryName={country.name}
+        city={server.city}
         guideHref={`/${protocol.slug}#guide`}
+        celebrate={celebrateId === state.requestId}
         onCreateAnother={() => {
           creation.reset();
           resetForm();

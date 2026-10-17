@@ -7,7 +7,10 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { copyText } from "./browser-actions";
 
-/** Copy button with a short "copied" state and a clipboard fallback for non-secure contexts. */
+/**
+ * Copy button with a short "Copied!" state and a clipboard fallback for non-secure contexts. Text
+ * buttons swap their label in place (same width); icon buttons show a small "Copied!" tag above.
+ */
 export function CopyAction({
   value,
   label,
@@ -40,7 +43,7 @@ export function CopyAction({
       size={size}
       aria-label={children ? undefined : label}
       title={children ? undefined : label}
-      className={cn(size === "icon-sm" && "size-9", className)}
+      className={cn("relative", size === "icon-sm" && "size-9", className)}
       onClick={async () => {
         const ok = await copyText(typeof value === "function" ? value() : value);
         if (!ok) {
@@ -54,7 +57,26 @@ export function CopyAction({
       }}
     >
       {copied ? <CheckIcon className="text-success" aria-hidden /> : <CopyIcon aria-hidden />}
-      {children}
+      {children ? (
+        // Both labels share one grid cell so the width never changes; only opacity switches, which
+        // keeps the button's accessible name ("Copy all") the same.
+        <span className="grid">
+          <span className={cn("col-start-1 row-start-1 transition-opacity duration-150 motion-reduce:transition-none", copied && "opacity-0")}>{children}</span>
+          <span
+            className={cn("col-start-1 row-start-1 transition-opacity duration-150 motion-reduce:transition-none", !copied && "opacity-0")}
+            aria-hidden
+          >
+            Copied!
+          </span>
+        </span>
+      ) : copied ? (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute right-0 bottom-full z-10 mb-1 rounded-md bg-foreground px-1.5 py-0.5 text-[11px] leading-4 font-medium text-background shadow-sm animate-in fade-in-0 slide-in-from-bottom-1 duration-200 motion-reduce:animate-none"
+        >
+          Copied!
+        </span>
+      ) : null}
       <span className="sr-only" aria-live="polite">
         {copied ? "Copied" : ""}
       </span>
