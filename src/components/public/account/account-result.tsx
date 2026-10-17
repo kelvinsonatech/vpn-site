@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { BookOpenIcon, DownloadIcon, EyeIcon, FileTextIcon, PlusIcon, TriangleAlertIcon } from "lucide-react";
+import { BookOpenIcon, DownloadIcon, FileTextIcon, PlusIcon, TriangleAlertIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Flag } from "@/components/public/flag";
 import { cn } from "@/lib/utils";
@@ -20,7 +20,7 @@ import { ExpiryCountdown, formatLocalDateTime, formatUtcDateTime, LocalDateTime,
  * The one-time account result, shown in place of the form: a gradient "Your account is ready!"
  * header with the DiceBear avatar, then the account as one compact "Label  value" block (server,
  * protocol, every connection detail, created and expiry), quick-import links/configs with a big copy
- * button, payloads and files, and Copy all / Save as .txt. Secrets stay hidden until revealed.
+ * button, payloads and files, and Copy all / Save as .txt. Everything is plain selectable text.
  * The data lives only in memory and is never sent anywhere. `celebrate` (a newly created account,
  * once) adds the confetti bursts.
  */
@@ -42,91 +42,40 @@ function SuccessCheck() {
   );
 }
 
-/** Text Show/Hide for a masked value; the accessible name says which value. */
-function RevealButton({ revealed, onToggle, label }: { revealed: boolean; onToggle: () => void; label: string }) {
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      size="sm"
-      className="h-9 min-w-14 px-2.5 text-xs font-medium text-primary hover:text-primary"
-      aria-pressed={revealed}
-      aria-label={revealed ? `Hide ${label}` : `Show ${label}`}
-      onClick={onToggle}
-    >
-      {revealed ? "Hide" : "Show"}
-    </Button>
-  );
-}
-
-function useMask(item: ResultItem) {
-  const maskable = item.sensitive || item.kind === "secret";
-  const [revealed, setRevealed] = useState(!maskable);
-  return { maskable, revealed, hidden: maskable && !revealed, toggle: () => setRevealed((v) => !v), reveal: () => setRevealed(true) };
-}
-
+/**
+ * Values are plain, selectable text (no masking, no form boxes), like a printed receipt: one tap or
+ * long-press selects the whole value (`select-all`) so it is easy to copy and paste; the copy
+ * buttons do the same in one tap.
+ */
 function ItemDetailRow({ item, filenameBase }: { item: ResultItem; filenameBase: string }) {
-  const m = useMask(item);
   return (
     <DetailRow
       label={item.label}
       actions={
         <>
-          {m.maskable ? <RevealButton revealed={m.revealed} onToggle={m.toggle} label={item.label} /> : null}
           {item.qr ? <QrDialog value={item.value} title={item.label} filename={`${filenameBase}-${item.label}`} /> : null}
           {item.copyable ? <CopyAction value={item.value} label={`Copy ${item.label}`} /> : null}
         </>
       }
     >
-      {m.hidden ? (
-        <span className="tracking-wider whitespace-nowrap text-muted-foreground">
-          ••••••••••<span className="sr-only"> (hidden)</span>
-        </span>
-      ) : (
-        item.value
-      )}
+      <span className="select-all">{item.value}</span>
     </DetailRow>
   );
 }
 
-/** Text that stays blurred until revealed (links, configs, payloads that are secret). */
-function MaskedBlock({ hidden, onReveal, className, children }: { hidden: boolean; onReveal: () => void; className?: string; children: React.ReactNode }) {
-  return (
-    <div className="relative">
-      <pre className={cn("overflow-auto font-mono text-[12.5px] leading-relaxed break-all whitespace-pre-wrap", hidden && "pointer-events-none blur-[5px] select-none", className)} aria-hidden={hidden || undefined}>
-        {children}
-      </pre>
-      {hidden ? (
-        <button
-          type="button"
-          onClick={onReveal}
-          className="absolute inset-0 flex items-center justify-center gap-2 rounded-lg text-sm font-medium text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
-        >
-          <span className="inline-flex items-center gap-2 rounded-full border bg-card/90 px-3 py-1.5 shadow-sm">
-            <EyeIcon className="size-4" aria-hidden />
-            Tap to reveal
-          </span>
-        </button>
-      ) : null}
-    </div>
-  );
+function ValueBlock({ className, children }: { className?: string; children: React.ReactNode }) {
+  return <pre className={cn("overflow-auto font-mono text-[12.5px] leading-relaxed break-all whitespace-pre-wrap select-all", className)}>{children}</pre>;
 }
 
 /** A share link or one-line app config with a big copy button, like "Copy to app". */
 function ImportCard({ item, filenameBase }: { item: ResultItem; filenameBase: string }) {
-  const m = useMask(item);
   return (
     <li className="grid gap-2.5 rounded-xl border bg-background/60 p-3">
       <div className="flex min-h-9 items-center justify-between gap-2">
         <span className="min-w-0 text-sm font-medium">{item.label}</span>
-        <div className="flex shrink-0 items-center gap-0.5">
-          {m.maskable ? <RevealButton revealed={m.revealed} onToggle={m.toggle} label={item.label} /> : null}
-          {item.qr ? <QrDialog value={item.value} title={item.label} filename={`${filenameBase}-${item.label}`} /> : null}
-        </div>
+        {item.qr ? <QrDialog value={item.value} title={item.label} filename={`${filenameBase}-${item.label}`} /> : null}
       </div>
-      <MaskedBlock hidden={m.hidden} onReveal={m.reveal} className="max-h-28 rounded-lg border bg-muted/40 px-3 py-2.5">
-        {item.value}
-      </MaskedBlock>
+      <ValueBlock className="max-h-28 rounded-lg border bg-muted/40 px-3 py-2.5">{item.value}</ValueBlock>
       <CopyAction value={item.value} label={`Copy ${item.label}`} variant="default" size="lg" className="h-11 w-full rounded-xl text-base">
         Copy {item.label}
       </CopyAction>
@@ -135,20 +84,16 @@ function ImportCard({ item, filenameBase }: { item: ResultItem; filenameBase: st
 }
 
 function CodeBlock({ item, filenameBase }: { item: ResultItem; filenameBase: string }) {
-  const m = useMask(item);
   return (
     <li className="rounded-xl border bg-background/60">
       <div className="flex items-center justify-between gap-2 py-1 pr-1 pl-3.5">
         <span className="text-sm font-medium">{item.label}</span>
         <div className="flex shrink-0 items-center gap-0.5">
-          {m.maskable ? <RevealButton revealed={m.revealed} onToggle={m.toggle} label={item.label} /> : null}
           {item.qr ? <QrDialog value={item.value} title={item.label} filename={`${filenameBase}-${item.label}`} /> : null}
           {item.copyable ? <CopyAction value={item.value} label={`Copy ${item.label}`} /> : null}
         </div>
       </div>
-      <MaskedBlock hidden={m.hidden} onReveal={m.reveal} className="max-h-56 border-t px-3.5 py-2.5">
-        {item.value}
-      </MaskedBlock>
+      <ValueBlock className="max-h-56 border-t px-3.5 py-2.5">{item.value}</ValueBlock>
     </li>
   );
 }
