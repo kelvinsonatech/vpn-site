@@ -7,6 +7,8 @@ export interface ProtocolSeed {
   name: string;
   description: string;
   icon: string;
+  /** Earlier default icons: an existing built-in protocol still using one of them gets `icon`. */
+  previousIcons?: string[];
   category: "ssh" | "v2ray" | "vpn" | "proxy";
   adapterKey: string;
   nodeIdentifiers: string[];
@@ -40,7 +42,8 @@ export const PROTOCOL_SEEDS: ProtocolSeed[] = [
     slug: "ssh",
     name: "SSH",
     description: "Classic SSH tunnel accounts with OpenSSH and Dropbear ports.",
-    icon: "terminal",
+    icon: "ssh-badge",
+    previousIcons: ["terminal"],
     category: "ssh",
     adapterKey: "ssh",
     nodeIdentifiers: ["ssh", "openssh", "ssh-direct", "dropbear"],

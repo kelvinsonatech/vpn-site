@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ICON_CREDITS } from "@/lib/protocol-icons";
 import { ActivityIcon, GlobeIcon, MailIcon, SendIcon, ShieldCheckIcon, SparklesIcon } from "lucide-react";
 import { BrandMark } from "@/components/brand";
 import { ProtocolIcon } from "@/components/protocol-icon";
@@ -168,6 +169,14 @@ export function SiteFooter({
               <SparklesIcon className="size-3.5 text-emerald-400" aria-hidden />
               Every account gets its own avatar
             </span>
+            {ICON_CREDITS.map((c) => (
+              <span key={c.href}>
+                {c.label}:{" "}
+                <a href={c.href} target="_blank" rel="noopener noreferrer" className="underline-offset-2 hover:text-footer-foreground hover:underline">
+                  {c.source}
+                </a>
+              </span>
+            ))}
           </p>
           <nav aria-label="Legal">
             <ul className="flex flex-wrap gap-x-4 gap-y-1">

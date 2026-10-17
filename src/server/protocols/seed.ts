@@ -1,4 +1,4 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db, type DbOrTx } from "@/server/db";
 import { protocolFields, protocols, type OutputFieldDefinition } from "@/server/db/schema";
 import { getAdapter } from "@/server/provisioning/adapters/registry";
@@ -100,9 +100,25 @@ async function upgradeExisting(tx: DbOrTx): Promise<string[]> {
   return upgraded;
 }
 
+/** Move built-in protocols still on an earlier default icon to the current one (a chosen icon is kept). */
+async function upgradeIcons(tx: DbOrTx): Promise<string[]> {
+  const upgraded: string[] = [];
+  for (const p of PROTOCOL_SEEDS) {
+    if (!p.previousIcons?.length) continue;
+    const rows = await tx
+      .update(protocols)
+      .set({ icon: p.icon })
+      .where(and(eq(protocols.slug, p.slug), eq(protocols.isSystem, true), inArray(protocols.icon, p.previousIcons)))
+      .returning({ slug: protocols.slug });
+    upgraded.push(...rows.map((r) => r.slug));
+  }
+  return upgraded;
+}
+
 /**
  * Insert the built-in protocols. Idempotent and non-destructive: missing protocols are created,
- * existing ones only receive the additions listed in UPGRADES; admin edits are never overwritten.
+ * existing ones only receive the additions listed in UPGRADES (and a newer default icon while they
+ * still use an earlier default); admin edits are never overwritten.
  */
 export async function seedProtocols(tx: DbOrTx = db()): Promise<{ created: string[]; upgraded: string[] }> {
   const created: string[] = [];
@@ -130,7 +146,7 @@ export async function seedProtocols(tx: DbOrTx = db()): Promise<{ created: strin
     created.push(p.slug);
     await tx.insert(protocolFields).values(p.fields.map((f, i) => fieldRow(row.id, f, (i + 1) * 10)));
   }
-  const upgraded = (await upgradeExisting(tx)).filter((slug) => !created.includes(slug));
+  const upgraded = [...new Set([...(await upgradeExisting(tx)), ...(await upgradeIcons(tx))])].filter((slug) => !created.includes(slug));
   return { created, upgraded };
 }
 

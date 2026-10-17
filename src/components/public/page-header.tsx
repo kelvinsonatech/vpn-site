@@ -38,7 +38,7 @@ export function PageHeader({
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="flex min-w-0 items-start gap-4">
             {icon ? (
-              <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl border bg-card text-primary shadow-sm [&_svg]:size-6">
+              <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl border bg-card text-primary shadow-sm [&_img]:size-full [&_img]:rounded-2xl [&_svg]:size-6">
                 {icon}
               </span>
             ) : null}
@@ -61,7 +61,7 @@ export function PageHeader({
         {crumbs?.length ? <Breadcrumbs items={crumbs} tone="inverted" centered className="mb-8 sm:mb-10" /> : null}
         <div className="animate-in duration-500 fade-in fill-mode-both slide-in-from-bottom-3">
           {icon ? (
-            <span className="mx-auto mb-5 flex size-16 items-center justify-center rounded-2xl bg-white/15 text-white shadow-lg ring-1 shadow-black/10 ring-white/25 backdrop-blur-sm [&_svg]:size-8">
+            <span className="mx-auto mb-5 flex size-16 items-center justify-center rounded-2xl bg-white/15 text-white shadow-lg ring-1 shadow-black/10 ring-white/25 backdrop-blur-sm [&_img]:size-full [&_img]:rounded-2xl [&_svg]:size-8">
               {icon}
             </span>
           ) : null}
