@@ -43,15 +43,20 @@ function SuccessCheck() {
 }
 
 /**
- * Values are plain, selectable text (no masking, no form boxes, no per-value copy icons), like a
- * printed receipt: one tap or long-press selects the whole value (`select-all`) for copy and paste.
- * "Copy all details" and the quick-import buttons copy in one tap.
+ * Values are plain, selectable text (no masking, no form boxes), like a printed receipt: one tap or
+ * long-press selects the whole value (`select-all`) so it is easy to copy and paste; the copy
+ * buttons do the same in one tap.
  */
 function ItemDetailRow({ item, filenameBase }: { item: ResultItem; filenameBase: string }) {
   return (
     <DetailRow
       label={item.label}
-      actions={item.qr ? <QrDialog value={item.value} title={item.label} filename={`${filenameBase}-${item.label}`} /> : null}
+      actions={
+        <>
+          {item.qr ? <QrDialog value={item.value} title={item.label} filename={`${filenameBase}-${item.label}`} /> : null}
+          {item.copyable ? <CopyAction value={item.value} label={`Copy ${item.label}`} /> : null}
+        </>
+      }
     >
       <span className="select-all">{item.value}</span>
     </DetailRow>
@@ -83,7 +88,10 @@ function CodeBlock({ item, filenameBase }: { item: ResultItem; filenameBase: str
     <li className="rounded-xl border bg-background/60">
       <div className="flex items-center justify-between gap-2 py-1 pr-1 pl-3.5">
         <span className="text-sm font-medium">{item.label}</span>
-        {item.qr ? <QrDialog value={item.value} title={item.label} filename={`${filenameBase}-${item.label}`} /> : null}
+        <div className="flex shrink-0 items-center gap-0.5">
+          {item.qr ? <QrDialog value={item.value} title={item.label} filename={`${filenameBase}-${item.label}`} /> : null}
+          {item.copyable ? <CopyAction value={item.value} label={`Copy ${item.label}`} /> : null}
+        </div>
       </div>
       <ValueBlock className="max-h-56 border-t px-3.5 py-2.5">{item.value}</ValueBlock>
     </li>
