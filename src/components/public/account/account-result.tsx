@@ -300,8 +300,8 @@ export function AccountResult({
           <div className="text-sm">
             <p className="font-semibold">Shown only once — save it now</p>
             <p className="text-muted-foreground">
-              Our encrypted copy of your password, keys and links is erased within an hour. Copy them, download the .txt file or scan the QR
-              codes before you leave this page.
+              These details won&apos;t be shown again once you leave or reload this page. Copy them, download the .txt file or scan the QR
+              codes now.
             </p>
           </div>
         </div>

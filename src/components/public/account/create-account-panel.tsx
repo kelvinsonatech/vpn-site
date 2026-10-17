@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRightIcon, LoaderCircleIcon, RotateCcwIcon, ShieldCheckIcon, SparklesIcon } from "lucide-react";
@@ -104,6 +104,24 @@ export function CreateAccountPanel({
     setCaptchaMissing(false);
     turnstileRef.current?.reset();
   };
+
+  // Coming back with the browser's Back button can restore this page from memory, details and all.
+  // The details are shown only once, so a restored page starts over with an empty form.
+  const startOverRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    startOverRef.current = () => {
+      if (state.phase !== "result") return;
+      creation.reset();
+      resetForm();
+    };
+  });
+  useEffect(() => {
+    const onShow = (e: PageTransitionEvent) => {
+      if (e.persisted) startOverRef.current();
+    };
+    window.addEventListener("pageshow", onShow);
+    return () => window.removeEventListener("pageshow", onShow);
+  }, []);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

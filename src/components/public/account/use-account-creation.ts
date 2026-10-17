@@ -9,8 +9,10 @@ import { newIdempotencyKey } from "./form-validation";
 /**
  * Account creation flow: POST /api/public/accounts, then poll GET /api/public/accounts/{id} with
  * the claim token until the account is ready. { requestId, claimToken } is kept in sessionStorage
- * (this tab only) so a reload during or right after creation recovers the one-time result; it is
- * cleared when the visitor starts over. The result itself is only ever held in memory.
+ * (this tab only) while the account is being created, so leaving or reloading mid-creation still
+ * finds it instead of creating a second one. It is forgotten as soon as the result is shown (and on
+ * failure or start over): after that, leaving or reloading the page shows a fresh form. The result
+ * itself is only ever held in memory.
  */
 export type CreationState =
   | { phase: "idle" }
@@ -142,6 +144,8 @@ export function useAccountCreation(options: CreationOptions) {
           failures = 0;
           if (data.status === "active") {
             if (data.account) {
+              // Shown once: leaving or reloading from here on starts a fresh form.
+              clearPending(key);
               setState({ phase: "result", requestId: pending.requestId, account: data.account, createdAt: pending.createdAt });
               optsRef.current.onReady?.(pending.requestId, data.account, pending.createdAt);
             } else {
