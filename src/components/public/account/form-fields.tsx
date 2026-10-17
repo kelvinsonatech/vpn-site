@@ -229,7 +229,7 @@ function PasswordInput({
           disabled={disabled}
           aria-invalid={!!error || undefined}
           aria-describedby={describedBy(field, error)}
-          className="h-11 pr-11 font-mono text-base sm:text-sm"
+          className="h-11 rounded-xl pr-11 font-mono text-base sm:text-sm"
         />
         <button
           type="button"
@@ -237,7 +237,7 @@ function PasswordInput({
           disabled={disabled}
           aria-label={visible ? "Hide password" : "Show password"}
           aria-pressed={visible}
-          className="absolute top-1/2 right-1 flex size-9 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+          className="absolute top-1/2 right-1 flex size-9 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
         >
           {visible ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
         </button>
@@ -351,7 +351,7 @@ function FieldControl({
         disabled={disabled}
         aria-invalid={!!error || undefined}
         aria-describedby={describedBy(field, error)}
-        className={cn("h-11 text-base sm:text-sm", (isUser || field.key === "sni_bug") && "font-mono")}
+        className={cn("h-11 rounded-xl text-base sm:text-sm", (isUser || field.key === "sni_bug") && "font-mono")}
       />
     </FieldShell>
   );

@@ -3,8 +3,9 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRightIcon, LoaderCircleIcon, RotateCcwIcon, ShieldCheckIcon, SparklesIcon, UserRoundPlusIcon } from "lucide-react";
+import { ArrowRightIcon, LoaderCircleIcon, RotateCcwIcon, ShieldCheckIcon, SparklesIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Flag } from "@/components/public/flag";
 import { UnavailableNotice } from "@/components/public/server/unavailable-notice";
 import { cn } from "@/lib/utils";
 import type { PublicAccountResult, PublicCountry, PublicProtocolDetail, PublicServerCard } from "@/lib/public/types";
@@ -132,6 +133,7 @@ export function CreateAccountPanel({
         countryCode={country.code}
         countryName={country.name}
         city={server.city}
+        createdAt={state.createdAt}
         guideHref={`/${protocol.slug}#guide`}
         celebrate={celebrateId === state.requestId}
         onCreateAnother={() => {
@@ -144,13 +146,22 @@ export function CreateAccountPanel({
 
   return (
     <div className="overflow-hidden rounded-2xl border bg-card shadow-xs">
-      <div className="flex items-start gap-3 border-b px-5 py-4 sm:px-6">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-          <UserRoundPlusIcon className="size-5" aria-hidden />
-        </span>
-        <div className="min-w-0">
-          <h2 className="font-semibold">New {protocol.name} account</h2>
-          <p className="text-sm text-muted-foreground">Free · created on {server.name} in seconds · comes with its own avatar</p>
+      <div className="relative overflow-hidden bg-card-band px-5 py-6 text-center text-hero-foreground sm:px-6">
+        <div aria-hidden className="pointer-events-none absolute inset-0 bg-hero-dots" />
+        <div className="relative">
+          <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">Get your free account</h2>
+          <p className="mt-1.5 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-0.5 text-sm text-white/85">
+            <span className="font-medium text-white">{protocol.name}</span>
+            <span aria-hidden>·</span>
+            <span className="inline-flex items-center gap-1.5">
+              <span aria-hidden className="inline-flex">
+                <Flag code={country.code} className="h-3 w-4 shrink-0" title={country.name} />
+              </span>
+              {server.name}
+            </span>
+            <span aria-hidden>·</span>
+            <span>{[server.city, country.name].filter(Boolean).join(", ")}</span>
+          </p>
         </div>
       </div>
 

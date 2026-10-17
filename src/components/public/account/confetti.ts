@@ -190,8 +190,10 @@ export function launchConfetti(): () => void {
   let particles = [...createBurst("left", width, height, n), ...createBurst("right", width, height, n, Math.random, SECOND_BURST_DELAY_S)];
 
   let frame = 0;
-  let last = performance.now();
-  const started = last;
+  // The clock starts with the first frame actually shown: a hidden tab runs no frames, so a result
+  // that arrives in the background still celebrates when the visitor comes back.
+  let started = -1;
+  let last = 0;
   let stopped = false;
   const stop = () => {
     if (stopped) return;
@@ -201,7 +203,8 @@ export function launchConfetti(): () => void {
     canvas.remove();
   };
   const tick = (now: number) => {
-    // Clamp the step so a busy or backgrounded tab doesn't make pieces jump.
+    if (started < 0) started = last = now;
+    // Clamp the step so a busy tab doesn't make pieces jump.
     const dt = Math.min(0.034, Math.max(0, (now - last) / 1000));
     last = now;
     particles = particles.filter((p) => stepParticle(p, dt));

@@ -221,6 +221,14 @@
     linear-gradient(118deg, var(--hero-from), var(--hero-via) 52%, var(--hero-to));
 }
 
+/* Gradient header of the create-account and account-ready cards (white text stays readable). */
+@utility bg-card-band {
+  background-color: var(--hero-via);
+  background-image:
+    radial-gradient(60% 130% at 100% 0%, color-mix(in oklch, var(--hero-to) 50%, transparent), transparent 70%),
+    linear-gradient(120deg, var(--hero-from), var(--hero-via));
+}
+
 /* Faint dot grid laid over hero bands; fades out towards the edges. */
 @utility bg-hero-dots {
   background-image: radial-gradient(color-mix(in oklch, white 26%, transparent) 1px, transparent 1.3px);
