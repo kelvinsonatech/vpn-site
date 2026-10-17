@@ -62,7 +62,7 @@ function pickColor(rand: Rand) {
 
 /** Pieces per burst: fewer on small screens. */
 export function burstSize(width: number) {
-  return width < 640 ? 32 : width < 1024 ? 50 : 70;
+  return width < 640 ? 65 : width < 1024 ? 90 : 120;
 }
 
 /**
@@ -79,11 +79,11 @@ export function createBurst(side: Side, width: number, height: number, count: nu
   const small = width < 640;
   const out: Particle[] = [];
   for (let i = 0; i < count; i++) {
-    const angle = base + (rand() - 0.5) * 0.62;
+    const angle = base + (rand() - 0.5) * 0.8;
     // Enough speed to reach the target against drag and gravity, with some spread in depth.
     const speed = (distance * DRAG * 1.12 + 420) * (0.78 + rand() * 0.42);
     const circle = rand() < 0.16;
-    const size = (small ? 5 : 7) + rand() * (small ? 3 : 4);
+    const size = (small ? 6.5 : 8) + rand() * (small ? 4 : 5);
     out.push({
       x: x0,
       y: y0,
