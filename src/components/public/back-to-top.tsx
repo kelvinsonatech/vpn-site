@@ -25,7 +25,7 @@ export function BackToTop() {
         document.getElementById("main")?.focus({ preventScroll: true });
       }}
       className={cn(
-        "fixed right-4 bottom-4 z-30 inline-flex size-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/25 ring-1 ring-black/5 transition-all duration-300 outline-none hover:-translate-y-0.5 hover:bg-primary/90 focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:right-6 sm:bottom-6",
+        "fixed right-4 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-30 inline-flex size-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/25 ring-1 ring-black/5 transition-all duration-300 outline-none hover:-translate-y-0.5 hover:bg-primary/90 focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:right-6 sm:bottom-6",
         visible ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-3 opacity-0",
       )}
     >

@@ -41,7 +41,7 @@ const THEMES = [
   { value: "system", label: "System", icon: LaptopIcon },
 ] as const;
 
-const isCurrent = (pathname: string, href: string) => (href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`));
+export const isCurrent = (pathname: string, href: string) => (href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`));
 
 /** The current page is marked by more than colour: bold text and a bar on the left (an outline in forced-colours mode). */
 const CURRENT_MARK =
@@ -62,6 +62,48 @@ function ServiceTile({ protocol: p }: { protocol: NavProtocol }) {
     <span className="flex size-8 shrink-0 items-center justify-center rounded-lg text-white" style={{ background: `var(--tone-${p.category}, var(--primary))` }}>
       <ProtocolIcon name={p.icon} className="size-4" />
     </span>
+  );
+}
+
+/** The services as rows (logo, name, open slots): the phone menu's Services list and the tab bar's Services sheet. */
+export function ServiceLinks({
+  protocols,
+  pathname,
+  onNavigate,
+  ...props
+}: { protocols: NavProtocol[]; pathname: string; onNavigate: () => void } & React.ComponentProps<"ul">) {
+  return (
+    <ul {...props}>
+      {protocols.length === 0 ? (
+        <li className="px-3 py-2 text-sm text-muted-foreground">No services are published right now.</li>
+      ) : (
+        protocols.map((p) => {
+          const current = isCurrent(pathname, p.href);
+          return (
+            <li key={p.slug}>
+              <Link
+                href={p.href}
+                onClick={onNavigate}
+                aria-current={current ? "page" : undefined}
+                className={cn(
+                  "flex min-h-12 items-center gap-3 rounded-xl px-2 py-1.5 outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                  current ? "bg-accent" : "hover:bg-muted",
+                )}
+              >
+                <ServiceTile protocol={p} />
+                <span className="min-w-0 flex-1">
+                  <span className={cn("block truncate text-sm font-semibold", current && "text-primary")}>{p.name}</span>
+                  <span className="block text-[11px] text-muted-foreground tabular-nums">
+                    {p.availableCount}/{p.serverCount} open
+                  </span>
+                </span>
+                <ChevronRightIcon className="size-4 text-muted-foreground/60" />
+              </Link>
+            </li>
+          );
+        })
+      )}
+    </ul>
   );
 }
 
@@ -225,37 +267,13 @@ export function SiteMobileNav({ siteName, protocols }: { siteName: string; proto
                     <ChevronDownIcon className={cn("size-4 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none", servicesOpen && "rotate-180")} />
                   </button>
                   {servicesOpen ? (
-                    <ul id="mobile-services" className="mt-0.5 mb-1 ml-5 grid gap-0.5 border-l pl-2 animate-in fade-in-0 slide-in-from-top-1 duration-200 motion-reduce:animate-none">
-                      {protocols.length === 0 ? (
-                        <li className="px-3 py-2 text-sm text-muted-foreground">No services are published right now.</li>
-                      ) : (
-                        protocols.map((p) => {
-                          const current = isCurrent(pathname, p.href);
-                          return (
-                            <li key={p.slug}>
-                              <Link
-                                href={p.href}
-                                onClick={close}
-                                aria-current={current ? "page" : undefined}
-                                className={cn(
-                                  "flex min-h-12 items-center gap-3 rounded-xl px-2 py-1.5 outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50",
-                                  current ? "bg-accent" : "hover:bg-muted",
-                                )}
-                              >
-                                <ServiceTile protocol={p} />
-                                <span className="min-w-0 flex-1">
-                                  <span className={cn("block truncate text-sm font-semibold", current && "text-primary")}>{p.name}</span>
-                                  <span className="block text-[11px] text-muted-foreground tabular-nums">
-                                    {p.availableCount}/{p.serverCount} open
-                                  </span>
-                                </span>
-                                <ChevronRightIcon className="size-4 text-muted-foreground/60" />
-                              </Link>
-                            </li>
-                          );
-                        })
-                      )}
-                    </ul>
+                    <ServiceLinks
+                      id="mobile-services"
+                      protocols={protocols}
+                      pathname={pathname}
+                      onNavigate={close}
+                      className="mt-0.5 mb-1 ml-5 grid gap-0.5 border-l pl-2 animate-in fade-in-0 slide-in-from-top-1 duration-200 motion-reduce:animate-none"
+                    />
                   ) : null}
                 </li>
                 {link("/server-status", "Server status", ActivityIcon)}

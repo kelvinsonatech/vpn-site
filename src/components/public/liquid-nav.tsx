@@ -12,9 +12,9 @@ const FADE = "opacity 200ms ease";
 const SQUISH: Keyframe[] = [{ transform: "scale(1, 1)" }, { transform: "scale(1, 0.88)", offset: 0.35 }, { transform: "scale(1, 1.04)", offset: 0.72 }, { transform: "scale(1, 1)" }];
 
 /**
- * The desktop header's pill navigation with one "liquid" highlight, like iOS's liquid glass: it
- * glides to the item under the pointer (or keyboard focus, or an open menu's button) and back to the
- * current page's item (marked data-current). The leading edge moves first, so the lens stretches and
+ * A pill navigation (the desktop header, the phone tab bar) with one "liquid" highlight, like iOS's
+ * liquid glass: it glides to the item under the pointer or finger (or keyboard focus, or an open
+ * menu's button) and back to the current page's item (marked data-current). The leading edge moves first, so the lens stretches and
  * settles. Until this hydrates the items paint their own highlight; under reduced motion it jumps.
  */
 export function LiquidNav({ className, children, ...props }: React.ComponentProps<"nav">) {
@@ -35,6 +35,8 @@ export function LiquidNav({ className, children, ...props }: React.ComponentProp
     };
 
     let hovered: HTMLElement | null = null;
+    /** The item just tapped or clicked: the lens goes there at once, before the next page arrives. */
+    let pressed: HTMLElement | null = null;
     let focused: HTMLElement | null = null;
     /** Focus only steers the lens for keyboard users (a menu closing hands focus back to its button). */
     let keyboard = false;
@@ -42,10 +44,11 @@ export function LiquidNav({ className, children, ...props }: React.ComponentProp
     let last = { left: 0, right: 0 };
     let squish: Animation | null = null;
     let leaveTimer = 0;
+    let pressTimer = 0;
     let frame = 0;
 
     const target = () =>
-      hovered ?? (keyboard ? focused : null) ?? items().find((el) => el.dataset.state === "open") ?? items().find((el) => el.dataset.current !== undefined) ?? null;
+      hovered ?? pressed ?? (keyboard ? focused : null) ?? items().find((el) => el.dataset.state === "open") ?? items().find((el) => el.dataset.current !== undefined) ?? null;
 
     const update = (animate: boolean) => {
       const el = target();
@@ -103,6 +106,18 @@ export function LiquidNav({ className, children, ...props }: React.ComponentProp
         schedule();
       }, 90);
     };
+    const onPress = (e: PointerEvent) => {
+      const el = itemOf(e.target);
+      if (!el) return;
+      pressed = el;
+      schedule();
+      // By then the new page has marked its item current; if the tap went nowhere, the lens goes back.
+      window.clearTimeout(pressTimer);
+      pressTimer = window.setTimeout(() => {
+        pressed = null;
+        schedule();
+      }, 1500);
+    };
     const onFocusIn = (e: FocusEvent) => {
       focused = itemOf(e.target);
       schedule();
@@ -124,6 +139,7 @@ export function LiquidNav({ className, children, ...props }: React.ComponentProp
     nav.dataset.lens = "";
     nav.addEventListener("pointerover", onOver);
     nav.addEventListener("pointerleave", onLeave);
+    nav.addEventListener("pointerdown", onPress);
     nav.addEventListener("focusin", onFocusIn);
     nav.addEventListener("focusout", onFocusOut);
     document.addEventListener("keydown", onKeyDown, true);
@@ -137,6 +153,7 @@ export function LiquidNav({ className, children, ...props }: React.ComponentProp
     return () => {
       nav.removeEventListener("pointerover", onOver);
       nav.removeEventListener("pointerleave", onLeave);
+      nav.removeEventListener("pointerdown", onPress);
       nav.removeEventListener("focusin", onFocusIn);
       nav.removeEventListener("focusout", onFocusOut);
       document.removeEventListener("keydown", onKeyDown, true);
@@ -144,6 +161,7 @@ export function LiquidNav({ className, children, ...props }: React.ComponentProp
       mutations.disconnect();
       resize.disconnect();
       window.clearTimeout(leaveTimer);
+      window.clearTimeout(pressTimer);
       cancelAnimationFrame(frame);
       squish?.cancel();
       delete nav.dataset.lens;

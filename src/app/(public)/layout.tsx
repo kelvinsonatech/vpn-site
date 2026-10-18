@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 import { AnnouncementBar } from "@/components/public/announcement-bar";
 import { BackToTop } from "@/components/public/back-to-top";
+import { MobileTabBar } from "@/components/public/mobile-tab-bar";
 import { SiteFooter } from "@/components/public/site-footer";
 import { SiteHeader } from "@/components/public/site-header";
 import type { NavProtocol } from "@/components/public/nav";
@@ -59,6 +60,7 @@ export default async function PublicLayout({ children }: { children: React.React
       </main>
       <SiteFooter settings={settings} protocols={nav} stats={stats} />
       <BackToTop />
+      <MobileTabBar protocols={nav} />
     </div>
   );
 }

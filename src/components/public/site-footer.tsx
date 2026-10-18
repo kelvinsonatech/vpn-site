@@ -156,7 +156,7 @@ export function SiteFooter({
       </div>
 
       <div className="border-t border-footer-border">
-        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6 text-xs text-footer-muted sm:px-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 pt-6 pb-28 text-xs text-footer-muted sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:pb-6">
           <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span>
               © {year} {settings.siteName}
