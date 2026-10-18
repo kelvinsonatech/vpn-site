@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { connection } from "next/server";
-import { GlobeIcon, InfoIcon } from "lucide-react";
+import { InfoIcon } from "lucide-react";
 import { PageHeader } from "@/components/public/page-header";
 import { Container } from "@/components/public/section";
 import { IpToHostname } from "@/components/public/tools/ip-to-hostname";
@@ -10,6 +10,7 @@ import { pageMetadata } from "@/lib/seo";
 import { clientIpFromHeaders } from "@/server/auth/request-context";
 import { parseIpInput } from "@/server/tools/reverse";
 import { loadSettings } from "../../_lib/data";
+import toolImage from "@/assets/ip-to-hostname.webp";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
@@ -32,7 +33,10 @@ export default async function IpToHostnamePage({ searchParams }: { searchParams:
     <>
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "Tools", href: "/tools" }, { label: "IP to Hostname" }]}
-        icon={<GlobeIcon />}
+        icon={
+          // eslint-disable-next-line @next/next/no-img-element -- small bundled picture; the header sizes it
+          <img src={toolImage.src} alt="" aria-hidden="true" width={64} height={64} draggable={false} className="rounded-2xl bg-white object-contain p-1" />
+        }
         eyebrow="Tool"
         title="IP to Hostname"
         description="Enter an IP address to see the hostname it belongs to (reverse DNS)."

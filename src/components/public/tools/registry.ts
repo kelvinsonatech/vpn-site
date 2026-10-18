@@ -1,5 +1,6 @@
 import { GlobeIcon, NetworkIcon } from "lucide-react";
 import hostnameToIpImage from "@/assets/hostname-to-ip.webp";
+import ipToHostnameImage from "@/assets/ip-to-hostname.webp";
 
 /**
  * The public tools, in menu order: the /tools page lists them from here. `image`, when set, is the
@@ -20,7 +21,7 @@ export const TOOLS = [
     name: "IP to Hostname",
     description: "Find the hostname (reverse DNS) of any IPv4 or IPv6 address.",
     icon: GlobeIcon,
-    image: null,
+    image: ipToHostnameImage,
   },
 ] as const;
 
