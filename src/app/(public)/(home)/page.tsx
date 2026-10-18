@@ -4,17 +4,14 @@ import { headers } from "next/headers";
 import { connection } from "next/server";
 import {
   ActivityIcon,
-  AppWindowIcon,
   ArrowRightIcon,
-  CalendarClockIcon,
   CopyIcon,
-  EyeOffIcon,
-  GlobeIcon,
   KeyRoundIcon,
   LayersIcon,
   MousePointerClickIcon,
   ServerIcon,
   ShieldCheckIcon,
+  SmartphoneIcon,
   SparklesIcon,
   UserRoundIcon,
   ZapIcon,
@@ -287,39 +284,46 @@ export default async function HomePage() {
       {/* Features */}
       <section className="mt-24 sm:mt-32" aria-labelledby="features-title">
         <Container>
-          <SectionHeading
-            id="features-title"
-            eyebrow={
-              <>
-                <ShieldCheckIcon /> Why {settings.siteName}
-              </>
-            }
-            title="Fast to start, private by design"
-          />
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <SectionHeading id="features-title" title={`Why choose ${settings.siteName}`} />
+          <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { icon: <ZapIcon />, title: "Instant creation", text: "Your account is created on the server the moment you submit, usually within a few seconds." },
-              { icon: <EyeOffIcon />, title: "Delivered once", text: "Credentials reach your browser exactly once through an encrypted one-time result." },
-              { icon: <ShieldCheckIcon />, title: "No stored secrets", text: "We never keep passwords, keys or configs, and never store raw IP addresses." },
               {
-                icon: <GlobeIcon />,
-                title: countries > 0 ? `${countries} ${countries === 1 ? "country" : "countries"}` : "Many locations",
-                text: "Pick the location closest to you, or the one with the best ping right now.",
+                // Big flat icons: coloured fill with card-coloured details.
+                icon: <SmartphoneIcon className="fill-yellow-400 text-yellow-400" />,
+                title: "Instant setup",
+                text: "Most accounts are ready a few seconds after you tap Create. No sign-up needed.",
               },
-              { icon: <CalendarClockIcon />, title: `${validity} validity`, text: "Choose how long you need the account. It expires and is cleaned up automatically." },
-              { icon: <AppWindowIcon />, title: "Open-source apps", text: "Connect with free, well-known apps on Android, iOS, Windows, macOS and Linux." },
+              {
+                icon: <ZapIcon className="fill-violet-600 text-violet-600" />,
+                title: "Fast servers",
+                text:
+                  countries > 1
+                    ? `Servers in ${countries} countries. Pick the closest one or the one with the lowest ping.`
+                    : "Pick the server closest to you or the one with the lowest ping right now.",
+              },
+              {
+                icon: <ShieldCheckIcon className="fill-cyan-400 text-cyan-400" />,
+                title: "Private and secure",
+                text: "Your login details are shown to you once, then never stored on our side.",
+              },
+              {
+                icon: <ServerIcon className="fill-rose-500 text-rose-500" />,
+                title: "Always open",
+                text: stats?.accountsTotal
+                  ? `Create a free account any time, day or night. ${stats.accountsTotal.toLocaleString("en-US")} accounts created so far.`
+                  : "Create a free account any time, day or night, weekends and holidays included.",
+              },
             ].map((f) => (
-              <div key={f.title} className="group flex gap-4 rounded-3xl border bg-card p-5 shadow-sm transition-colors hover:border-primary/30 sm:p-6">
-                <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-accent text-primary transition-transform duration-300 group-hover:scale-110 motion-reduce:group-hover:scale-100 [&_svg]:size-5">
-                  {f.icon}
-                </span>
-                <div>
-                  <h3 className="font-semibold">{f.title}</h3>
-                  <p className="mt-1 text-sm text-pretty text-muted-foreground">{f.text}</p>
-                </div>
-              </div>
+              <li
+                key={f.title}
+                className="flex flex-col items-center rounded-[1.75rem] border border-border/60 bg-card px-6 pt-8 pb-9 text-center shadow-[0_12px_32px_-24px_rgb(15_30_120/0.35)] transition-transform duration-300 hover:-translate-y-1 motion-reduce:hover:translate-y-0 [&>svg]:size-14 [&>svg]:stroke-card [&>svg]:stroke-[1.75]"
+              >
+                {f.icon}
+                <h3 className="mt-5 text-lg font-bold tracking-tight">{f.title}</h3>
+                <p className="mt-2.5 text-[15px] leading-7 text-pretty text-muted-foreground">{f.text}</p>
+              </li>
             ))}
-          </div>
+          </ul>
         </Container>
       </section>
 
