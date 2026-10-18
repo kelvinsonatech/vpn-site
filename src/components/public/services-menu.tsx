@@ -19,7 +19,7 @@ export function ServicesMenu({ protocols, active }: { protocols: NavProtocol[]; 
   const groups = groupProtocols(protocols);
   return (
     <DropdownMenu modal={false}>
-      <DropdownMenuTrigger className={cn(navItemClass(active), "group")}>
+      <DropdownMenuTrigger data-current={active || undefined} className={cn(navItemClass(active), "group")}>
         <ServerIcon />
         Services
         <ChevronDownIcon className="opacity-60 transition-transform duration-200 group-data-[state=open]:rotate-180" />

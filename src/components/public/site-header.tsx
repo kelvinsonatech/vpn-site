@@ -10,6 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { cn } from "@/lib/utils";
 import { MyAccountsButton, MyAccountsMenu } from "./my-accounts-menu";
 import { navItemClass, type NavProtocol } from "./nav";
+import { LiquidNav } from "./liquid-nav";
 import { ServicesMenu } from "./services-menu";
 import { SiteMobileNav } from "./site-mobile-nav";
 
@@ -43,8 +44,8 @@ export function SiteHeader({ siteName, protocols }: { siteName: string; protocol
           <Brand name={siteName} className="text-lg" markClassName="size-10" />
         </Link>
 
-        <nav aria-label="Main" className="hidden items-center gap-0.5 rounded-full border border-border/70 bg-card/70 p-1 shadow-sm lg:flex">
-          <Link href="/" aria-current={pathname === "/" ? "page" : undefined} className={navItemClass(pathname === "/")}>
+        <LiquidNav aria-label="Main" className="hidden items-center gap-0.5 rounded-full border border-border/70 bg-card/70 p-1 shadow-sm lg:flex">
+          <Link href="/" aria-current={pathname === "/" ? "page" : undefined} data-current={pathname === "/" || undefined} className={navItemClass(pathname === "/")}>
             <HomeIcon />
             Home
           </Link>
@@ -52,6 +53,7 @@ export function SiteHeader({ siteName, protocols }: { siteName: string; protocol
           <Link
             href="/server-status"
             aria-current={pathname.startsWith("/server-status") ? "page" : undefined}
+            data-current={pathname.startsWith("/server-status") || undefined}
             className={navItemClass(pathname.startsWith("/server-status"))}
           >
             <ActivityIcon />
@@ -59,7 +61,7 @@ export function SiteHeader({ siteName, protocols }: { siteName: string; protocol
           </Link>
           <MyAccountsMenu active={pathname.startsWith("/my-accounts")} />
           <DropdownMenu modal={false}>
-            <DropdownMenuTrigger className={cn(navItemClass(inSupport), "group")}>
+            <DropdownMenuTrigger data-current={inSupport || undefined} className={cn(navItemClass(inSupport), "group")}>
               <LifeBuoyIcon />
               Support
               <ChevronDownIcon className="opacity-60 transition-transform duration-200 group-data-[state=open]:rotate-180" />
@@ -70,7 +72,7 @@ export function SiteHeader({ siteName, protocols }: { siteName: string; protocol
               <SupportItem href="/about" icon={<InfoIcon />} title="About" text="How the service works" />
             </DropdownMenuContent>
           </DropdownMenu>
-        </nav>
+        </LiquidNav>
 
         <div className="flex items-center gap-1 lg:ml-2">
           <MyAccountsButton className="lg:hidden" />

@@ -29,7 +29,7 @@ export function groupProtocols<T extends Pick<NavProtocol, "category">>(protocol
   return [...groups].map(([category, items]) => ({ category, label: categoryLabel(category), items }));
 }
 
-/** Header link / menu trigger style; `active` marks the current section. */
+/** Header link / menu trigger style; `active` marks the current section (the header's LiquidNav also wants data-current on it). */
 export const navItemClass = (active: boolean) =>
   cn(
     "inline-flex h-10 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 [&_svg]:size-4 [&_svg]:shrink-0",

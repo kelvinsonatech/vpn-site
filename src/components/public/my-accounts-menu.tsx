@@ -53,7 +53,7 @@ export function MyAccountsMenu({ active: routeActive }: { active: boolean }) {
   return (
     <DropdownMenu modal={false}>
       {/* The accessible name is the visible text plus the badge ("My accounts 2 active"). */}
-      <DropdownMenuTrigger className={cn(navItemClass(routeActive), "group")}>
+      <DropdownMenuTrigger data-current={routeActive || undefined} className={cn(navItemClass(routeActive), "group")}>
         {active.length > 0 ? <AvatarStack accounts={active} size={20} /> : <UserRoundIcon />}
         My accounts
         <CountBadge count={active.length} />
