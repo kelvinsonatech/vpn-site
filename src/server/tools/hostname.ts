@@ -2,6 +2,7 @@ import { Resolver } from "node:dns/promises";
 import { isIP } from "node:net";
 import { domainToASCII } from "node:url";
 import { isRestrictedAddress } from "@/server/nodes/net-guard";
+import { ToolError } from "./errors";
 
 /**
  * "Hostname to IP" tool: turns a hostname (or a pasted link) into its IPv4 and IPv6 addresses with a
@@ -57,16 +58,6 @@ export interface HostnameLookup {
   ipv6: ResolvedAddress[];
 }
 
-export class HostnameLookupError extends Error {
-  constructor(
-    readonly code: "NOT_FOUND" | "NO_ADDRESSES" | "DNS_FAILED",
-    readonly httpStatus: number,
-    message: string,
-  ) {
-    super(message);
-  }
-}
-
 const MAX_ADDRESSES = 32;
 
 function addresses(result: PromiseSettledResult<{ address: string; ttl: number }[]>): ResolvedAddress[] {
@@ -93,9 +84,9 @@ export async function lookupHostname(hostname: string): Promise<HostnameLookup> 
     return { hostname, aliasOf: cname.status === "fulfilled" ? (cname.value[0] ?? null) : null, ipv4, ipv6 };
   }
   const codes = [errorCode(v4), errorCode(v6)];
-  if (codes.includes("ENOTFOUND")) throw new HostnameLookupError("NOT_FOUND", 404, `${hostname} doesn't exist (the domain isn't registered or has no DNS).`);
+  if (codes.includes("ENOTFOUND")) throw new ToolError("NOT_FOUND", 404, `${hostname} doesn't exist (the domain isn't registered or has no DNS).`);
   if (codes.every((c) => c === "ENODATA" || c === undefined)) {
-    throw new HostnameLookupError("NO_ADDRESSES", 404, `${hostname} exists but doesn't point to any IP address.`);
+    throw new ToolError("NO_ADDRESSES", 404, `${hostname} exists but doesn't point to any IP address.`);
   }
-  throw new HostnameLookupError("DNS_FAILED", 502, "The DNS lookup didn't answer in time. Please try again.");
+  throw new ToolError("DNS_FAILED", 502, "The DNS lookup didn't answer in time. Please try again.");
 }

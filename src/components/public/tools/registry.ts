@@ -1,4 +1,4 @@
-import { NetworkIcon } from "lucide-react";
+import { GlobeIcon, NetworkIcon } from "lucide-react";
 
 /** The public tools, in menu order: the /tools page, the header and the phone menu list them from here. */
 export const TOOLS = [
@@ -8,6 +8,13 @@ export const TOOLS = [
     name: "Hostname to IP",
     description: "Find the IPv4 and IPv6 addresses behind any hostname or link.",
     icon: NetworkIcon,
+  },
+  {
+    slug: "ip-to-hostname",
+    href: "/tools/ip-to-hostname",
+    name: "IP to Hostname",
+    description: "Find the hostname (reverse DNS) of any IPv4 or IPv6 address.",
+    icon: GlobeIcon,
   },
 ] as const;
 

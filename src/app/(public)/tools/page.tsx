@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
   return pageMetadata({
     title: "Tools",
-    description: "Free network tools: find the IP address behind any hostname, and more on the way.",
+    description: "Free network tools: hostname to IP, IP to hostname (reverse DNS), and more on the way.",
     path: "/tools",
     siteName: settings.siteName,
   });

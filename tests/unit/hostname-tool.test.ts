@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { HostnameLookupError, isPublicAddress, lookupHostname, parseHostname } from "@/server/tools/hostname";
+import { ToolError } from "@/server/tools/errors";
+import { isPublicAddress, lookupHostname, parseHostname } from "@/server/tools/hostname";
 
 /** The "Hostname to IP" tool's input handling and public/private address labels. */
 
@@ -99,7 +100,7 @@ describe("lookupHostname", () => {
     dns.aaaa.mockRejectedValue(fail(c6!));
     dns.cname.mockRejectedValue(fail("ENODATA"));
     const err = await lookupHostname("x.example").catch((e) => e);
-    expect(err).toBeInstanceOf(HostnameLookupError);
+    expect(err).toBeInstanceOf(ToolError);
     expect(err).toMatchObject({ code, httpStatus: status });
   });
 });
