@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRightLeftIcon, CalendarClockIcon, InfoIcon } from "lucide-react";
+import { ArrowRightLeftIcon, InfoIcon } from "lucide-react";
 import { calendarSpan, daysBetween, formatSpan } from "@/lib/date-span";
 import { cn } from "@/lib/utils";
+import calendarImage from "@/assets/domain-age-result.webp";
 import { CopyAction } from "../account/copy-action";
 import { crossLinkClass, LookupError, LookupForm, useLookup } from "./lookup";
 
@@ -98,9 +99,8 @@ export function DomainAgeChecker({ initialDomain }: { initialDomain: string }) {
         {result ? (
           <section aria-label="Result" className="grid gap-5 rounded-3xl border bg-card p-5 shadow-sm animate-in fade-in-0 slide-in-from-bottom-2 sm:p-6 motion-reduce:animate-none">
             <div className="flex items-start gap-3">
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                <CalendarClockIcon className="size-5" aria-hidden />
-              </span>
+              {/* eslint-disable-next-line @next/next/no-img-element -- small bundled picture */}
+              <img src={calendarImage.src} alt="" aria-hidden="true" width={44} height={44} draggable={false} className="size-11 shrink-0 object-contain" />
               <div className="min-w-0 flex-1">
                 <p className="font-mono text-base font-semibold [overflow-wrap:anywhere]">{result.domain}</p>
                 <p className="text-sm text-muted-foreground">{result.registrar ? `Registered through ${result.registrar}` : "Registration record"}</p>
