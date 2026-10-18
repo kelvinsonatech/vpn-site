@@ -48,7 +48,7 @@ export const WHEN_OPEN =
 export function sidebarRowClass(active = false) {
   return cn(
     "relative flex h-11 w-full items-center gap-3 overflow-hidden rounded-2xl px-3.5 text-sm font-medium whitespace-nowrap outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50 [&>svg]:size-5 [&>svg]:shrink-0",
-    active ? "bg-primary text-primary-foreground shadow-md shadow-primary/25" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+    active ? "bg-admin-nav-active text-admin-nav-active-foreground shadow-md shadow-admin-nav-active/30" : "text-muted-foreground hover:bg-muted hover:text-foreground",
   );
 }
 

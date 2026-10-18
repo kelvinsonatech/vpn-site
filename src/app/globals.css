@@ -36,6 +36,9 @@
   /* Amber text on white or warning-soft (WCAG AA); --warning stays bright for dots and bars. */
   --warning-strong: oklch(0.52 0.12 60);
   --warning-soft: oklch(0.96 0.05 85);
+  /* Admin sidebar: the current page's pill (the owner's chosen pink, same in both themes). */
+  --admin-nav-active: #ed3189;
+  --admin-nav-active-foreground: #ffffff;
   --danger-soft: oklch(0.95 0.035 27);
   --info: oklch(0.5 0.13 250);
   --info-soft: oklch(0.95 0.03 250);
@@ -84,6 +87,8 @@
   --warning: oklch(0.8 0.14 78);
   --warning-strong: oklch(0.8 0.14 78);
   --warning-soft: oklch(0.3 0.05 78);
+  --admin-nav-active: #ed3189;
+  --admin-nav-active-foreground: #ffffff;
   --danger-soft: oklch(0.29 0.06 25);
   --info: oklch(0.72 0.12 250);
   --info-soft: oklch(0.28 0.05 250);
@@ -134,6 +139,8 @@
   --color-success-soft: var(--success-soft);
   --color-warning: var(--warning);
   --color-warning-soft: var(--warning-soft);
+  --color-admin-nav-active: var(--admin-nav-active);
+  --color-admin-nav-active-foreground: var(--admin-nav-active-foreground);
   --color-warning-strong: var(--warning-strong);
   --color-danger-soft: var(--danger-soft);
   --color-info: var(--info);
