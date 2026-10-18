@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
-import { ActivityIcon, RefreshCwIcon } from "lucide-react";
+import { RefreshCwIcon } from "lucide-react";
 import { HeroChip, PageHeader } from "@/components/public/page-header";
 import { Container } from "@/components/public/section";
 import { StatusBoard } from "@/components/public/status/status-board";
 import { pageMetadata } from "@/lib/seo";
 import { loadSettings, loadStatus, resetSchedule } from "@/app/(public)/_lib/data";
+import statusIcon from "@/assets/server-status.webp";
 
 export async function generateMetadata(): Promise<Metadata> {
   await connection();
@@ -30,7 +31,10 @@ export default async function ServerStatusPage({ searchParams }: { searchParams:
     <>
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "Server status" }]}
-        icon={<ActivityIcon />}
+        icon={
+          // eslint-disable-next-line @next/next/no-img-element -- small bundled picture; the header sizes it
+          <img src={statusIcon.src} alt="" aria-hidden="true" width={64} height={64} draggable={false} data-shape="round" className="rounded-full object-contain" />
+        }
         eyebrow="Live"
         title="Server status"
         description="Every server we run, checked around the clock: whether it's online, how fast it answers and how many slots are left."
