@@ -52,7 +52,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
     >
       <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background/85 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/70 sm:px-6">
         <MobileNav allowed={allowed} badges={badges} siteName={settings.siteName} logout={logoutAction} />
-        <Link href="/admin" className="lg:hidden">
+        <Link href="/admin" className="desk:hidden">
           <Brand name={settings.siteName} />
         </Link>
         <div className="ml-auto flex items-center gap-1">

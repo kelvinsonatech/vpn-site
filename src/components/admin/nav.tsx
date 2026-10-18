@@ -69,7 +69,7 @@ export function AdminNav({ allowed, badges, onNavigate }: { allowed: NavKey[]; b
                 {/* On the slim rail a dot on the icon; open, the count. */}
                 <span
                   aria-hidden
-                  className="absolute top-2.5 left-8 size-2 rounded-full bg-warning ring-2 ring-card transition-opacity group-data-[open]/side:opacity-0"
+                  className="absolute top-2.5 left-8 size-2 rounded-full bg-warning-strong ring-2 ring-card transition-opacity group-data-[open]/side:opacity-0 forced-colors:bg-[CanvasText]"
                 />
                 <span
                   aria-hidden
@@ -89,7 +89,8 @@ export function AdminNav({ allowed, badges, onNavigate }: { allowed: NavKey[]; b
 
 /**
  * The rows under the nav: the public website (new tab) and sign out. `pin`, on the desktop sidebar,
- * adds the "keep open" toggle beside Sign out (shown once the sidebar is open).
+ * adds the "keep open" toggle at the open sidebar's right edge beside Sign out: on the slim rail it
+ * sits outside the clipped area, so it slides into view with the labels and never covers Sign out.
  */
 export function SidebarFooter({
   logout,
@@ -121,7 +122,7 @@ export function SidebarFooter({
             aria-label="Keep sidebar open"
             title={pin.pinned ? "Let the sidebar close" : "Keep the sidebar open"}
             className={cn(
-              "pointer-events-none absolute top-1/2 right-1 inline-flex size-9 -translate-y-1/2 items-center justify-center rounded-xl text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 group-data-[open]/side:pointer-events-auto [&_svg]:pointer-events-none [&_svg]:size-4.5",
+              "absolute top-1/2 left-44 inline-flex size-9 -translate-y-1/2 items-center justify-center rounded-xl text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 [&_svg]:pointer-events-none [&_svg]:size-4.5",
               WHEN_OPEN,
             )}
           >

@@ -39,8 +39,8 @@ export function AdminShell({
 
   // Hover, with a short delay each way so crossing the rail on the way elsewhere doesn't flick it
   // open. Chrome skips pointerleave when the node under the pointer was removed from the page, so
-  // any pointer move outside the sidebar also counts as leaving. Touch has no hover; pinning is how
-  // it stays open there.
+  // any pointer move outside the sidebar also counts as leaving. Escape closes it until the pointer
+  // comes back or focus moves on. Touch-only devices get MobileNav instead (the `desk` variant).
   useEffect(() => {
     const aside = asideRef.current;
     if (!aside) return;
@@ -56,13 +56,21 @@ export function AdminShell({
       if (e.pointerType !== "touch") set(e.target instanceof Node && aside.contains(e.target));
     };
     const leave = (e: PointerEvent) => e.pointerType !== "touch" && set(false);
+    const escape = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      clearTimeout(timer);
+      setHovered(false);
+      setFocused(false);
+    };
     document.addEventListener("pointermove", move, { passive: true });
+    document.addEventListener("keydown", escape);
     aside.addEventListener("pointerleave", leave);
     // Already resting on it when the page finished loading.
     if (aside.matches(":hover")) set(true);
     return () => {
       clearTimeout(timer);
       document.removeEventListener("pointermove", move);
+      document.removeEventListener("keydown", escape);
       aside.removeEventListener("pointerleave", leave);
     };
   }, []);
@@ -76,17 +84,18 @@ export function AdminShell({
   return (
     <div
       data-pinned={pinned ? "" : undefined}
-      className={cn("min-h-dvh lg:pl-25 lg:transition-[padding] lg:duration-300 lg:data-[pinned]:pl-67 motion-reduce:transition-none", EASE)}
+      className={cn("min-h-dvh desk:pl-25 desk:transition-[padding] desk:duration-300 desk:data-[pinned]:pl-67 motion-reduce:transition-none", EASE)}
     >
       <aside
         ref={asideRef}
         aria-label="Sidebar"
         data-open={open ? "" : undefined}
-        // Keyboard focus opens it; a mouse click leaving focus on a link doesn't keep it open.
-        onFocus={(e) => e.target.matches(":focus-visible") && setFocused(true)}
+        // Keyboard focus opens it; a click (which leaves focus on a link) doesn't keep it open.
+        onPointerDown={() => setFocused(false)}
+        onFocus={(e) => setFocused(e.target.matches(":focus-visible"))}
         onBlur={(e) => !e.currentTarget.contains(e.relatedTarget) && setFocused(false)}
         className={cn(
-          "group/side fixed inset-y-3 left-3 z-40 hidden w-18 flex-col overflow-hidden rounded-3xl border bg-card px-3 py-4 transition-[width,box-shadow] duration-300 data-[open]:w-60 lg:flex motion-reduce:transition-none",
+          "group/side fixed inset-y-3 left-3 z-40 hidden w-18 flex-col overflow-clip rounded-3xl border bg-card px-3 py-4 transition-[width,box-shadow] duration-300 data-[open]:w-60 desk:flex motion-reduce:transition-none",
           EASE,
           open && !pinned ? "shadow-2xl shadow-black/15" : "shadow-sm",
         )}
@@ -101,7 +110,8 @@ export function AdminShell({
             <span className="rounded-md bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">Admin</span>
           </span>
         </Link>
-        <div className="-mx-1 mt-5 mb-3 min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-1">
+        {/* p-1 leaves room for focus rings; no scrollbar on the slim rail (it would squeeze the icons). */}
+        <div className="-mx-1 mt-4 mb-2 min-h-0 flex-1 scroll-py-1 overflow-x-hidden overflow-y-auto p-1 [scrollbar-width:none] group-data-[open]/side:[scrollbar-width:thin] [&::-webkit-scrollbar]:hidden">
           <AdminNav allowed={allowed} badges={badges} />
         </div>
         <SidebarFooter logout={logout} pin={{ pinned, onToggle: togglePin }} />

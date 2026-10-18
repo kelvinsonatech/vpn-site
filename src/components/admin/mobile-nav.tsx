@@ -7,14 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Brand } from "@/components/brand";
 import { AdminNav, SidebarFooter, type NavBadges, type NavKey } from "./nav";
 
-/** Phones and tablets: the sidebar as a floating sheet that slides in from the left, always open. */
+/** Phones, tablets and touch-only screens: the sidebar as a floating sheet that slides in from the left, always open. */
 export function MobileNav({ allowed, badges, siteName, logout }: { allowed: NavKey[]; badges?: NavBadges; siteName?: string; logout: () => Promise<void> }) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
   return (
     <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
       <DialogPrimitive.Trigger asChild>
-        <Button variant="ghost" size="icon-sm" className="lg:hidden" aria-label="Open navigation">
+        <Button variant="ghost" size="icon-sm" className="desk:hidden" aria-label="Open navigation">
           <MenuIcon />
         </Button>
       </DialogPrimitive.Trigger>
@@ -26,7 +26,7 @@ export function MobileNav({ allowed, badges, siteName, logout }: { allowed: NavK
         >
           <DialogPrimitive.Title className="sr-only">Navigation</DialogPrimitive.Title>
           <Brand suffix="Admin" name={siteName} markClassName="size-9" className="h-12 px-1.5" />
-          <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
+          <div className="-m-1 min-h-0 flex-1 scroll-py-1 overflow-y-auto p-1">
             <AdminNav allowed={allowed} badges={badges} onNavigate={close} />
           </div>
           <SidebarFooter logout={logout} onNavigate={close} />
