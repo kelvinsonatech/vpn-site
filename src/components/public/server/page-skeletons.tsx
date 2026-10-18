@@ -100,3 +100,25 @@ export function StatusPageSkeleton() {
     </div>
   );
 }
+
+/** Loading state of the simple inner pages (about, contact, legal, report, my accounts): the hero band and a few text cards. */
+export function InnerPageSkeleton() {
+  return (
+    <div aria-busy="true" aria-live="polite">
+      <span className="sr-only">Loading…</span>
+      <HeroSkeleton chips={2} />
+      <Container className="grid max-w-4xl gap-4 pt-2 pb-16 sm:pb-24">
+        {Array.from({ length: 3 }, (_, i) => (
+          <div key={i} className="rounded-3xl border bg-card p-5 sm:p-6">
+            <Skeleton className="h-5 w-48 max-w-full" />
+            <div className="mt-4 space-y-2.5">
+              <Skeleton className="h-3.5 w-full" />
+              <Skeleton className="h-3.5 w-11/12" />
+              <Skeleton className="h-3.5 w-4/5" />
+            </div>
+          </div>
+        ))}
+      </Container>
+    </div>
+  );
+}

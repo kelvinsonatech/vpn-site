@@ -95,8 +95,8 @@ function ThemeRow() {
 
 /**
  * Navigation for phones and tablets: a dropdown card under the menu button (Radix Popover, modal:
- * focus stays inside, Escape or a tap outside closes it, focus returns to the button). It also
- * closes whenever the route changes. The portal is wrapped in .vl-public so the public palette
+ * focus stays inside, Escape or a tap outside closes it, focus returns to the button). Tapping a
+ * link closes it at once, before the next page arrives; it also closes whenever the route changes. The portal is wrapped in .vl-public so the public palette
  * applies outside the layout tree.
  */
 export function SiteMobileNav({ siteName, protocols }: { siteName: string; protocols: NavProtocol[] }) {
@@ -130,14 +130,12 @@ export function SiteMobileNav({ siteName, protocols }: { siteName: string; proto
     if (next) setServicesOpen(inServices);
   };
   const close = () => setOpen(false);
-  /** Following a link to the page you're on doesn't change the route, so close explicitly. */
-  const closeIfHere = (href: string) => (pathname === href ? close : undefined);
 
   const link = (href: string, label: string, Icon: typeof HomeIcon, extra?: React.ReactNode) => {
     const current = isCurrent(pathname, href);
     return (
       <li key={href}>
-        <Link href={href} onClick={closeIfHere(href)} aria-current={current ? "page" : undefined} className={rowClass(current)}>
+        <Link href={href} onClick={close} aria-current={current ? "page" : undefined} className={rowClass(current)}>
           <Icon />
           <span className="flex-1">{label}</span>
           {extra}
@@ -181,7 +179,7 @@ export function SiteMobileNav({ siteName, protocols }: { siteName: string; proto
               {active.length > 0 ? (
                 <Link
                   href="/my-accounts"
-                  onClick={closeIfHere("/my-accounts")}
+                  onClick={close}
                   className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl bg-muted/60 px-3 py-3 outline-none transition-colors hover:bg-muted focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 >
                   <AvatarStack accounts={active} size={36} />
@@ -237,7 +235,7 @@ export function SiteMobileNav({ siteName, protocols }: { siteName: string; proto
                             <li key={p.slug}>
                               <Link
                                 href={p.href}
-                                onClick={closeIfHere(p.href)}
+                                onClick={close}
                                 aria-current={current ? "page" : undefined}
                                 className={cn(
                                   "flex min-h-12 items-center gap-3 rounded-xl px-2 py-1.5 outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50",

@@ -37,7 +37,7 @@ import { Container, EmptyState, SectionHeading } from "@/components/public/secti
 import { absoluteUrl, pageMetadata } from "@/lib/seo";
 import type { PublicServerCard, StatusPageData } from "@/lib/public/types";
 import { avatarDataUri } from "@/server/avatar";
-import { loadProtocols, loadSettings, loadStats, loadStatus, joinTimes, zoneLabel } from "./_lib/data";
+import { loadProtocols, loadSettings, loadStats, loadStatus, joinTimes, zoneLabel } from "../_lib/data";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
