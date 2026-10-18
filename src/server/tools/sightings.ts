@@ -2,6 +2,7 @@ import { and, eq, inArray, lt, ne, sql } from "drizzle-orm";
 import { rateLimit } from "@/server/auth/rate-limit";
 import { db } from "@/server/db";
 import { dnsSightings } from "@/server/db/schema";
+import { registrableDomain } from "./domain-name";
 
 /**
  * The tools' memory of which hostname pointed to which IP (src/server/db/schema.ts dnsSightings):
@@ -21,16 +22,6 @@ const MAX_NAMES_PER_DOMAIN = 20;
 const DAILY_BUDGET = 5_000;
 /** Read side: per domain, only its most recent names are checked, so one domain can't fill an IP's list. */
 const CANDIDATES_PER_DOMAIN = 2;
-
-/** Second-level labels used under country codes ("example.co.uk", "site.com.ng"). */
-const SECOND_LEVEL = new Set(["co", "com", "net", "org", "gov", "edu", "ac", "or", "ne", "go", "sch", "mil", "nic"]);
-
-/** "www.example.co.uk" → "example.co.uk", "a.b.example.com" → "example.com" (close enough for caps). */
-export function registrableDomain(hostname: string): string {
-  const labels = hostname.split(".");
-  const take = labels.length >= 3 && labels.at(-1)!.length === 2 && SECOND_LEVEL.has(labels.at(-2)!) ? 3 : 2;
-  return labels.slice(-take).join(".");
-}
 
 /** Dynamic-DNS, tunnel and preview domains: names that usually point at one person's machine. */
 const PERSONAL_SUFFIXES = [

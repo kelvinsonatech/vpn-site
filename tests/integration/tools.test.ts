@@ -2,9 +2,12 @@ import { sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { db } from "@/server/db";
 import { dnsSightings } from "@/server/db/schema";
-import { isPersonalName, purgeDnsSightings, registrableDomain } from "@/server/tools/sightings";
+import { registrableDomain } from "@/server/tools/domain-name";
+import { isPersonalName, purgeDnsSightings } from "@/server/tools/sightings";
 import { POST as hostnameToIp } from "@/app/api/public/tools/hostname-ip/route";
 import { POST as ipToHostname } from "@/app/api/public/tools/ip-hostname/route";
+import { POST as domainAge } from "@/app/api/public/tools/domain-age/route";
+import { resetDomainAgeCaches } from "@/server/tools/domain-age";
 import { resetDatabase, teardown } from "../helpers";
 
 /**
@@ -185,5 +188,35 @@ describe("sightings helpers", () => {
   it("spots dynamic-DNS and tunnel names only", () => {
     for (const h of ["myhome.duckdns.org", "abc-def.trycloudflare.com", "1-2-3-4.nip.io", "nas.synology.me"]) expect(isPersonalName(h)).toBe(true);
     for (const h of ["screenclass.com", "notduckdns.org", "duckdns.org.example.com"]) expect(isPersonalName(h)).toBe(false);
+  });
+});
+
+describe("Domain Age route", () => {
+  beforeEach(() => {
+    resetDomainAgeCaches();
+    vi.stubGlobal("fetch", async (input: URL | string) => {
+      const url = String(input);
+      if (url === "https://data.iana.org/rdap/dns.json") return Response.json({ services: [[["com"], ["https://rdap.verisign.example/com/v1/"]]] });
+      if (url === "https://rdap.verisign.example/com/v1/domain/google.com")
+        return Response.json({ ldhName: "GOOGLE.COM", events: [{ eventAction: "registration", eventDate: "1997-09-15T04:00:00Z" }] });
+      return new Response("{}", { status: 404 });
+    });
+  });
+  afterAll(() => vi.unstubAllGlobals());
+
+  const check = async (domain: unknown) => {
+    const res = await domainAge(post("/api/public/tools/domain-age", { domain }));
+    return { status: res.status, body: await res.json() };
+  };
+
+  it("checks the input, then answers from the registry", async () => {
+    expect(await check("8.8.8.8")).toMatchObject({ status: 400, body: { error: { code: "IS_IP" } } });
+    expect(await check("not a domain")).toMatchObject({ status: 400, body: { error: { code: "INVALID_DOMAIN" } } });
+    expect(await check(42)).toMatchObject({ status: 400, body: { error: { code: "INVALID_INPUT" } } });
+    expect(await check("https://www.google.com/search?q=x")).toMatchObject({
+      status: 200,
+      body: { domain: "google.com", registered: "1997-09-15T04:00:00.000Z", source: "rdap" },
+    });
+    expect(await check("nope-zzq.com")).toMatchObject({ status: 404, body: { error: { code: "NOT_REGISTERED" } } });
   });
 });

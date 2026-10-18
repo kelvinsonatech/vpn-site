@@ -1,4 +1,4 @@
-import { GlobeIcon, NetworkIcon } from "lucide-react";
+import { CalendarClockIcon, GlobeIcon, NetworkIcon } from "lucide-react";
 import hostnameToIpImage from "@/assets/hostname-to-ip.webp";
 import ipToHostnameImage from "@/assets/ip-to-hostname.webp";
 
@@ -22,6 +22,14 @@ export const TOOLS = [
     description: "Find the hostname (reverse DNS) of any IPv4 or IPv6 address.",
     icon: GlobeIcon,
     image: ipToHostnameImage,
+  },
+  {
+    slug: "domain-age",
+    href: "/tools/domain-age",
+    name: "Domain Age Checker",
+    description: "See how old a domain is, when it was registered and when it expires.",
+    icon: CalendarClockIcon,
+    image: null,
   },
 ] as const;
 
