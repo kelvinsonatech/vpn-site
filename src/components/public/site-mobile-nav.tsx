@@ -43,10 +43,14 @@ const THEMES = [
 
 const isCurrent = (pathname: string, href: string) => (href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`));
 
+/** The current page is marked by more than colour: bold text and a bar on the left (an outline in forced-colours mode). */
+const CURRENT_MARK =
+  "relative font-semibold before:absolute before:inset-y-2.5 before:left-0 before:w-1 before:rounded-full before:bg-primary forced-colors:outline forced-colors:outline-1";
+
 const rowClass = (current: boolean) =>
   cn(
     "flex h-11 w-full items-center gap-3 rounded-xl px-3 text-[15px] font-medium outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50 [&>svg:first-child]:size-5 [&>svg:first-child]:shrink-0",
-    current ? "bg-accent text-primary [&>svg:first-child]:text-primary" : "text-foreground hover:bg-muted [&>svg:first-child]:text-muted-foreground",
+    current ? cn("bg-accent text-primary [&>svg:first-child]:text-primary", CURRENT_MARK) : "text-foreground hover:bg-muted [&>svg:first-child]:text-muted-foreground",
   );
 
 /** A service's logo: picture logos fill the tile, line icons sit on the service's colour. */
@@ -67,7 +71,7 @@ function ThemeRow() {
   return (
     <div className="flex items-center justify-between gap-3 px-3 py-1.5">
       <span className="text-[15px] font-medium text-foreground">Appearance</span>
-      <div role="group" aria-label="Colour theme" className="flex rounded-full bg-muted p-0.5">
+      <div role="group" aria-label="Colour theme" className="flex gap-0.5 rounded-full bg-muted p-0.5">
         {THEMES.map(({ value, label, icon: Icon }) => (
           <button
             key={value}
@@ -77,7 +81,7 @@ function ThemeRow() {
             aria-label={label}
             title={label}
             className={cn(
-              "flex size-8 items-center justify-center rounded-full outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50",
+              "flex size-10 items-center justify-center rounded-full outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50",
               theme === value ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground",
             )}
           >
@@ -109,6 +113,17 @@ export function SiteMobileNav({ siteName, protocols }: { siteName: string; proto
       setOpen(false);
     }
   }, [pathname]);
+
+  // From the lg breakpoint the header shows the full navigation and hides this button: close the menu
+  // (e.g. a tablet rotated to landscape) instead of leaving it floating with no anchor.
+  useEffect(() => {
+    const desktop = window.matchMedia("(min-width: 64rem)");
+    const onChange = () => {
+      if (desktop.matches) setOpen(false);
+    };
+    desktop.addEventListener("change", onChange);
+    return () => desktop.removeEventListener("change", onChange);
+  }, []);
 
   const onOpenChange = (next: boolean) => {
     setOpen(next);
@@ -157,33 +172,43 @@ export function SiteMobileNav({ siteName, protocols }: { siteName: string; proto
               (e.currentTarget as HTMLElement | null)?.focus({ preventScroll: true });
             }}
             tabIndex={-1}
-            className="vl-public z-50 max-h-[min(var(--radix-popover-content-available-height),42rem)] w-[min(22rem,calc(100vw-1.5rem))] origin-(--radix-popover-content-transform-origin) overflow-y-auto overscroll-contain rounded-3xl border bg-card p-2 text-card-foreground shadow-2xl shadow-[oklch(0.3_0.1_265/0.18)] outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=open]:slide-in-from-top-2 motion-reduce:animate-none"
+            className="z-50 max-h-[min(var(--radix-popover-content-available-height),42rem)] w-[min(22rem,calc(100vw-1.5rem))] origin-(--radix-popover-content-transform-origin) overflow-y-auto overscroll-contain rounded-3xl border bg-card p-2 text-card-foreground shadow-2xl shadow-[oklch(0.3_0.1_265/0.18)] outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=open]:slide-in-from-top-2 motion-reduce:animate-none"
           >
-            {/* Header card: your accounts on this device, or the site when there are none yet. */}
-            {active.length > 0 ? (
-              <Link
-                href="/my-accounts"
-                onClick={closeIfHere("/my-accounts")}
-                className="flex items-center gap-3 rounded-2xl bg-muted/60 px-3 py-3 outline-none transition-colors hover:bg-muted focus-visible:ring-[3px] focus-visible:ring-ring/50"
-              >
-                <AvatarStack accounts={active} size={36} />
-                <span className="min-w-0 flex-1">
-                  <span className="block font-semibold">
-                    {active.length} active account{active.length === 1 ? "" : "s"}
+            {/* Header card (your accounts on this device, or the site when there are none yet) and a close
+                button inside the card: while the menu is open everything outside it is hidden from screen
+                readers, so the menu button's X can't be reached there. */}
+            <div className="flex items-stretch gap-2">
+              {active.length > 0 ? (
+                <Link
+                  href="/my-accounts"
+                  onClick={closeIfHere("/my-accounts")}
+                  className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl bg-muted/60 px-3 py-3 outline-none transition-colors hover:bg-muted focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                >
+                  <AvatarStack accounts={active} size={36} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-semibold">
+                      {active.length} active account{active.length === 1 ? "" : "s"}
+                    </span>
+                    <span className="block text-xs text-muted-foreground">Saved on this device</span>
                   </span>
-                  <span className="block text-xs text-muted-foreground">Saved on this device</span>
-                </span>
-                <ChevronRightIcon className="size-4 text-muted-foreground" />
-              </Link>
-            ) : (
-              <div className="flex items-center gap-3 rounded-2xl bg-muted/60 px-3 py-3">
-                <BrandMark className="size-9" />
-                <span className="min-w-0">
-                  <span className="block truncate font-semibold">{siteName}</span>
-                  <span className="block text-xs text-muted-foreground">Free SSH &amp; VPN accounts</span>
-                </span>
-              </div>
-            )}
+                  <ChevronRightIcon className="size-4 text-muted-foreground" />
+                </Link>
+              ) : (
+                <div className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl bg-muted/60 px-3 py-3">
+                  <BrandMark className="size-9" />
+                  <span className="min-w-0">
+                    <span className="block truncate font-semibold">{siteName}</span>
+                    <span className="block text-xs text-muted-foreground">Free SSH &amp; VPN accounts</span>
+                  </span>
+                </div>
+              )}
+              <PopoverPrimitive.Close
+                aria-label="Close menu"
+                className="flex w-11 shrink-0 items-center justify-center rounded-2xl bg-muted/60 text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              >
+                <XIcon className="size-5" />
+              </PopoverPrimitive.Close>
+            </div>
 
             <nav aria-label="Mobile" className="mt-2">
               <ul className="grid gap-0.5">
