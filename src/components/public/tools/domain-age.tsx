@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRightLeftIcon, InfoIcon } from "lucide-react";
 import { calendarSpan, daysBetween, formatSpan } from "@/lib/date-span";
 import { cn } from "@/lib/utils";
+import bandImage from "@/assets/domain-age-band.webp";
 import calendarImage from "@/assets/domain-age-result.webp";
 import { CopyAction } from "../account/copy-action";
 import { crossLinkClass, LookupError, LookupForm, useLookup } from "./lookup";
@@ -116,17 +117,35 @@ export function DomainAgeChecker({ initialDomain }: { initialDomain: string }) {
               <CopyAction value={result.domain} label={`Copy ${result.domain}`} />
             </div>
 
-            <div className="rounded-2xl bg-primary/5 px-5 py-4 text-center ring-1 ring-primary/15">
-              <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Domain age</p>
+            {/* The age over a photo: a dark gradient keeps the white text readable on any part of the picture. */}
+            <div className="relative isolate overflow-hidden rounded-2xl px-5 py-7 text-center text-white shadow-md ring-1 ring-black/10 sm:py-9">
+              {/* eslint-disable-next-line @next/next/no-img-element -- bundled background picture */}
+              <img
+                src={bandImage.src}
+                alt=""
+                aria-hidden="true"
+                width={bandImage.width}
+                height={bandImage.height}
+                decoding="async"
+                draggable={false}
+                className="absolute inset-0 -z-20 size-full object-cover object-[50%_60%]"
+              />
+              <span
+                aria-hidden
+                className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_55%_65%_at_center,rgb(0_0_0/0.45),transparent),linear-gradient(to_top,rgb(0_0_0/0.8),rgb(0_0_0/0.5),rgb(0_0_0/0.35))]"
+              />
+              <p className="inline-flex rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold tracking-wider uppercase ring-1 ring-white/25 backdrop-blur-sm">
+                Domain age
+              </p>
               {age ? (
                 <>
-                  <p className="mt-1 text-2xl font-bold tracking-tight text-balance sm:text-3xl">{formatSpan(age)}</p>
-                  <p className="mt-1 text-sm text-muted-foreground tabular-nums">
+                  <p className="mt-2 text-2xl font-bold tracking-tight text-balance drop-shadow-md sm:text-4xl">{formatSpan(age)}</p>
+                  <p className="mt-1.5 text-sm text-white/85 tabular-nums drop-shadow">
                     {ageDays.toLocaleString("en-US")} day{ageDays === 1 ? "" : "s"} since {formatDate(result.registered!)}
                   </p>
                 </>
               ) : (
-                <p className="mt-1 text-sm text-muted-foreground">This domain&apos;s registry doesn&apos;t publish when it was registered.</p>
+                <p className="mt-2 text-sm text-white/90 drop-shadow">This domain&apos;s registry doesn&apos;t publish when it was registered.</p>
               )}
             </div>
 
