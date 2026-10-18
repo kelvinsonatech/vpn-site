@@ -1,6 +1,7 @@
 import { CalendarClockIcon, GlobeIcon, NetworkIcon } from "lucide-react";
 import hostnameToIpImage from "@/assets/hostname-to-ip.webp";
 import ipToHostnameImage from "@/assets/ip-to-hostname.webp";
+import domainAgeImage from "@/assets/domain-age.webp";
 
 /**
  * The public tools, in menu order: the /tools page lists them from here. `image`, when set, is the
@@ -29,7 +30,7 @@ export const TOOLS = [
     name: "Domain Age Checker",
     description: "See how old a domain is, when it was registered and when it expires.",
     icon: CalendarClockIcon,
-    image: null,
+    image: domainAgeImage,
   },
 ] as const;
 

@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
-import { CalendarClockIcon, InfoIcon } from "lucide-react";
+import { InfoIcon } from "lucide-react";
 import { PageHeader } from "@/components/public/page-header";
 import { Container } from "@/components/public/section";
 import { DomainAgeChecker } from "@/components/public/tools/domain-age";
 import { pageMetadata } from "@/lib/seo";
 import { loadSettings } from "../../_lib/data";
+import toolImage from "@/assets/domain-age.webp";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
@@ -26,7 +27,10 @@ export default async function DomainAgePage({ searchParams }: { searchParams: Se
     <>
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "Tools", href: "/tools" }, { label: "Domain Age Checker" }]}
-        icon={<CalendarClockIcon />}
+        icon={
+          // eslint-disable-next-line @next/next/no-img-element -- small bundled picture; the header sizes it
+          <img src={toolImage.src} alt="" aria-hidden="true" width={64} height={64} draggable={false} className="rounded-2xl bg-white object-contain p-1" />
+        }
         eyebrow="Tool"
         title="Domain Age Checker"
         description="Type a domain name to see how old it is, when it was registered and when it expires."
