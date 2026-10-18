@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
-import { InfoIcon, NetworkIcon } from "lucide-react";
+import { InfoIcon } from "lucide-react";
 import { PageHeader } from "@/components/public/page-header";
 import { Container } from "@/components/public/section";
 import { HostnameToIp } from "@/components/public/tools/hostname-to-ip";
 import { pageMetadata } from "@/lib/seo";
 import { loadSettings } from "../../_lib/data";
+import toolImage from "@/assets/hostname-to-ip.webp";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
@@ -27,7 +28,10 @@ export default async function HostnameToIpPage({ searchParams }: { searchParams:
     <>
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "Tools", href: "/tools" }, { label: "Hostname to IP" }]}
-        icon={<NetworkIcon />}
+        icon={
+          // eslint-disable-next-line @next/next/no-img-element -- small bundled picture; the header sizes it
+          <img src={toolImage.src} alt="" aria-hidden="true" width={64} height={64} draggable={false} className="rounded-2xl bg-white object-contain p-1.5" />
+        }
         eyebrow="Tool"
         title="Hostname to IP"
         description="Type a hostname or paste a link to see the IP addresses it points to."

@@ -31,15 +31,22 @@ export default async function ToolsPage() {
       />
       <Container className="pt-2 pb-16 sm:pb-24">
         <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {TOOLS.map(({ slug, href, name, description, icon: Icon }) => (
+          {TOOLS.map(({ slug, href, name, description, icon: Icon, image }) => (
             <li key={slug}>
               <Link
                 href={href}
                 className="group flex h-full flex-col rounded-3xl border bg-card p-5 shadow-sm outline-none transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:shadow-lg focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:p-6 motion-reduce:hover:translate-y-0"
               >
-                <span className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-md shadow-primary/25">
-                  <Icon className="size-6" aria-hidden />
-                </span>
+                {image ? (
+                  <span className="flex size-12 items-center justify-center rounded-2xl border bg-white p-1 shadow-sm">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- small bundled picture */}
+                    <img src={image.src} alt="" aria-hidden="true" width={48} height={48} draggable={false} className="size-full object-contain" />
+                  </span>
+                ) : (
+                  <span className="flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-md shadow-primary/25">
+                    <Icon className="size-6" aria-hidden />
+                  </span>
+                )}
                 <span className="mt-4 text-lg font-bold tracking-tight">{name}</span>
                 <span className="mt-1 flex-1 text-sm text-muted-foreground">{description}</span>
                 <span className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
