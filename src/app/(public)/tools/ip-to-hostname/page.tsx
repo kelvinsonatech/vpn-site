@@ -52,6 +52,14 @@ export default async function IpToHostnamePage({ searchParams }: { searchParams:
               <strong className="font-semibold text-foreground">Verified</strong> means the hostname also points back to the same IP, so the two really belong
               together.
             </li>
+            <li>
+              Websites on shared hosting or a CDN share their provider&apos;s IPs with many other sites. For those you&apos;ll see the provider&apos;s name (for
+              example <span className="font-mono text-foreground">…ingress.render.com</span>), not the website. That&apos;s how reverse DNS works everywhere.
+            </li>
+            <li>
+              <strong className="font-semibold text-foreground">Owner of this IP</strong> shows the network the address belongs to, from the public internet
+              routing records (via Team Cymru&apos;s free lookup service).
+            </li>
             <li>Many addresses have no hostname at all, and mobile data addresses usually show your network provider&apos;s name.</li>
             <li>Only public addresses can be looked up. We only query DNS; nothing connects to the address, and lookups aren&apos;t saved.</li>
           </ul>

@@ -1,19 +1,68 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import Link from "next/link";
-import { ArrowRightLeftIcon, BadgeCheckIcon, GlobeIcon } from "lucide-react";
+import { ArrowRightLeftIcon, BadgeCheckIcon, GlobeIcon, InfoIcon } from "lucide-react";
+import { countryName } from "@/lib/countries";
 import { CopyAction } from "../account/copy-action";
+import { Flag } from "../flag";
 import { crossLinkClass, LookupError, LookupForm, useLookup } from "./lookup";
 
 interface ReverseLookup {
   ip: string;
   hostnames: { name: string; confirmed: boolean }[];
+  network: { asn: number; name: string; prefix: string; country: string | null } | null;
+}
+
+/** Lets a long hostname wrap after its dots ("ip-216-24-57-1.ingress." / "render.com") rather than mid-word. */
+function breakAtDots(name: string) {
+  return name.split(".").map((part, i) => (
+    <Fragment key={i}>
+      {i ? "." : null}
+      {i ? <wbr /> : null}
+      {part}
+    </Fragment>
+  ));
+}
+
+function OwnerRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex min-h-11 items-center gap-3 px-4 py-2">
+      <dt className="w-20 shrink-0 text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 font-medium [overflow-wrap:anywhere]">{children}</dd>
+    </div>
+  );
+}
+
+/** Who the address belongs to: network name and ASN, country and announced range. */
+function NetworkOwner({ network }: { network: NonNullable<ReverseLookup["network"]> }) {
+  return (
+    <div>
+      <h3 className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Owner of this IP</h3>
+      <dl className="divide-y overflow-hidden rounded-2xl border bg-muted/30 text-sm">
+        <OwnerRow label="Network">
+          {network.name || "Unknown"} <span className="text-muted-foreground">· AS{network.asn}</span>
+        </OwnerRow>
+        {network.country ? (
+          <OwnerRow label="Country">
+            <span className="inline-flex items-center gap-1.5">
+              <Flag code={network.country} className="h-3 w-4" />
+              {countryName(network.country)}
+            </span>
+          </OwnerRow>
+        ) : null}
+        <OwnerRow label="IP range">
+          <span className="font-mono">{network.prefix}</span>
+        </OwnerRow>
+      </dl>
+    </div>
+  );
 }
 
 /**
  * The "IP to Hostname" form and result: an IP address in, its reverse DNS names out, each marked
- * "Verified" when it points back to the same IP, with a copy button and a link to look it up forwards.
+ * "Verified" when it points back to the same IP, with a copy button and a link to look it up forwards,
+ * plus who owns the address (shared hosting and CDN addresses show the provider, not the websites).
  * `myIp` (the visitor's own public address) becomes a one-tap example. Shareable as ?ip=.
  */
 export function IpToHostname({ initialIp, myIp }: { initialIp: string; myIp: string | null }) {
@@ -63,30 +112,44 @@ export function IpToHostname({ initialIp, myIp }: { initialIp: string; myIp: str
               <div className="min-w-0 flex-1">
                 <p className="font-mono text-base font-semibold [overflow-wrap:anywhere]">{result.ip}</p>
                 <p className="text-sm text-muted-foreground">
-                  {result.hostnames.length} hostname{result.hostnames.length === 1 ? "" : "s"} found
+                  {result.hostnames.length
+                    ? `${result.hostnames.length} hostname${result.hostnames.length === 1 ? "" : "s"} found`
+                    : "No hostname is set for this IP"}
                 </p>
               </div>
             </div>
-            <ul className="divide-y overflow-hidden rounded-2xl border bg-muted/30">
-              {result.hostnames.map((h) => (
-                <li key={h.name} className="flex min-h-12 items-center gap-1 py-1 pr-1 pl-4">
-                  <span className="min-w-0 flex-1 font-mono text-sm font-medium select-all [overflow-wrap:anywhere]">{h.name}</span>
-                  {h.confirmed ? (
-                    <span
-                      className="mr-1 inline-flex shrink-0 items-center gap-1 rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-medium text-success"
-                      title="This hostname points back to the same IP address"
-                    >
-                      <BadgeCheckIcon className="size-3" aria-hidden />
-                      Verified
+            {result.hostnames.length ? (
+              <ul className="divide-y overflow-hidden rounded-2xl border bg-muted/30">
+                {result.hostnames.map((h) => (
+                  <li key={h.name} className="flex min-h-12 items-center gap-1 py-1 pr-1 pl-4">
+                    <span className="min-w-0 flex-1 py-1.5">
+                      <span className="block font-mono text-sm font-medium break-words select-all">{breakAtDots(h.name)}</span>
+                      {h.confirmed ? (
+                        <span
+                          className="mt-1 inline-flex items-center gap-1 rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-medium text-success"
+                          title="This hostname points back to the same IP address"
+                        >
+                          <BadgeCheckIcon className="size-3" aria-hidden />
+                          Verified
+                        </span>
+                      ) : null}
                     </span>
-                  ) : null}
-                  <Link href={`/tools/hostname-to-ip?host=${encodeURIComponent(h.name)}`} aria-label={`Find the IP addresses of ${h.name}`} title="Find its IP addresses" className={crossLinkClass}>
-                    <ArrowRightLeftIcon aria-hidden />
-                  </Link>
-                  <CopyAction value={h.name} label={`Copy ${h.name}`} />
-                </li>
-              ))}
-            </ul>
+                    <Link href={`/tools/hostname-to-ip?host=${encodeURIComponent(h.name)}`} aria-label={`Find the IP addresses of ${h.name}`} title="Find its IP addresses" className={crossLinkClass}>
+                      <ArrowRightLeftIcon aria-hidden />
+                    </Link>
+                    <CopyAction value={h.name} label={`Copy ${h.name}`} />
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            {result.network ? <NetworkOwner network={result.network} /> : null}
+            <p className="flex items-start gap-2.5 rounded-2xl bg-info-soft px-4 py-3 text-xs text-foreground/80">
+              <InfoIcon className="mt-0.5 size-4 shrink-0 text-info" aria-hidden />
+              <span>
+                Reverse DNS shows the name the IP&apos;s owner gave it. Websites on shared hosting or a CDN (Render, Cloudflare, Vercel…) use their
+                provider&apos;s IPs together with many other sites, so you&apos;ll see the provider here, not the website.
+              </span>
+            </p>
           </section>
         ) : null}
       </div>

@@ -3,7 +3,8 @@ import { limitTool, readToolField, toolResponse } from "@/server/tools/http";
 import { parseIpInput, reverseLookup } from "@/server/tools/reverse";
 
 /**
- * POST /api/public/tools/ip-hostname — { ip } → ReverseLookup (the address's reverse DNS names).
+ * POST /api/public/tools/ip-hostname — { ip } → ReverseLookup (the address's reverse DNS names, possibly
+ * none, and the network that owns it).
  * Same-origin JSON only; public addresses only; shares the tools' rate limit (src/server/tools/http.ts).
  */
 export async function POST(req: Request) {
