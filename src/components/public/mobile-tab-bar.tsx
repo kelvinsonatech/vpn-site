@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ActivityIcon, HomeIcon, LayersIcon, UserRoundIcon } from "lucide-react";
 import { Popover as PopoverPrimitive } from "radix-ui";
+import { UserAvatar } from "@/components/user-avatar";
 import { cn } from "@/lib/utils";
 import { LiquidNav } from "./liquid-nav";
 import { CountBadge, useActiveAccounts } from "./my-accounts-menu";
@@ -13,7 +14,7 @@ import { isCurrent, ServiceLinks } from "./site-mobile-nav";
 
 /** Icon tab; the current one is marked by the lens (its own tint only shows until the lens runs). */
 const TAB =
-  "relative flex h-12 w-16 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50 data-[current]:bg-primary/10 data-[current]:text-primary data-[state=open]:text-primary [&>svg]:size-[1.375rem] [&>svg]:transition-transform active:[&>svg]:scale-90";
+  "relative flex h-12 w-16 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50 data-[current]:bg-primary/10 data-[current]:text-primary data-[state=open]:text-primary [&>svg]:size-[1.375rem] [&>:first-child]:transition-transform active:[&>:first-child]:scale-90";
 
 /** Text fields that bring up the on-screen keyboard (the bar steps aside so it never covers them). */
 const TYPING_FIELD = "input:not([type=checkbox],[type=radio],[type=button],[type=submit],[type=reset],[type=range],[type=color],[type=file]), textarea, select, [contenteditable=true]";
@@ -53,11 +54,13 @@ export function MobileTabBar({ protocols }: { protocols: NavProtocol[] }) {
     };
   }, []);
 
-  const tab = (href: string, label: string, Icon: typeof HomeIcon, extra?: React.ReactNode) => {
+  // Saved accounts are newest first: the latest one's avatar stands in for the person icon.
+  const profile = active[0];
+  const tab = (href: string, label: string, icon: React.ReactNode, extra?: React.ReactNode) => {
     const current = isCurrent(pathname, href);
     return (
       <Link href={href} aria-label={label} aria-current={current ? "page" : undefined} data-current={current || undefined} className={TAB}>
-        <Icon aria-hidden />
+        {icon}
         {extra}
       </Link>
     );
@@ -76,16 +79,19 @@ export function MobileTabBar({ protocols }: { protocols: NavProtocol[] }) {
             aria-label="Shortcuts"
             className="flex gap-1 rounded-full border border-white/60 bg-card/85 p-1 shadow-[0_12px_32px_-12px_rgb(15_30_90/0.35)] ring-1 ring-black/5 backdrop-blur-xl backdrop-saturate-150 dark:border-white/10 dark:ring-white/5 dark:shadow-[0_12px_32px_-12px_rgb(0_0_0/0.7)]"
           >
-            {tab("/", "Home", HomeIcon)}
+            {tab("/", "Home", <HomeIcon aria-hidden />)}
             <PopoverPrimitive.Trigger aria-label="Services" data-current={inServices || undefined} className={TAB}>
               <LayersIcon aria-hidden />
             </PopoverPrimitive.Trigger>
-            {tab("/server-status", "Server status", ActivityIcon)}
+            {tab("/server-status", "Server status", <ActivityIcon aria-hidden />)}
             {tab(
               "/my-accounts",
               "My accounts",
-              UserRoundIcon,
-              <CountBadge count={active.length} className="absolute top-1.5 left-[calc(50%+0.2rem)] h-4 min-w-4 px-1 text-[10px] ring-2 ring-card" />,
+              profile ? <UserAvatar src={profile.avatar} size={28} className="ring-2 ring-card" /> : <UserRoundIcon aria-hidden />,
+              <CountBadge
+                count={active.length}
+                className={cn("absolute h-4 min-w-4 px-1 text-[10px] ring-2 ring-card", profile ? "top-0.5 left-[calc(50%+0.45rem)]" : "top-1.5 left-[calc(50%+0.2rem)]")}
+              />,
             )}
           </LiquidNav>
         </PopoverPrimitive.Anchor>
