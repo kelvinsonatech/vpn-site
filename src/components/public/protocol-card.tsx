@@ -28,10 +28,6 @@ export function ProtocolCard({ protocol: p, className, style }: { protocol: Publ
       )}
     >
       <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-[var(--tone)]" />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-40 bg-[radial-gradient(80%_100%_at_50%_0%,color-mix(in_oklch,var(--tone)_16%,transparent),transparent)] opacity-70 transition-opacity duration-300 group-hover:opacity-100"
-      />
       <div className="flex items-center justify-between gap-2">
         <span className="rounded-full bg-[color-mix(in_oklch,var(--tone)_12%,transparent)] px-2.5 py-1 text-[11px] font-semibold text-[var(--tone)]">{categoryLabel(p.category)}</span>
         <span
