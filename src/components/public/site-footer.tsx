@@ -11,6 +11,7 @@ const fmt = new Intl.NumberFormat("en-US");
 
 const RESOURCES = [
   { href: "/server-status", label: "Server status" },
+  { href: "/tools", label: "Tools" },
   { href: "/my-accounts", label: "My accounts" },
   { href: "/report", label: "Report a problem" },
   { href: "/#how-it-works", label: "How it works" },

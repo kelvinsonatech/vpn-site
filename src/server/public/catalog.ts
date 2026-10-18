@@ -50,7 +50,7 @@ const COUNTRY_SLUG = /^[a-z0-9][a-z0-9-]{0,63}$/;
 /** Fixed-key entries are never evicted by URL-derived ones (see cached()). */
 const PINNED = { pinned: true };
 
-export const STATIC_PAGES = ["/about", "/contact", "/privacy", "/terms", "/acceptable-use", "/server-status", "/report"];
+export const STATIC_PAGES = ["/about", "/contact", "/privacy", "/terms", "/acceptable-use", "/server-status", "/report", "/tools", "/tools/hostname-to-ip"];
 
 // ---------------------------------------------------------------------------
 // Snapshot: one query for every listed (server, protocol) pair

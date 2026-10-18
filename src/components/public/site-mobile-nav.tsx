@@ -17,6 +17,7 @@ import {
   MoonIcon,
   SunIcon,
   UserRoundIcon,
+  WrenchIcon,
   XIcon,
 } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -277,6 +278,7 @@ export function SiteMobileNav({ siteName, protocols }: { siteName: string; proto
                   ) : null}
                 </li>
                 {link("/server-status", "Server status", ActivityIcon)}
+                {link("/tools", "Tools", WrenchIcon)}
                 {link(
                   "/my-accounts",
                   "My accounts",

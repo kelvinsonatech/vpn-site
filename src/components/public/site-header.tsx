@@ -3,7 +3,7 @@
 import { useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ActivityIcon, ChevronDownIcon, FlagIcon, HomeIcon, InfoIcon, LifeBuoyIcon, MailIcon } from "lucide-react";
+import { ActivityIcon, ChevronDownIcon, FlagIcon, HomeIcon, InfoIcon, LifeBuoyIcon, MailIcon, WrenchIcon } from "lucide-react";
 import { Brand } from "@/components/brand";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -58,6 +58,15 @@ export function SiteHeader({ siteName, protocols }: { siteName: string; protocol
           >
             <ActivityIcon />
             Server status
+          </Link>
+          <Link
+            href="/tools"
+            aria-current={pathname.startsWith("/tools") ? "page" : undefined}
+            data-current={pathname.startsWith("/tools") || undefined}
+            className={navItemClass(pathname.startsWith("/tools"))}
+          >
+            <WrenchIcon />
+            Tools
           </Link>
           <MyAccountsMenu active={pathname.startsWith("/my-accounts")} />
           <DropdownMenu modal={false}>

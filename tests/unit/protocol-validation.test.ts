@@ -41,7 +41,7 @@ describe("protocol slugs", () => {
     }
   });
   it("covers every static public route listed in the product spec", () => {
-    const spec = ["about", "contact", "privacy", "terms", "acceptable-use", "report", "server-status", "my-accounts", "admin", "api", "sitemap.xml", "robots.txt", "_next"];
+    const spec = ["about", "contact", "privacy", "terms", "acceptable-use", "report", "server-status", "my-accounts", "tools", "admin", "api", "sitemap.xml", "robots.txt", "_next"];
     for (const slug of spec) expect(RESERVED_PROTOCOL_SLUGS).toContain(slug);
   });
   it("does not reserve similar but distinct names", () => {
