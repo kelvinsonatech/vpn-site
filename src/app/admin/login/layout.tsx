@@ -8,7 +8,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
     .then((s) => s.siteName)
     .catch(() => undefined);
   return (
-    <div className="relative flex min-h-dvh flex-col bg-muted/40">
+    <div className="vl-admin relative flex min-h-dvh flex-col bg-muted/40">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-0 h-72 bg-[radial-gradient(60%_100%_at_50%_0%,color-mix(in_oklch,var(--primary)_14%,transparent),transparent)]"

@@ -84,7 +84,7 @@ export function AdminShell({
   return (
     <div
       data-pinned={pinned ? "" : undefined}
-      className={cn("min-h-dvh desk:pl-25 desk:transition-[padding] desk:duration-300 desk:data-[pinned]:pl-67 motion-reduce:transition-none", EASE)}
+      className={cn("vl-admin min-h-dvh desk:pl-25 desk:transition-[padding] desk:duration-300 desk:data-[pinned]:pl-67 motion-reduce:transition-none", EASE)}
     >
       <aside
         ref={asideRef}
