@@ -195,7 +195,7 @@ export function SiteMobileNav({ siteName, protocols }: { siteName: string; proto
                 </Link>
               ) : (
                 <div className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl bg-muted/60 px-3 py-3">
-                  <BrandMark className="size-9" />
+                  <BrandMark className="size-10" />
                   <span className="min-w-0">
                     <span className="block truncate font-semibold">{siteName}</span>
                     <span className="block text-xs text-muted-foreground">Free SSH &amp; VPN accounts</span>

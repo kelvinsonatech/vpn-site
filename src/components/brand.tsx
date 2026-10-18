@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import { siteConfig } from "@/lib/site";
 import wolf from "@/assets/brand-wolf.webp";
 
-/** The wolf logo on a white tile. Decorative: the site name is always beside it or in the link's label. */
+/** The wolf logo (cut out, transparent). Decorative: the site name is always beside it or in the link's label. */
 export function BrandMark({ className }: { className?: string }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element -- small bundled logo, sized by the caller
@@ -13,7 +13,7 @@ export function BrandMark({ className }: { className?: string }) {
       width={wolf.width}
       height={wolf.height}
       draggable={false}
-      className={cn("size-7 shrink-0 rounded-[28%] bg-white object-cover ring-1 ring-black/5", className)}
+      className={cn("size-8 shrink-0 object-contain", className)}
     />
   );
 }

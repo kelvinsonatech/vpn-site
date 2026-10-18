@@ -56,7 +56,7 @@ export function SiteFooter({
       <div className="mx-auto grid max-w-6xl gap-10 px-4 pt-20 pb-12 sm:px-6 sm:pt-24 md:grid-cols-2 lg:grid-cols-12">
         <div className="lg:col-span-4">
           <Link href="/" className="inline-flex items-center gap-2.5 rounded-lg text-xl font-semibold tracking-tight outline-none focus-visible:ring-[3px] focus-visible:ring-white/40">
-            <BrandMark className="size-9" />
+            <BrandMark className="size-11" />
             {settings.siteName}
           </Link>
           <p className="mt-4 max-w-sm text-sm leading-6 text-footer-muted">

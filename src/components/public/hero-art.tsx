@@ -61,7 +61,7 @@ export function HeroArt({ avatar, servers, sample }: { avatar: string; servers: 
       </svg>
 
       <div className="absolute top-[40%] left-1/2 flex size-32 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[2.2rem] bg-white/15 shadow-2xl ring-1 shadow-black/20 ring-white/30 backdrop-blur-md sm:size-36">
-        <BrandMark className="size-20 drop-shadow-lg sm:size-24" />
+        <BrandMark className="size-24 drop-shadow-lg sm:size-28" />
       </div>
 
       {chips.map((s, i) => (

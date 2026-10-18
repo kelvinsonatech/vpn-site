@@ -12,7 +12,7 @@ export default async function NotFound() {
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center">
       <Link href="/" className="rounded-lg outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
-        <Brand className="text-lg" markClassName="size-8" name={siteName} />
+        <Brand className="text-lg" markClassName="size-10" name={siteName} />
       </Link>
       <StatusMessage code="404" title="This page could not be found" description="The link may be broken or the page may have moved." className="py-12 sm:py-16">
         <Link href="/" className={pillPrimary}>
