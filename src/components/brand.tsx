@@ -1,20 +1,20 @@
 import { cn } from "@/lib/utils";
 import { siteConfig } from "@/lib/site";
+import wolf from "@/assets/brand-wolf.webp";
 
-/** Original mark: a keyhole inside a rounded shield. */
+/** The wolf logo on a white tile. Decorative: the site name is always beside it or in the link's label. */
 export function BrandMark({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 32 32" aria-hidden="true" className={cn("size-7", className)}>
-      <rect x="2" y="2" width="28" height="28" rx="9" className="fill-primary" />
-      <path
-        d="M16 7.5 9.5 10v5.6c0 4.1 2.8 7.6 6.5 8.9 3.7-1.3 6.5-4.8 6.5-8.9V10L16 7.5Z"
-        className="fill-primary-foreground/15 stroke-primary-foreground"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-      <circle cx="16" cy="14.4" r="2.1" className="fill-primary-foreground" />
-      <path d="M15.1 15.6h1.8l.5 4h-2.8l.5-4Z" className="fill-primary-foreground" />
-    </svg>
+    // eslint-disable-next-line @next/next/no-img-element -- small bundled logo, sized by the caller
+    <img
+      src={wolf.src}
+      alt=""
+      aria-hidden="true"
+      width={wolf.width}
+      height={wolf.height}
+      draggable={false}
+      className={cn("size-7 shrink-0 rounded-[28%] bg-white object-cover ring-1 ring-black/5", className)}
+    />
   );
 }
 
