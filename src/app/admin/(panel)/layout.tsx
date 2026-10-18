@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { Brand } from "@/components/brand";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { AdminNav, PublicSiteLink, type NavBadges, type NavKey } from "@/components/admin/nav";
+import type { NavBadges, NavKey } from "@/components/admin/nav";
 import { MobileNav } from "@/components/admin/mobile-nav";
+import { AdminShell } from "@/components/admin/sidebar";
+import { SIDEBAR_COOKIE } from "@/components/admin/sidebar-cookie";
 import { UserMenu } from "@/components/admin/user-menu";
 import { requireAdmin } from "@/server/auth/guards";
 import { can, ROLE_LABELS } from "@/server/auth/rbac";
@@ -35,34 +38,29 @@ export default async function PanelLayout({ children }: { children: React.ReactN
   if (can(admin.role, "admins:manage")) allowed.push("admins");
   if (can(admin.role, "settings:manage")) allowed.push("settings");
 
-  const [settings, openReports] = await Promise.all([getSiteSettings(), allowed.includes("reports") ? openReportsBadge() : undefined]);
+  const [settings, openReports, jar] = await Promise.all([getSiteSettings(), allowed.includes("reports") ? openReportsBadge() : undefined, cookies()]);
   const badges: NavBadges = { reports: openReports };
   const avatar = adminAvatar(admin.id, settings.avatarStyle);
 
   return (
-    <div className="flex min-h-dvh">
-      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col gap-6 overflow-y-auto border-r border-sidebar-border bg-sidebar px-3 py-4 lg:flex">
-        <Link href="/admin" className="px-1.5">
-          <Brand suffix="Admin" name={settings.siteName} />
+    <AdminShell
+      allowed={allowed}
+      badges={badges}
+      siteName={settings.siteName}
+      initialPinned={jar.get(SIDEBAR_COOKIE)?.value === "pinned"}
+      logout={logoutAction}
+    >
+      <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background/85 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/70 sm:px-6">
+        <MobileNav allowed={allowed} badges={badges} siteName={settings.siteName} logout={logoutAction} />
+        <Link href="/admin" className="lg:hidden">
+          <Brand name={settings.siteName} />
         </Link>
-        <AdminNav allowed={allowed} badges={badges} />
-        <div className="mt-auto border-t border-sidebar-border pt-3">
-          <PublicSiteLink />
+        <div className="ml-auto flex items-center gap-1">
+          <ThemeToggle />
+          <UserMenu name={admin.name} email={admin.email} roleLabel={ROLE_LABELS[admin.role]} avatar={avatar} logout={logoutAction} />
         </div>
-      </aside>
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background/85 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/70 sm:px-6">
-          <MobileNav allowed={allowed} badges={badges} siteName={settings.siteName} />
-          <Link href="/admin" className="lg:hidden">
-            <Brand name={settings.siteName} />
-          </Link>
-          <div className="ml-auto flex items-center gap-1">
-            <ThemeToggle />
-            <UserMenu name={admin.name} email={admin.email} roleLabel={ROLE_LABELS[admin.role]} avatar={avatar} logout={logoutAction} />
-          </div>
-        </header>
-        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:py-8">{children}</main>
-      </div>
-    </div>
+      </header>
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:py-8">{children}</main>
+    </AdminShell>
   );
 }
