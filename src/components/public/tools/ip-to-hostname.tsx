@@ -10,7 +10,9 @@ import { crossLinkClass, LookupError, LookupForm, useLookup } from "./lookup";
 
 interface ReverseLookup {
   ip: string;
+  websites: string[];
   hostnames: { name: string; confirmed: boolean }[];
+  reverseDnsFailed: boolean;
   network: { asn: number; name: string; prefix: string; country: string | null } | null;
 }
 
@@ -23,6 +25,34 @@ function breakAtDots(name: string) {
       {part}
     </Fragment>
   ));
+}
+
+function ResultGroup({ title, count, children }: { title: string; count: number; children: React.ReactNode }) {
+  return (
+    <div>
+      <h3 className="mb-2 flex items-center justify-between text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+        {title}
+        {count ? <span className="font-normal tabular-nums normal-case">{count}</span> : null}
+      </h3>
+      {children}
+    </div>
+  );
+}
+
+/** A hostname with an optional badge under it, a link to look it up forwards and a copy button. */
+function NameRow({ name, children }: { name: string; children?: React.ReactNode }) {
+  return (
+    <li className="flex min-h-12 items-center gap-1 py-1 pr-1 pl-4">
+      <span className="min-w-0 flex-1 py-1.5">
+        <span className="block font-mono text-sm font-medium break-words select-all">{breakAtDots(name)}</span>
+        {children}
+      </span>
+      <Link href={`/tools/hostname-to-ip?host=${encodeURIComponent(name)}`} aria-label={`Find the IP addresses of ${name}`} title="Find its IP addresses" className={crossLinkClass}>
+        <ArrowRightLeftIcon aria-hidden />
+      </Link>
+      <CopyAction value={name} label={`Copy ${name}`} />
+    </li>
+  );
 }
 
 function OwnerRow({ label, children }: { label: string; children: React.ReactNode }) {
@@ -60,9 +90,9 @@ function NetworkOwner({ network }: { network: NonNullable<ReverseLookup["network
 }
 
 /**
- * The "IP to Hostname" form and result: an IP address in, its reverse DNS names out, each marked
- * "Verified" when it points back to the same IP, with a copy button and a link to look it up forwards,
- * plus who owns the address (shared hosting and CDN addresses show the provider, not the websites).
+ * The "IP to Hostname" form and result: an IP address in; out come the websites known to point to it
+ * (checked live), its reverse DNS names ("Verified" when they point back) and who owns the address.
+ * Every name has a copy button and a link to look it up forwards.
  * `myIp` (the visitor's own public address) becomes a one-tap example. Shareable as ?ip=.
  */
 export function IpToHostname({ initialIp, myIp }: { initialIp: string; myIp: string | null }) {
@@ -112,18 +142,39 @@ export function IpToHostname({ initialIp, myIp }: { initialIp: string; myIp: str
               <div className="min-w-0 flex-1">
                 <p className="font-mono text-base font-semibold [overflow-wrap:anywhere]">{result.ip}</p>
                 <p className="text-sm text-muted-foreground">
-                  {result.hostnames.length
-                    ? `${result.hostnames.length} hostname${result.hostnames.length === 1 ? "" : "s"} found`
-                    : "No hostname is set for this IP"}
+                  {result.websites.length
+                    ? `${result.websites.length} website${result.websites.length === 1 ? "" : "s"} on this IP`
+                    : result.hostnames.length
+                      ? `${result.hostnames.length} reverse DNS name${result.hostnames.length === 1 ? "" : "s"}`
+                      : "No hostname found"}
+                  {result.network?.name ? ` · ${result.network.name}` : ""}
                 </p>
               </div>
             </div>
-            {result.hostnames.length ? (
-              <ul className="divide-y overflow-hidden rounded-2xl border bg-muted/30">
-                {result.hostnames.map((h) => (
-                  <li key={h.name} className="flex min-h-12 items-center gap-1 py-1 pr-1 pl-4">
-                    <span className="min-w-0 flex-1 py-1.5">
-                      <span className="block font-mono text-sm font-medium break-words select-all">{breakAtDots(h.name)}</span>
+
+            <ResultGroup title="Websites on this IP" count={result.websites.length}>
+              {result.websites.length ? (
+                <ul className="divide-y overflow-hidden rounded-2xl border bg-muted/30">
+                  {result.websites.map((name) => (
+                    <NameRow key={name} name={name} />
+                  ))}
+                </ul>
+              ) : (
+                <p className="rounded-2xl border border-dashed px-4 py-3 text-sm text-muted-foreground">
+                  None known yet. Look a website up with{" "}
+                  <Link href="/tools/hostname-to-ip" className="font-medium text-primary underline-offset-2 hover:underline">
+                    Hostname to IP
+                  </Link>{" "}
+                  and, if it uses this IP, it will show here.
+                </p>
+              )}
+            </ResultGroup>
+
+            <ResultGroup title="Reverse DNS name" count={result.hostnames.length}>
+              {result.hostnames.length ? (
+                <ul className="divide-y overflow-hidden rounded-2xl border bg-muted/30">
+                  {result.hostnames.map((h) => (
+                    <NameRow key={h.name} name={h.name}>
                       {h.confirmed ? (
                         <span
                           className="mt-1 inline-flex items-center gap-1 rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-medium text-success"
@@ -133,21 +184,23 @@ export function IpToHostname({ initialIp, myIp }: { initialIp: string; myIp: str
                           Verified
                         </span>
                       ) : null}
-                    </span>
-                    <Link href={`/tools/hostname-to-ip?host=${encodeURIComponent(h.name)}`} aria-label={`Find the IP addresses of ${h.name}`} title="Find its IP addresses" className={crossLinkClass}>
-                      <ArrowRightLeftIcon aria-hidden />
-                    </Link>
-                    <CopyAction value={h.name} label={`Copy ${h.name}`} />
-                  </li>
-                ))}
-              </ul>
-            ) : null}
+                    </NameRow>
+                  ))}
+                </ul>
+              ) : (
+                <p className="rounded-2xl border border-dashed px-4 py-3 text-sm text-muted-foreground">
+                  {result.reverseDnsFailed ? "The reverse DNS lookup didn't answer. Try again in a moment." : "No reverse DNS name is set for this IP."}
+                </p>
+              )}
+            </ResultGroup>
+
             {result.network ? <NetworkOwner network={result.network} /> : null}
             <p className="flex items-start gap-2.5 rounded-2xl bg-info-soft px-4 py-3 text-xs text-foreground/80">
               <InfoIcon className="mt-0.5 size-4 shrink-0 text-info" aria-hidden />
               <span>
-                Reverse DNS shows the name the IP&apos;s owner gave it. Websites on shared hosting or a CDN (Render, Cloudflare, Vercel…) use their
-                provider&apos;s IPs together with many other sites, so you&apos;ll see the provider here, not the website.
+                <strong className="font-semibold">Websites on this IP</strong> come from lookups made with Hostname to IP and are checked in DNS just now, so
+                they really point here. Shared hosting and CDN addresses (Render, Cloudflare, Vercel…) can carry many more sites than we know of.{" "}
+                <strong className="font-semibold">Reverse DNS</strong> is the name the IP&apos;s owner set; for hosting that&apos;s the provider.
               </span>
             </p>
           </section>

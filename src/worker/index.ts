@@ -6,8 +6,8 @@
  * Consumes two queues so slow VPN servers never block web requests:
  *  - `provisioning`: account creation, uncertain-outcome reconciliation, the one-minute sweeper;
  *  - `maintenance`: scheduled jobs — health monitor tick (30 s), account expiry (1 min) and
- *    retention of health history and resolved reports (hourly). Every job re-reads the database, so
- *    duplicates are harmless.
+ *    retention of health history, resolved reports and the tools' DNS sightings (hourly). Every job
+ *    re-reads the database, so duplicates are harmless.
  */
 import { Worker } from "bullmq";
 import { closeDb } from "@/server/db";
@@ -29,6 +29,7 @@ import { expireAccounts, processExpiredRevokes } from "@/server/provisioning/exp
 import { HEALTH_TICK_MS, purgeHealthHistory, runDueHealthChecks } from "@/server/servers/health";
 import { purgeExpiredSessions } from "@/server/auth/session";
 import { purgeResolvedReports } from "@/server/reports/service";
+import { purgeDnsSightings } from "@/server/tools/sightings";
 
 const concurrency = Number(process.env.WORKER_CONCURRENCY ?? 8);
 
@@ -69,7 +70,7 @@ const maintenance = new Worker<MaintenanceJob>(
         return { ...expired, ...revokes };
       }
       case "purge":
-        return { deleted: await purgeHealthHistory(), reportsDeleted: await purgeResolvedReports() };
+        return { deleted: await purgeHealthHistory(), reportsDeleted: await purgeResolvedReports(), sightingsDeleted: await purgeDnsSightings() };
     }
   },
   { connection: queueConnection(), concurrency: 2 },

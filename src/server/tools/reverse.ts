@@ -4,12 +4,14 @@ import { ToolError } from "./errors";
 import { isPublicAddress, parseHostname } from "./hostname";
 
 /**
- * "IP to Hostname" tool: the reverse DNS (PTR) names of a public IP address, each checked forwards
- * (does the name point back to the same IP?), and the network the address belongs to (owner, ASN,
- * country, range) from Team Cymru's public IP-to-ASN DNS service. Reverse DNS is whatever name the
- * address's owner set: for shared hosting and CDNs that is the provider, not the websites on it, so
- * the owner is shown alongside. Plain DNS queries; nothing connects to the address. Private and
- * reserved addresses are refused: our own resolver could otherwise reveal internal names.
+ * "IP to Hostname" tool. Three answers for a public IP address:
+ *  - websites on it: hostnames people looked up with "Hostname to IP" that pointed here (the caller
+ *    passes them in), each re-checked in DNS now and listed only if it still points here;
+ *  - its reverse DNS (PTR) names, each checked forwards (does the name point back to the same IP?).
+ *    That is whatever name the address's owner set: for shared hosting and CDNs, the provider;
+ *  - the network it belongs to (owner, ASN, country, range) from Team Cymru's IP-to-ASN DNS service.
+ * Plain DNS queries; nothing connects to the address. Private and reserved addresses are refused: our
+ * own resolver could otherwise reveal internal names.
  */
 
 export type ParsedIp = { ok: true; ip: string } | { ok: false; reason: "empty" | "hostname" | "invalid" | "private"; ip?: string };
@@ -17,7 +19,7 @@ export type ParsedIp = { ok: true; ip: string } | { ok: false; reason: "empty" |
 const SCHEME = /^[a-z][a-z0-9+.-]*:\/\//i;
 
 /** "2001:DB8:0:0::1" → "2001:db8::1" (the form DNS answers use), IPv4 unchanged. */
-function canonical(ip: string): string {
+export function canonical(ip: string): string {
   return isIP(ip) === 6 ? new URL(`http://[${ip}]`).hostname.slice(1, -1) : ip;
 }
 
@@ -59,13 +61,19 @@ export interface IpNetwork {
 
 export interface ReverseLookup {
   ip: string;
-  /** Empty when no reverse DNS is set for the address. */
+  /** Websites that point to this IP right now (checked during this lookup). */
+  websites: string[];
+  /** Reverse DNS names; empty when none is set for the address (or when the query failed, see below). */
   hostnames: ReverseHostname[];
+  /** The reverse DNS query got no answer (timeout, SERVFAIL), so `hostnames` is unknown rather than none. */
+  reverseDnsFailed: boolean;
   network: IpNetwork | null;
 }
 
 const MAX_NAMES = 10;
 const MAX_CONFIRM = 5;
+/** Remembered website names checked per lookup (most recently seen first), all at once. */
+export const MAX_WEBSITE_CHECKS = 24;
 
 /** "2001:db8::1" → "1.0.0.0…8.b.d.0.1.0.0.2" (the 32 nibbles reversed, as reverse-DNS style names use). */
 function nibbles(ip: string): string {
@@ -104,22 +112,42 @@ async function networkOf(resolver: Resolver, ip: string): Promise<IpNetwork | nu
 
 const NO_NAME = new Set(["ENOTFOUND", "ENODATA"]);
 
-export async function reverseLookup(ip: string): Promise<ReverseLookup> {
+/** A remembered name, checked now: points here, conclusively doesn't (moved or gone), or no answer. */
+type Check = "here" | "elsewhere" | "unknown";
+
+/**
+ * Looks `ip` up. `stale` lists the candidates DNS says no longer point here, for the caller to forget;
+ * it is never part of the answer. The reverse DNS query failing (rather than finding no name) only
+ * fails the lookup when nothing else was found either.
+ */
+export async function reverseLookup(ip: string, candidates: string[] = []): Promise<{ lookup: ReverseLookup; stale: string[] }> {
   const resolver = new Resolver({ timeout: 3000, tries: 2 });
-  const [ptr, network] = await Promise.all([resolver.reverse(ip).then((names) => ({ names }), (e: { code?: string }) => ({ error: e.code })), networkOf(resolver, ip)]);
-  if ("error" in ptr && !NO_NAME.has(ptr.error ?? "")) throw new ToolError("DNS_FAILED", 502, "The DNS lookup didn't answer in time. Please try again.");
-  const names = "names" in ptr ? ptr.names : [];
-  const unique = [...new Set(names.map((n) => n.replace(/\.$/, "").toLowerCase()).filter(Boolean))].slice(0, MAX_NAMES);
+  // Website checks get a quick resolver of their own: one slow name can't hold the whole answer up.
+  const quick = new Resolver({ timeout: 1500, tries: 1 });
   const v6 = isIP(ip) === 6;
-  const confirmed = await Promise.all(
-    unique.slice(0, MAX_CONFIRM).map(async (name) => {
-      try {
-        const addresses = v6 ? await resolver.resolve6(name) : await resolver.resolve4(name);
-        return addresses.some((a) => canonical(a) === ip);
-      } catch {
-        return false;
-      }
-    }),
-  );
-  return { ip, hostnames: unique.map((name, i) => ({ name, confirmed: confirmed[i] ?? false })), network };
+  const check = async (r: Resolver, name: string): Promise<Check> => {
+    try {
+      const addresses = v6 ? await r.resolve6(name) : await r.resolve4(name);
+      return addresses.some((a) => canonical(a) === ip) ? "here" : "elsewhere";
+    } catch (e) {
+      return NO_NAME.has((e as { code?: string }).code ?? "") ? "elsewhere" : "unknown";
+    }
+  };
+  const toCheck = [...new Set(candidates)].slice(0, MAX_WEBSITE_CHECKS);
+  const [ptr, network, checks] = await Promise.all([
+    resolver.reverse(ip).then(
+      (names) => ({ names, failed: false }),
+      (e: { code?: string }) => ({ names: [] as string[], failed: !NO_NAME.has(e.code ?? "") }),
+    ),
+    networkOf(resolver, ip),
+    Promise.all(toCheck.map((name) => check(quick, name))),
+  ]);
+  const unique = [...new Set(ptr.names.map((n) => n.replace(/\.$/, "").toLowerCase()).filter(Boolean))].slice(0, MAX_NAMES);
+  const confirmed = await Promise.all(unique.slice(0, MAX_CONFIRM).map(async (name) => (await check(resolver, name)) === "here"));
+  const websites = toCheck.filter((name, i) => checks[i] === "here" && !unique.includes(name)).sort();
+  if (ptr.failed && !websites.length && !network) throw new ToolError("DNS_FAILED", 502, "The DNS lookup didn't answer in time. Please try again.");
+  return {
+    lookup: { ip, websites, hostnames: unique.map((name, i) => ({ name, confirmed: confirmed[i] ?? false })), reverseDnsFailed: ptr.failed, network },
+    stale: toCheck.filter((_, i) => checks[i] === "elsewhere"),
+  };
 }

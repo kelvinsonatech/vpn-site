@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ToolError } from "@/server/tools/errors";
-import { parseIpInput, reverseLookup } from "@/server/tools/reverse";
+import { MAX_WEBSITE_CHECKS, parseIpInput, reverseLookup } from "@/server/tools/reverse";
 
 /** The "IP to Hostname" tool: accepted inputs, refused private addresses and forward confirmation. */
 
@@ -39,6 +39,7 @@ vi.mock("node:dns/promises", () => ({
   },
 }));
 const fail = (code: string) => Object.assign(new Error(code), { code });
+const look = async (ip: string, candidates?: string[]) => (await reverseLookup(ip, candidates)).lookup;
 
 /** Team Cymru answers for the Render ingress address 216.24.57.1. */
 const CYMRU: Record<string, string[][]> = {
@@ -62,16 +63,21 @@ describe("reverseLookup", () => {
     dns.reverse.mockResolvedValue(["ip-216-24-57-1.ingress.render.com"]);
     dns.a.mockResolvedValue(["216.24.57.1"]);
     await expect(reverseLookup("216.24.57.1")).resolves.toEqual({
-      ip: "216.24.57.1",
-      hostnames: [{ name: "ip-216-24-57-1.ingress.render.com", confirmed: true }],
-      network: { asn: 397273, name: "RENDER", prefix: "216.24.56.0/21", country: "US" },
+      lookup: {
+        ip: "216.24.57.1",
+        websites: [],
+        hostnames: [{ name: "ip-216-24-57-1.ingress.render.com", confirmed: true }],
+        reverseDnsFailed: false,
+        network: { asn: 397273, name: "RENDER", prefix: "216.24.56.0/21", country: "US" },
+      },
+      stale: [],
     });
   });
 
   it("returns the names, deduplicated, with forward confirmation", async () => {
     dns.reverse.mockResolvedValue(["dns.google.", "DNS.google", "other.example."]);
     dns.a.mockImplementation(async (name: string) => (name === "dns.google" ? ["8.8.4.4", "8.8.8.8"] : ["9.9.9.9"]));
-    const r = await reverseLookup("8.8.8.8");
+    const r = await look("8.8.8.8");
     expect(r.hostnames).toEqual([
       { name: "dns.google", confirmed: true },
       { name: "other.example", confirmed: false },
@@ -87,26 +93,26 @@ describe("reverseLookup", () => {
       if (name === "AS13335.asn.cymru.com") return [["13335 | US | arin | 2010-07-14 | CLOUDFLARENET, US"]];
       throw fail("ENOTFOUND");
     });
-    const r = await reverseLookup("2606:4700:4700::1111");
+    const r = await look("2606:4700:4700::1111");
     expect(r.hostnames).toEqual([{ name: "one.one.one.one", confirmed: true }]);
     expect(r.network).toEqual({ asn: 13335, name: "CLOUDFLARENET", prefix: "2606:4700::/44", country: "US" });
   });
 
   it("no reverse DNS is a normal answer: no hostnames, network still shown", async () => {
     dns.reverse.mockRejectedValue(fail("ENOTFOUND"));
-    const r = await reverseLookup("216.24.57.1");
+    const r = await look("216.24.57.1");
     expect(r.hostnames).toEqual([]);
     expect(r.network?.name).toBe("RENDER");
     dns.reverse.mockRejectedValue(fail("ENODATA"));
-    expect((await reverseLookup("216.24.57.1")).hostnames).toEqual([]);
+    expect((await look("216.24.57.1")).hostnames).toEqual([]);
     dns.reverse.mockResolvedValue([]);
-    expect((await reverseLookup("216.24.57.1")).hostnames).toEqual([]);
+    expect((await look("216.24.57.1")).hostnames).toEqual([]);
   });
 
   it("a name that fails to resolve is just not confirmed", async () => {
     dns.reverse.mockResolvedValue(["gone.example"]);
     dns.a.mockRejectedValue(fail("ENOTFOUND"));
-    expect((await reverseLookup("1.2.3.4")).hostnames).toEqual([{ name: "gone.example", confirmed: false }]);
+    expect((await look("1.2.3.4")).hostnames).toEqual([{ name: "gone.example", confirmed: false }]);
   });
 
   it("an unknown AS name still gives the ASN; a broken Team Cymru answer gives no network", async () => {
@@ -115,14 +121,63 @@ describe("reverseLookup", () => {
       if (name.endsWith(".origin.asn.cymru.com")) return [["64500 64501 | 192.0.2.0/24 | ZZ | ripencc | "]];
       throw fail("ETIMEOUT");
     });
-    expect((await reverseLookup("1.2.3.4")).network).toEqual({ asn: 64500, name: "", prefix: "192.0.2.0/24", country: "ZZ" });
+    expect((await look("1.2.3.4")).network).toEqual({ asn: 64500, name: "", prefix: "192.0.2.0/24", country: "ZZ" });
     dns.txt.mockResolvedValue([["garbage"]]);
-    expect((await reverseLookup("1.2.3.4")).network).toBeNull();
+    expect((await look("1.2.3.4")).network).toBeNull();
   });
 
-  it("a DNS failure (not just 'no name') is an error", async () => {
+  it("websites: remembered names are listed only if they still point here, sorted, without the PTR names; moved and gone ones are stale", async () => {
+    dns.reverse.mockResolvedValue(["ip-216-24-57-1.ingress.render.com"]);
+    const A: Record<string, string[]> = {
+      "ip-216-24-57-1.ingress.render.com": ["216.24.57.1"],
+      "screenclass.com": ["216.24.57.1"],
+      "another.app": ["216.24.57.253", "216.24.57.1"],
+      "moved.example": ["93.184.215.14"],
+    };
+    dns.a.mockImplementation(async (name: string) => {
+      if (name === "slow.example") throw fail("ETIMEOUT");
+      if (name === "v6only.example") throw fail("ENODATA");
+      if (!A[name]) throw fail("ENOTFOUND");
+      return A[name];
+    });
+    const { lookup, stale } = await reverseLookup("216.24.57.1", [
+      "screenclass.com",
+      "moved.example",
+      "gone.example",
+      "slow.example",
+      "v6only.example",
+      "another.app",
+      "screenclass.com",
+      "ip-216-24-57-1.ingress.render.com",
+    ]);
+    expect(lookup.websites).toEqual(["another.app", "screenclass.com"]);
+    expect(lookup.hostnames).toEqual([{ name: "ip-216-24-57-1.ingress.render.com", confirmed: true }]);
+    // A name that didn't answer is neither listed nor forgotten.
+    expect(stale).toEqual(["moved.example", "gone.example", "v6only.example"]);
+  });
+
+  it("checks at most MAX_WEBSITE_CHECKS remembered names", async () => {
+    dns.reverse.mockRejectedValue(fail("ENOTFOUND"));
+    dns.a.mockResolvedValue(["1.2.3.4"]);
+    const many = Array.from({ length: MAX_WEBSITE_CHECKS + 10 }, (_, i) => `site${String(i).padStart(2, "0")}.example`);
+    const r = await look("1.2.3.4", many);
+    expect(r.websites).toHaveLength(MAX_WEBSITE_CHECKS);
+    expect(dns.a).toHaveBeenCalledTimes(MAX_WEBSITE_CHECKS);
+  });
+
+  it("a reverse DNS failure (not just 'no name') still shows the network and websites, flagged", async () => {
+    dns.reverse.mockRejectedValue(fail("ESERVFAIL"));
+    const r = await look("216.24.57.1");
+    expect(r).toMatchObject({ hostnames: [], reverseDnsFailed: true, network: { name: "RENDER" } });
+    dns.txt.mockRejectedValue(fail("ETIMEOUT"));
+    dns.a.mockResolvedValue(["216.24.57.1"]);
+    expect(await look("216.24.57.1", ["screenclass.com"])).toMatchObject({ websites: ["screenclass.com"], reverseDnsFailed: true, network: null });
+  });
+
+  it("is an error when every query failed", async () => {
     dns.reverse.mockRejectedValue(fail("ETIMEOUT"));
-    const err = await reverseLookup("1.2.3.4").catch((e) => e);
+    dns.a.mockRejectedValue(fail("ETIMEOUT"));
+    const err = await reverseLookup("1.2.3.4", ["screenclass.com"]).catch((e) => e);
     expect(err).toBeInstanceOf(ToolError);
     expect(err).toMatchObject({ code: "DNS_FAILED", httpStatus: 502 });
   });

@@ -22,6 +22,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   real,
   text,
   timestamp,
@@ -600,6 +601,29 @@ export const serverReports = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("server_reports_status_created_idx").on(t.status, t.createdAt.desc()), index("server_reports_server_idx").on(t.serverId)],
+);
+
+/**
+ * Hostname → IP pairs seen by the public "Hostname to IP" tool, so "IP to Hostname" can list the
+ * websites on an address (DNS itself only answers forwards). Only public addresses, never the
+ * requester's own, and never who looked them up. Rows not looked up for 90 days are purged hourly.
+ */
+export const dnsSightings = pgTable(
+  "dns_sightings",
+  {
+    ip: text("ip").notNull(),
+    hostname: text("hostname").notNull(),
+    /** The hostname's registrable domain ("www.example.co.uk" → "example.co.uk"), for per-domain caps. */
+    domain: text("domain").notNull(),
+    firstSeen: timestamp("first_seen", { withTimezone: true }).notNull().defaultNow(),
+    lastSeen: timestamp("last_seen", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.ip, t.hostname] }),
+    index("dns_sightings_ip_last_seen_idx").on(t.ip, t.lastSeen.desc()),
+    index("dns_sightings_domain_idx").on(t.domain),
+    index("dns_sightings_last_seen_idx").on(t.lastSeen),
+  ],
 );
 
 export type Admin = typeof admins.$inferSelect;

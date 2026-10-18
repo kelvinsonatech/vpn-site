@@ -93,6 +93,20 @@ export default async function PrivacyPage() {
       ),
     },
     {
+      id: "tools",
+      title: "When you use the tools",
+      body: (
+        <p>
+          The <Link href="/tools">network tools</Link> look names and addresses up in public DNS from our server; the owner of an IP address comes from
+          Team Cymru&apos;s public lookup service, which receives only the address being looked up. When you use Hostname to IP, we remember the hostname
+          together with the public IP addresses it pointed to, so IP to Hostname can show which websites use an address. Anyone who looks up one of those
+          addresses may then see the hostname, so don&apos;t use the tool for names you want to keep private. We never store who looked something up, and
+          we never remember addresses on your own connection or dynamic-DNS and tunnel names (which usually point at someone&apos;s own device). A keyed
+          hash of your IP is kept for a few minutes only, to limit how many lookups can be made.
+        </p>
+      ),
+    },
+    {
       id: "browser",
       title: "What stays in your browser",
       body: (
@@ -115,7 +129,7 @@ export default async function PrivacyPage() {
       body: (
         <p>
           When the captcha is switched on, the account and report forms load Cloudflare Turnstile to tell people from bots. Cloudflare then processes
-          technical data such as your IP address under its own privacy policy. It is the only third-party service the public site talks to.
+          technical data such as your IP address under its own privacy policy. It is the only third-party service your browser is sent to by our site.
         </p>
       ),
     },
@@ -138,6 +152,7 @@ export default async function PrivacyPage() {
           <li>Account records (without any credentials): kept after the account expires, for statistics and abuse prevention.</li>
           <li>Problem reports: kept while we look into them, then deleted automatically 90 days after they are resolved (sooner on request).</li>
           <li>Server health history (no personal data): 7 days.</li>
+          <li>Hostnames looked up with the tools and the IPs they pointed to: deleted 90 days after they were last looked up, or sooner once they stop pointing there.</li>
         </ul>
       ),
     },

@@ -249,7 +249,7 @@ describe("public catalogue", () => {
     const status = await getStatusPage();
     expect(status.totals).toMatchObject({ servers: 4, online: 3, offline: 1, maintenance: 0, full: 0, protocols: 5 });
     const ssh = status.sections.find((s) => s.protocol.slug === "ssh")!;
-    expect(ssh.protocol).toEqual({ slug: "ssh", name: "SSH", icon: "terminal", href: "/ssh" });
+    expect(ssh.protocol).toEqual({ slug: "ssh", name: "SSH", icon: "ssh-badge", href: "/ssh" });
     // Ordered by country, then name.
     expect(ssh.servers.map((s) => s.name)).toEqual(["Germany 01", "Germany 02", "Japan 01", "London 01"]);
     expect(ssh.servers.find((s) => s.id === ids.jp1)!.availability).toBe("offline");

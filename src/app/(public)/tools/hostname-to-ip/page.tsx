@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { connection } from "next/server";
 import { InfoIcon, NetworkIcon } from "lucide-react";
 import { PageHeader } from "@/components/public/page-header";
@@ -46,7 +47,13 @@ export default async function HostnameToIpPage({ searchParams }: { searchParams:
             </li>
             <li>Big sites often return several addresses, and they can change over time. The TTL shows how long an answer may be cached.</li>
             <li>Handy when an app asks for a server, proxy or SNI host as an IP address instead of a name.</li>
-            <li>We only look the name up in DNS; nothing connects to the site, and lookups aren&apos;t saved.</li>
+            <li>
+              We only look the name up in DNS; nothing connects to the site. The hostname and the IPs it points to are remembered (never who looked it up)
+              so <Link href="/tools/ip-to-hostname" className="font-medium text-primary underline-offset-2 hover:underline">
+                IP to Hostname
+              </Link> can show which websites use an IP, which means anyone can see it there: don&apos;t look up private names. IPs on your own connection
+              and dynamic-DNS names are never remembered.
+            </li>
           </ul>
         </section>
       </Container>

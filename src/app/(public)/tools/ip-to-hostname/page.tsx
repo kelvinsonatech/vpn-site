@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { headers } from "next/headers";
 import { connection } from "next/server";
 import { GlobeIcon, InfoIcon } from "lucide-react";
@@ -53,15 +54,23 @@ export default async function IpToHostnamePage({ searchParams }: { searchParams:
               together.
             </li>
             <li>
+              <strong className="font-semibold text-foreground">Websites on this IP</strong> lists websites people have looked up with{" "}
+              <Link href="/tools/hostname-to-ip" className="font-medium text-primary underline-offset-2 hover:underline">
+                Hostname to IP
+              </Link> that point to this address. Each one is checked in DNS during your lookup, so the list is
+              current. A website you look up there normally shows here straight away.
+            </li>
+            <li>
               Websites on shared hosting or a CDN share their provider&apos;s IPs with many other sites. For those you&apos;ll see the provider&apos;s name (for
-              example <span className="font-mono text-foreground">…ingress.render.com</span>), not the website. That&apos;s how reverse DNS works everywhere.
+              example <span className="font-mono text-foreground">…ingress.render.com</span>) as the reverse DNS name. That&apos;s how reverse DNS works
+              everywhere.
             </li>
             <li>
               <strong className="font-semibold text-foreground">Owner of this IP</strong> shows the network the address belongs to, from the public internet
               routing records (via Team Cymru&apos;s free lookup service).
             </li>
             <li>Many addresses have no hostname at all, and mobile data addresses usually show your network provider&apos;s name.</li>
-            <li>Only public addresses can be looked up. We only query DNS; nothing connects to the address, and lookups aren&apos;t saved.</li>
+            <li>Only public addresses can be looked up. We only query DNS; nothing connects to the address, and IP lookups aren&apos;t saved.</li>
           </ul>
         </section>
       </Container>
