@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { StaticImageData } from "next/image";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { connection } from "next/server";
@@ -36,6 +37,7 @@ import type { PublicServerCard, StatusPageData } from "@/lib/public/types";
 import { avatarDataUri } from "@/server/avatar";
 import { loadProtocols, loadSettings, loadStats, loadStatus, joinTimes, zoneLabel } from "../_lib/data";
 import chooseProtocolImage from "@/assets/step-choose-protocol.webp";
+import pickServerImage from "@/assets/step-pick-server.webp";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
@@ -62,9 +64,9 @@ function liveEntries(status: StatusPageData | null, limit: number): LiveEntry[] 
   return [...firsts, ...sorted.filter((e) => !firsts.includes(e))].slice(0, limit);
 }
 
-const STEPS: { icon: React.ReactNode; image?: string; title: string; text: string }[] = [
-  { icon: <LayersIcon />, image: chooseProtocolImage.src, title: "Choose a protocol", text: "SSH, V2Ray, Trojan, UDP and more. Not sure? The guide on each page explains which app to use." },
-  { icon: <MousePointerClickIcon />, title: "Pick a server", text: "See live status, ping and free slots for every location, then open the server you like." },
+const STEPS: { icon: React.ReactNode; image?: StaticImageData; title: string; text: string }[] = [
+  { icon: <LayersIcon />, image: chooseProtocolImage, title: "Choose a protocol", text: "SSH, V2Ray, Trojan, UDP and more. Not sure? The guide on each page explains which app to use." },
+  { icon: <MousePointerClickIcon />, image: pickServerImage, title: "Pick a server", text: "See live status, ping and free slots for every location, then open the server you like." },
   { icon: <CopyIcon />, title: "Copy your config", text: "Your account is created on the server in seconds. Copy it, scan the QR code or download the file." },
 ];
 
@@ -271,13 +273,21 @@ export default async function HomePage() {
                 <span
                   className={
                     s.image
-                      ? "relative mx-auto -my-1 block size-16" // a picture instead of the blue tile; -my-1 keeps titles level
+                      ? "relative mx-auto -my-1 block h-16 w-fit" // a picture instead of the blue tile; -my-1 keeps titles level
                       : "relative mx-auto flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/25 [&_svg]:size-6"
                   }
                 >
                   {s.image ? (
                     // eslint-disable-next-line @next/next/no-img-element -- small bundled picture
-                    <img src={s.image} alt="" aria-hidden="true" width={64} height={64} draggable={false} className="size-full object-contain" />
+                    <img
+                      src={s.image.src}
+                      alt=""
+                      aria-hidden="true"
+                      width={s.image.width}
+                      height={s.image.height}
+                      draggable={false}
+                      className="h-full w-auto object-contain"
+                    />
                   ) : (
                     s.icon
                   )}
