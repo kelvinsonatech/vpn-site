@@ -1,4 +1,4 @@
-import { CalendarClockIcon, GlobeIcon, NetworkIcon } from "lucide-react";
+import { CalendarClockIcon, GlobeIcon, LocateFixedIcon, NetworkIcon } from "lucide-react";
 import hostnameToIpImage from "@/assets/hostname-to-ip.webp";
 import ipToHostnameImage from "@/assets/ip-to-hostname.webp";
 import domainAgeImage from "@/assets/domain-age.webp";
@@ -8,6 +8,14 @@ import domainAgeImage from "@/assets/domain-age.webp";
  * tool's picture (shown instead of the line icon on its card and page header).
  */
 export const TOOLS = [
+  {
+    slug: "my-ip",
+    href: "/tools/my-ip",
+    name: "Check My IP",
+    description: "See your public IP address, its hostname and provider, and whether you're browsing through our servers.",
+    icon: LocateFixedIcon,
+    image: null,
+  },
   {
     slug: "hostname-to-ip",
     href: "/tools/hostname-to-ip",

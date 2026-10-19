@@ -1,14 +1,15 @@
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { db } from "@/server/db";
-import { dnsSightings } from "@/server/db/schema";
+import { dnsSightings, servers } from "@/server/db/schema";
 import { registrableDomain } from "@/server/tools/domain-name";
 import { isPersonalName, purgeDnsSightings } from "@/server/tools/sightings";
 import { POST as hostnameToIp } from "@/app/api/public/tools/hostname-ip/route";
 import { POST as ipToHostname } from "@/app/api/public/tools/ip-hostname/route";
 import { POST as domainAge } from "@/app/api/public/tools/domain-age/route";
 import { resetDomainAgeCaches } from "@/server/tools/domain-age";
-import { resetDatabase, teardown } from "../helpers";
+import { myIpDetails, ourServerAt } from "@/server/tools/my-ip";
+import { createServer, resetDatabase, teardown } from "../helpers";
 
 /**
  * The two DNS tools end to end (route handlers, Redis rate limit, PostgreSQL memory), with DNS
@@ -171,6 +172,44 @@ describe("DNS tools", () => {
     expect((await lookupIp("216.24.57.1")).body.websites).toEqual(["kept.org"]);
     expect(await purgeDnsSightings()).toBe(1);
     expect((await db().select().from(dnsSightings)).map((r) => r.hostname)).toEqual(["kept.org"]);
+  });
+
+  describe("Check My IP", () => {
+    const listServer = async (name: string, ipAddress: string, lifecycle: "draft" | "active" | "maintenance" | "disabled" = "active") => {
+      const s = await createServer(1, { name, countryCode: "DE" });
+      await db().update(servers).set({ ipAddress, lifecycle }).where(eq(servers.id, s.id));
+      return s;
+    };
+
+    it("recognises a listed server's address, however its IPv6 form was typed", async () => {
+      await listServer("Germany 01", "45.33.32.156");
+      await listServer("Germany 02", "2A01:4F8:0:0::10", "maintenance");
+      expect(await ourServerAt("45.33.32.156")).toEqual({ name: "Germany 01", countryCode: "DE" });
+      expect(await ourServerAt("2a01:4f8::10")).toEqual({ name: "Germany 02", countryCode: "DE" });
+      expect(await ourServerAt("45.33.32.157")).toBeNull();
+    });
+
+    it("ignores drafts, disabled and deleted servers", async () => {
+      await listServer("Draft", "45.33.32.1", "draft");
+      await listServer("Off", "45.33.32.2", "disabled");
+      const gone = await listServer("Gone", "45.33.32.3");
+      await db().update(servers).set({ deletedAt: new Date() }).where(eq(servers.id, gone.id));
+      for (const ip of ["45.33.32.1", "45.33.32.2", "45.33.32.3"]) expect(await ourServerAt(ip)).toBeNull();
+    });
+
+    it("adds the reverse DNS name, the network and the server match", async () => {
+      await listServer("Render Edge", "216.24.57.1");
+      expect(await myIpDetails("216.24.57.1")).toEqual({
+        hostnames: [{ name: "ip-216-24-57-1.ingress.render.com", confirmed: true }],
+        reverseDnsFailed: false,
+        network: { asn: 397273, name: "RENDER", prefix: "216.24.56.0/21", country: "US" },
+        server: { name: "Render Edge", countryCode: "DE" },
+      });
+    });
+
+    it("answers with empty details for an address DNS knows nothing about", async () => {
+      expect(await myIpDetails("9.9.9.9")).toEqual({ hostnames: [], reverseDnsFailed: false, network: null, server: null });
+    });
   });
 });
 

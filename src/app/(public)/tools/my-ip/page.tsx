@@ -1,0 +1,131 @@
+import { Suspense } from "react";
+import type { Metadata } from "next";
+import Link from "next/link";
+import { headers } from "next/headers";
+import { connection } from "next/server";
+import { InfoIcon, LocateFixedIcon, TriangleAlertIcon } from "lucide-react";
+import { CopyAction } from "@/components/public/account/copy-action";
+import { PageHeader } from "@/components/public/page-header";
+import { Container } from "@/components/public/section";
+import { RecheckButton } from "@/components/public/tools/my-ip-recheck";
+import { pageMetadata } from "@/lib/seo";
+import { clientIpFromHeaders } from "@/server/auth/request-context";
+import { hashClientIp } from "@/server/crypto/hashing";
+import { parseIpInput } from "@/server/tools/reverse";
+import { loadSettings } from "../../_lib/data";
+import { MyIpDetailsPanel, MyIpDetailsSkeleton } from "./details";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await loadSettings();
+  return pageMetadata({
+    title: "Check My IP",
+    description: "See your public IP address, its hostname and network provider, and whether you're browsing through one of our servers. Free and instant.",
+    path: "/tools/my-ip",
+    siteName: settings.siteName,
+  });
+}
+
+/** IPv6 addresses wrap after their colons on narrow screens rather than mid-group. */
+function breakAtColons(ip: string) {
+  return ip.split(":").map((part, i) => (
+    <span key={i}>
+      {i ? ":" : null}
+      {i ? <wbr /> : null}
+      {part}
+    </span>
+  ));
+}
+
+export default async function MyIpPage() {
+  await connection();
+  const [h, settings] = await Promise.all([headers(), loadSettings()]);
+  const raw = clientIpFromHeaders(h);
+  const parsed = parseIpInput(raw ?? "");
+  const v6 = parsed.ok && parsed.ip.includes(":");
+  return (
+    <>
+      <PageHeader
+        crumbs={[{ label: "Home", href: "/" }, { label: "Tools", href: "/tools" }, { label: "Check My IP" }]}
+        icon={<LocateFixedIcon />}
+        eyebrow="Tool"
+        title="Check My IP"
+        description="The public IP address websites see when you visit them, who it belongs to, and whether you're browsing through one of our servers."
+      />
+      <Container className="grid max-w-3xl gap-8 pt-2 pb-16 sm:pb-24">
+        {parsed.ok ? (
+          <section aria-labelledby="my-ip-heading" className="grid gap-5 rounded-3xl border bg-card p-5 shadow-sm sm:p-6">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div className="min-w-0">
+                <h2 id="my-ip-heading" className="text-sm font-medium text-muted-foreground">
+                  Your public IP address
+                </h2>
+                <p
+                  aria-live="polite"
+                  className={`mt-1 font-mono font-bold tracking-tight select-all ${v6 ? "text-xl [overflow-wrap:anywhere] sm:text-2xl" : "text-3xl sm:text-4xl"}`}
+                >
+                  {v6 ? breakAtColons(parsed.ip) : parsed.ip}
+                </p>
+                <p className="mt-2.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span className="rounded-full bg-primary/10 px-2.5 py-0.5 font-semibold text-primary">{v6 ? "IPv6" : "IPv4"}</span>
+                  Your browser reached us over {v6 ? "IPv6" : "IPv4"}.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <CopyAction value={parsed.ip} label="Copy IP address" variant="outline" size="default" className="rounded-full">
+                  Copy
+                </CopyAction>
+                <RecheckButton />
+              </div>
+            </div>
+            {/* Keyed by the address, so a new one (after connecting a tunnel) shows the placeholder rather than the old details. */}
+            <Suspense key={parsed.ip} fallback={<MyIpDetailsSkeleton />}>
+              <MyIpDetailsPanel ip={parsed.ip} clientKey={hashClientIp(raw)} siteName={settings.siteName} />
+            </Suspense>
+          </section>
+        ) : (
+          <section aria-labelledby="my-ip-heading" className="flex items-start gap-3 rounded-3xl border bg-card p-5 shadow-sm sm:p-6">
+            <TriangleAlertIcon className="mt-0.5 size-5 shrink-0 text-warning-strong" aria-hidden />
+            <div className="min-w-0 text-sm">
+              <h2 id="my-ip-heading" className="text-base font-bold">
+                We can&apos;t see a public IP address
+              </h2>
+              <p className="mt-1 text-muted-foreground">
+                Your request reached us from {parsed.ip ? <span className="font-mono text-foreground">{parsed.ip}</span> : "an unknown address"}, which
+                isn&apos;t a public internet address. That happens on a local network or behind some proxies. Try again from your normal connection.
+              </p>
+            </div>
+          </section>
+        )}
+
+        <section aria-labelledby="about-tool" className="rounded-3xl border bg-card p-5 text-sm text-muted-foreground shadow-sm sm:p-6">
+          <h2 id="about-tool" className="mb-3 flex items-center gap-2 text-base font-bold text-foreground">
+            <InfoIcon className="size-4 text-primary" aria-hidden />
+            How it works
+          </h2>
+          <ul className="grid list-disc gap-2 pl-5 marker:text-primary/60">
+            <li>
+              This is the address your connection uses on the internet. Every website and app you connect to sees it, and it usually reveals your provider and
+              rough location.
+            </li>
+            <li>Many connections have both an IPv4 and an IPv6 address. This shows the one your browser used to reach us.</li>
+            <li>
+              <strong className="font-semibold text-foreground">Hostname</strong> is the reverse DNS name the address&apos;s owner set, often your
+              provider&apos;s. <strong className="font-semibold text-foreground">Provider</strong>, ASN, country and IP range come from the public internet
+              routing records (via Team Cymru&apos;s free lookup service). The country is where the network is registered, which is usually, but not always,
+              where you are.
+            </li>
+            <li>
+              When your browser goes through a {settings.siteName} tunnel, you&apos;ll see the server&apos;s address here and a green{" "}
+              <strong className="font-semibold text-foreground">You&apos;re browsing through {settings.siteName}</strong> note.{" "}
+              <Link href="/#protocols" className="font-medium text-primary underline-offset-2 hover:underline">
+                Get a free account
+              </Link>
+              .
+            </li>
+            <li>Your address is read from your request and isn&apos;t saved. We only query DNS; nothing connects to your device.</li>
+          </ul>
+        </section>
+      </Container>
+    </>
+  );
+}
