@@ -15,6 +15,7 @@ import { parseIpInput } from "@/server/tools/reverse";
 import { loadSettings } from "../../_lib/data";
 import { MyIpDetailsPanel, MyIpDetailsSkeleton } from "./details";
 import toolImage from "@/assets/my-ip.webp";
+import bandImage from "@/assets/my-ip-band.webp";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
@@ -58,7 +59,28 @@ export default async function MyIpPage() {
       <Container className="grid max-w-3xl gap-8 pt-2 pb-16 sm:pb-24">
         {parsed.ok ? (
           <section aria-labelledby="my-ip-heading" className="grid gap-5 rounded-3xl border bg-card p-5 shadow-sm sm:p-6">
-            <div className="flex flex-wrap items-end justify-between gap-4">
+            {/* The address over a pastel desk photo: flipped so the props sit behind the buttons, and faded into the page colour (light or dark) behind the words. */}
+            <div className="relative isolate flex flex-wrap items-end justify-between gap-4 overflow-hidden rounded-2xl px-5 py-6 ring-1 ring-black/5 sm:px-7 sm:py-8 dark:ring-white/10">
+              {/* eslint-disable-next-line @next/next/no-img-element -- bundled background picture */}
+              <img
+                src={bandImage.src}
+                alt=""
+                aria-hidden="true"
+                width={bandImage.width}
+                height={bandImage.height}
+                decoding="async"
+                draggable={false}
+                className="absolute inset-0 -z-20 size-full -scale-x-100 object-cover object-[0%_100%] sm:object-[0%_78%]"
+              />
+              {/* Phones: an even wash (the words run the full width). Larger screens: fade from the words to the photo. */}
+              <span
+                aria-hidden
+                className="absolute inset-0 -z-10 bg-[color-mix(in_oklch,var(--background)_80%,transparent)] sm:hidden dark:bg-[color-mix(in_oklch,var(--background)_88%,transparent)]"
+              />
+              <span
+                aria-hidden
+                className="absolute inset-0 -z-10 hidden bg-[linear-gradient(to_right,color-mix(in_oklch,var(--background)_95%,transparent)_40%,color-mix(in_oklch,var(--background)_60%,transparent)_62%,color-mix(in_oklch,var(--background)_10%,transparent))] sm:block"
+              />
               <div className="min-w-0">
                 <h2 id="my-ip-heading" className="text-sm font-medium text-muted-foreground">
                   Your public IP address
