@@ -38,7 +38,7 @@ describe("V2Ray to JSON", () => {
       streamSettings: {
         network: "ws",
         security: "tls",
-        tlsSettings: { allowInsecure: false, serverName: "cdn.example.com", alpn: ["h2", "http/1.1"], fingerprint: "chrome" },
+        tlsSettings: { serverName: "cdn.example.com", alpn: ["h2", "http/1.1"], fingerprint: "chrome" },
         wsSettings: { path: "/vmess", headers: { Host: "cdn.example.com" } },
       },
     });
@@ -76,7 +76,7 @@ describe("V2Ray to JSON", () => {
       streamSettings: {
         network: "ws",
         security: "tls",
-        tlsSettings: { allowInsecure: false, serverName: "node.example.net", alpn: ["http/1.1"] },
+        tlsSettings: { serverName: "node.example.net", alpn: ["http/1.1"] },
         wsSettings: { path: "/vmess", headers: { Host: "node.example.net" } },
       },
     });
@@ -118,7 +118,7 @@ describe("V2Ray to JSON", () => {
     expect(r.outbound.streamSettings).toEqual({
       network: "grpc",
       security: "tls",
-      tlsSettings: { allowInsecure: false, serverName: "g.example.com" },
+      tlsSettings: { serverName: "g.example.com" },
       grpcSettings: { serviceName: "svc", multiMode: true },
     });
     expect((r.outbound.settings as { vnext: { port: number; users: { alterId: number }[] }[] }).vnext[0]).toMatchObject({
@@ -170,7 +170,7 @@ describe("V2Ray to JSON", () => {
     expect(r.outbound.streamSettings).toEqual({
       network: "grpc",
       security: "tls",
-      tlsSettings: { allowInsecure: false, serverName: "x.example.com" },
+      tlsSettings: { serverName: "x.example.com" },
       grpcSettings: { serviceName: "grpc-svc", multiMode: false },
     });
   });
@@ -181,14 +181,31 @@ describe("V2Ray to JSON", () => {
       tag: "proxy",
       protocol: "trojan",
       settings: { servers: [{ address: "tr.example.com", port: 443, password: "p@ss:w0rd" }] },
-      streamSettings: { network: "tcp", security: "tls", tlsSettings: { allowInsecure: false, serverName: "tr.example.com" } },
+      streamSettings: { network: "tcp", security: "tls", tlsSettings: { serverName: "tr.example.com" } },
     });
   });
 
-  it("Trojan: allowInsecure is kept, with a warning", () => {
-    const r = convertLink("trojan://pw@1.2.3.4:443?security=tls&allowInsecure=1&type=ws&path=%2Ft#x");
-    expect(r.outbound.streamSettings).toMatchObject({ tlsSettings: { allowInsecure: true }, wsSettings: { path: "/t" } });
-    expect(r.warnings.join(" ")).toMatch(/certificate checks/);
+  it("allowInsecure is never written (current Xray refuses it); pinning from pcs/vcn is used instead", () => {
+    let r = convertLink("trojan://pw@1.2.3.4:443?security=tls&allowInsecure=1&sni=t.example.com&type=ws&path=%2Ft#x");
+    expect(r.outbound.streamSettings).toEqual({ network: "ws", security: "tls", tlsSettings: { serverName: "t.example.com" }, wsSettings: { path: "/t" } });
+    expect(r.warnings.join(" ")).toMatch(/turns off certificate checks.*pinnedPeerCertSha256/);
+    expect(r.decoded).toMatchObject({ allowInsecure: "1" });
+
+    const pin = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+    r = convertLink(
+      `vless://${UUID}@1.2.3.4:443?encryption=none&security=tls&sni=self.example.com&insecure=1&pcs=${pin}&vcn=self.example.com&ech=AEX%2B&type=tcp#p`,
+    );
+    expect((r.outbound.streamSettings as Record<string, unknown>).tlsSettings).toEqual({
+      serverName: "self.example.com",
+      pinnedPeerCertSha256: pin,
+      verifyPeerCertByName: "self.example.com",
+      echConfigList: "AEX+",
+    });
+    expect(r.warnings.join(" ")).not.toMatch(/certificate checks/);
+
+    // v2rayN/v2rayNG VMess JSON carries "insecure" and "pcs".
+    r = convertLink(vmess({ add: "v.example.com", port: "443", id: UUID, net: "tcp", tls: "tls", insecure: "1", pcs: pin }));
+    expect((r.outbound.streamSettings as Record<string, unknown>).tlsSettings).toEqual({ serverName: "v.example.com", pinnedPeerCertSha256: pin });
   });
 
   it("Shadowsocks: SIP002 (base64 user info), 2022 keys in plain text, and the legacy all-base64 form", () => {
@@ -211,6 +228,113 @@ describe("V2Ray to JSON", () => {
   it("Shadowsocks: a plugin is left out, with a warning", () => {
     const r = convertLink(`ss://${b64url("aes-128-gcm:pw")}@s.example.com:443/?plugin=v2ray-plugin%3Bmode%3Dwebsocket#p`);
     expect(r.warnings.join(" ")).toMatch(/plugin "v2ray-plugin"/);
+  });
+
+  it("mKCP: header and seed go to finalmask (current Xray), with a version note", () => {
+    let r = convertLink(`vless://${UUID}@k.example.com:1234?encryption=none&security=tls&type=kcp&headerType=wechat-video&seed=myseed#k`);
+    expect(r.outbound.streamSettings).toMatchObject({
+      network: "kcp",
+      kcpSettings: {},
+      finalmask: {
+        udp: [
+          { type: "mkcp-legacy", settings: { value: "myseed" } },
+          { type: "mkcp-legacy", settings: { header: "wechat" } },
+        ],
+      },
+    });
+    expect(r.warnings.join(" ")).toMatch(/26\.6\.1/);
+    // VMess JSON: seed in "path", header in "type"; no seed or header → the bare legacy mask.
+    r = convertLink(vmess({ add: "k.example.com", port: "1234", id: UUID, net: "kcp", type: "none", path: "" }));
+    expect(r.outbound.streamSettings).toMatchObject({ kcpSettings: {}, finalmask: { udp: [{ type: "mkcp-legacy" }] } });
+    // A link's own finalmask (fm) wins.
+    r = convertLink(
+      `vless://${UUID}@k.example.com:1234?encryption=none&security=tls&type=kcp&fm=${encodeURIComponent('{"udp":[{"type":"mkcp-original"}]}')}#k`,
+    );
+    expect((r.outbound.streamSettings as Record<string, unknown>).finalmask).toEqual({ udp: [{ type: "mkcp-original" }] });
+  });
+
+  it("HTTP/2 and QUIC are flagged as removed from current Xray; h2 takes the first host as SNI", () => {
+    let r = convertLink(`vless://${UUID}@h.example.com:443?encryption=none&security=tls&type=http&host=a.example.com,b.example.com&path=%2Fh2#h2`);
+    expect(r.outbound.streamSettings).toMatchObject({
+      network: "h2",
+      tlsSettings: { serverName: "a.example.com" },
+      httpSettings: { path: "/h2", host: ["a.example.com", "b.example.com"] },
+    });
+    expect(r.warnings.join(" ")).toMatch(/HTTP\/2 \(h2\) transport/);
+    // VMess QUIC keeps its security in "host": it must not become the SNI.
+    r = convertLink(vmess({ add: "q.example.com", port: "443", id: UUID, net: "quic", type: "none", host: "none", path: "", tls: "tls" }));
+    expect(r.outbound.streamSettings).toMatchObject({ tlsSettings: { serverName: "q.example.com" }, quicSettings: { security: "none" } });
+    expect(r.link.host).toBeNull();
+  });
+
+  it("XHTTP: mode (VMess keeps it in type), extra settings, and unknown modes", () => {
+    let r = convertLink(
+      vmess({ add: "x.example.com", port: "443", id: UUID, net: "xhttp", type: "stream-one", host: "x.example.com", path: "/xh", tls: "tls" }),
+    );
+    expect((r.outbound.streamSettings as Record<string, unknown>).xhttpSettings).toEqual({ path: "/xh", host: "x.example.com", mode: "stream-one" });
+    const extra = { xPaddingBytes: "500-1500", downloadSettings: { address: "d.example.com", port: 443, network: "xhttp" } };
+    r = convertLink(
+      `vless://${UUID}@x.example.com:443?encryption=none&security=tls&type=xhttp&path=%2Fxh&mode=stream-up&extra=${encodeURIComponent(JSON.stringify(extra))}#x`,
+    );
+    expect((r.outbound.streamSettings as Record<string, unknown>).xhttpSettings).toEqual({ path: "/xh", mode: "stream-up", extra });
+    r = convertLink(`vless://${UUID}@x.example.com:443?encryption=none&security=tls&type=xhttp&mode=weird&extra=%7Bbroken#x`);
+    expect((r.outbound.streamSettings as Record<string, unknown>).xhttpSettings).toEqual({ path: "/" });
+    expect(r.warnings.join(" ")).toMatch(/mode "weird".*extra settings couldn't be read/);
+  });
+
+  it("gRPC VMess: host is the :authority; REALITY pqv becomes mldsa65Verify", () => {
+    let r = convertLink(
+      vmess({ add: "g.example.com", port: "443", id: UUID, net: "grpc", host: "auth.example.com", sni: "g.example.com", path: "svc", tls: "tls" }),
+    );
+    expect((r.outbound.streamSettings as Record<string, unknown>).grpcSettings).toEqual({
+      serviceName: "svc",
+      multiMode: false,
+      authority: "auth.example.com",
+    });
+    r = convertLink(
+      `vless://${UUID}@203.0.113.5:443?encryption=none&flow=xtls-rprx-vision&security=reality&sni=www.example.com&pbk=PK&sid=6b&pqv=PQVKEY&type=tcp#r`,
+    );
+    expect((r.outbound.streamSettings as Record<string, unknown>).realitySettings).toMatchObject({ publicKey: "PK", mldsa65Verify: "PQVKEY" });
+  });
+
+  it("drops the removed XTLS flows and flags old Shadowsocks ciphers and plain VLESS", () => {
+    let r = convertLink(`vless://${UUID}@x.example.com:443?encryption=none&security=xtls&flow=xtls-rprx-direct&sni=x.example.com#old`);
+    expect(r.outbound.settings).toEqual({ vnext: [{ address: "x.example.com", port: 443, users: [{ id: UUID, encryption: "none" }] }] });
+    expect(r.warnings.join(" ")).toMatch(/legacy XTLS.*flow "xtls-rprx-direct"/);
+    r = convertLink(`ss://${b64url("aes-256-cfb:pw")}@1.2.3.4:8388#cfb`);
+    expect(r.warnings.join(" ")).toMatch(/cipher "aes-256-cfb"/);
+    expect(convertLink(`ss://${b64url("2022-blake3-aes-128-gcm:a2V5")}@1.2.3.4:8388`).warnings).toEqual([]);
+    r = convertLink(`vless://${UUID}@ws.example.com:80?type=ws&security=none#plain`);
+    expect(r.warnings.join(" ")).toMatch(/no TLS, REALITY or VLESS encryption/);
+  });
+
+  it("reads Shadowrocket links (base64 user info and query options)", () => {
+    const r = convertLink(
+      `vmess://${b64url(`auto:${UUID}@sr.example.com:443`)}?remarks=SR%20node&obfsParam=cdn.example.com&path=/ws&obfs=websocket&tls=1&peer=cdn.example.com&alterId=0`,
+    );
+    expect(r.link).toMatchObject({ protocol: "vmess", remark: "SR node", address: "sr.example.com", port: 443, secret: UUID, network: "ws", security: "tls" });
+    expect(r.outbound.streamSettings).toEqual({
+      network: "ws",
+      security: "tls",
+      tlsSettings: { serverName: "cdn.example.com" },
+      wsSettings: { path: "/ws", headers: { Host: "cdn.example.com" } },
+    });
+    const v = convertLink(`vless://${b64(`auto:${UUID}@sr.example.com:443`)}?remarks=SR&tls=1&peer=sr.example.com&xtls=2`);
+    expect(v.outbound.settings).toEqual({
+      vnext: [{ address: "sr.example.com", port: 443, users: [{ id: UUID, encryption: "none", flow: "xtls-rprx-vision" }] }],
+    });
+  });
+
+  it("tolerates wrapped base64, spaces in a remark and stray % signs", () => {
+    const original = { add: "w.example.com", port: "443", id: UUID, net: "ws", path: "/w", tls: "tls", ps: "wrapped" };
+    const wrapped = `vmess://${b64(JSON.stringify(original)).replace(/(.{76})/g, "$1\n")}`;
+    expect(convertLink(wrapped).link.remark).toBe("wrapped");
+    expect(convertLink(`vless://${UUID}@a.example.com:443?security=tls&type=ws#My Server DE`).link.remark).toBe("My Server DE");
+    expect(convertLink(`vless://${UUID}@a.example.com:443?security=tls#🇩🇪Germany-100%Speed`).link.remark).toBe("🇩🇪Germany-100%Speed");
+    expect(convertLink("trojan://p%ss%5Eword@t.example.com:443#t").link.secret).toBe("p%ss^word");
+    // The legacy all-base64 ss:// form whose base64 contains "/".
+    const legacy = convertLink(`ss://${b64("aes-128-gcm:test~?>>@1.2.3.4:443")}#x`);
+    expect(legacy.link).toMatchObject({ secret: "test~?>>", address: "1.2.3.4", port: 443 });
   });
 
   it("builds a complete client config around the outbound", () => {
@@ -236,6 +360,7 @@ describe("V2Ray to JSON", () => {
     fails("", /Paste a vmess/);
     fails("   ", /Paste a vmess/);
     fails(`vless://${UUID}@a.example.com:443\nvless://${UUID}@b.example.com:443`, /one link at a time/);
+    fails(`vless://${UUID}@a.example.com:443 trojan://pw@b.example.com:443`, /one link at a time/);
     fails("hysteria2://pw@h.example.com:443#h", /Hysteria\/TUIC link/);
     fails("https://example.com", /isn't a V2Ray link/);
     fails("hello", /isn't a V2Ray link/);

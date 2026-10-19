@@ -26,9 +26,9 @@ const EXAMPLES = [
 ];
 
 const VIEWS = [
-  { key: "decoded", label: "Decoded JSON", hint: "What the link contains, as JSON." },
-  { key: "config", label: "Xray config", hint: "A complete client config: SOCKS on 127.0.0.1:10808, HTTP on 127.0.0.1:10809." },
-  { key: "outbound", label: "Outbound only", hint: "Just the proxy outbound, to paste into a config you already have." },
+  { key: "decoded", label: "Decoded JSON", short: "Decoded", hint: "What the link contains, as JSON." },
+  { key: "config", label: "Xray config", short: "Config", hint: "A complete client config: SOCKS on 127.0.0.1:10808, HTTP on 127.0.0.1:10809." },
+  { key: "outbound", label: "Outbound only", short: "Outbound", hint: "Just the proxy outbound, to paste into a config you already have." },
 ] as const;
 type View = (typeof VIEWS)[number]["key"];
 
@@ -166,7 +166,6 @@ export function V2rayToJson() {
         </label>
         <Textarea
           id="v2ray-link"
-          name="v2ray-link"
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => {
@@ -183,7 +182,7 @@ export function V2rayToJson() {
           spellCheck={false}
           maxLength={8192}
           aria-describedby="v2ray-link-hint"
-          className="min-h-28 resize-y rounded-2xl font-mono text-sm break-all"
+          className="min-h-28 resize-y rounded-2xl font-mono break-all"
         />
         <div className="flex flex-wrap items-center gap-3">
           <Button type="submit" size="lg" className="h-11 rounded-2xl px-6">
@@ -228,13 +227,19 @@ export function V2rayToJson() {
         </p>
       </form>
 
-      <div aria-live="polite" className="contents">
+      {/* Screen readers hear a short summary, never the ID, password or JSON (errors announce themselves as alerts). */}
+      <p role="status" className="sr-only">
+        {c
+          ? `Decoded ${PROTOCOL_LABEL[c.link.protocol]} link ${c.link.remark || "without a name"}${c.warnings.length ? `, ${c.warnings.length} warning${c.warnings.length === 1 ? "" : "s"}` : ""}.`
+          : ""}
+      </p>
+      <div className="contents">
         {result && !result.ok ? <LookupError message={result.message} /> : null}
 
         {c ? (
           <section
             aria-label="Result"
-            className="grid gap-5 rounded-3xl border bg-card p-5 shadow-sm animate-in fade-in-0 slide-in-from-bottom-2 sm:p-6 motion-reduce:animate-none"
+            className="grid min-w-0 gap-5 rounded-3xl border bg-card p-5 shadow-sm animate-in fade-in-0 slide-in-from-bottom-2 sm:p-6 motion-reduce:animate-none"
           >
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">{PROTOCOL_LABEL[c.link.protocol]}</span>
@@ -248,18 +253,19 @@ export function V2rayToJson() {
                 {c.warnings.map((w) => (
                   <li key={w} className="flex items-start gap-2">
                     <TriangleAlertIcon className="mt-0.5 size-4 shrink-0 text-warning-strong" aria-hidden />
-                    <span>{w}</span>
+                    <span className="min-w-0 [overflow-wrap:anywhere]">{w}</span>
                   </li>
                 ))}
               </ul>
             ) : null}
 
-            <Tabs value={view} onValueChange={(v) => setView(v as View)} className="gap-3">
+            <Tabs value={view} onValueChange={(v) => setView(v as View)} className="min-w-0 gap-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <TabsList className="h-10 rounded-xl max-sm:w-full">
                   {VIEWS.map((v) => (
                     <TabsTrigger key={v.key} value={v.key} className="rounded-lg px-3 text-xs sm:text-sm">
-                      {v.label}
+                      <span className="sm:hidden">{v.short}</span>
+                      <span className="max-sm:hidden">{v.label}</span>
                     </TabsTrigger>
                   ))}
                 </TabsList>
@@ -282,7 +288,7 @@ export function V2rayToJson() {
                 </div>
               </div>
               {VIEWS.map((v) => (
-                <TabsContent key={v.key} value={v.key} className="grid gap-2">
+                <TabsContent key={v.key} value={v.key} tabIndex={-1} className="grid gap-2">
                   <p className="text-xs text-muted-foreground">{v.hint}</p>
                   <pre
                     tabIndex={0}
