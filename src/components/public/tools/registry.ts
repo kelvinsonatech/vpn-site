@@ -3,6 +3,7 @@ import hostnameToIpImage from "@/assets/hostname-to-ip.webp";
 import ipToHostnameImage from "@/assets/ip-to-hostname.webp";
 import domainAgeImage from "@/assets/domain-age.webp";
 import myIpImage from "@/assets/my-ip.webp";
+import v2rayToJsonImage from "@/assets/v2ray-to-json.webp";
 
 /**
  * The public tools, in menu order: the /tools page lists them from here. `image`, when set, is the
@@ -47,7 +48,7 @@ export const TOOLS = [
     name: "V2Ray to JSON",
     description: "Decode a vmess, vless, trojan or ss link to JSON and get a ready-to-use V2Ray/Xray config.",
     icon: FileJsonIcon,
-    image: null,
+    image: v2rayToJsonImage,
   },
 ] as const;
 

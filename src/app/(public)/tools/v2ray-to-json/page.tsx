@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
-import { FileJsonIcon, InfoIcon } from "lucide-react";
+import { InfoIcon } from "lucide-react";
 import { PageHeader } from "@/components/public/page-header";
 import { Container } from "@/components/public/section";
 import { V2rayToJson } from "@/components/public/tools/v2ray-to-json";
 import { pageMetadata } from "@/lib/seo";
 import { loadSettings } from "../../_lib/data";
+import toolImage from "@/assets/v2ray-to-json.webp";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
@@ -21,7 +22,10 @@ export default function V2rayToJsonPage() {
     <>
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "Tools", href: "/tools" }, { label: "V2Ray to JSON" }]}
-        icon={<FileJsonIcon />}
+        icon={
+          // eslint-disable-next-line @next/next/no-img-element -- small bundled picture; the header sizes it
+          <img src={toolImage.src} alt="" aria-hidden="true" width={64} height={64} draggable={false} className="rounded-2xl bg-white object-contain p-1" />
+        }
         eyebrow="Tool"
         title="V2Ray to JSON"
         description="Paste a vmess, vless, trojan or ss link to see what's inside it as JSON, and get a config you can run with V2Ray or Xray."
