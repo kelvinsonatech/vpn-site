@@ -1,4 +1,4 @@
-import { CalendarClockIcon, GlobeIcon, LocateFixedIcon, NetworkIcon } from "lucide-react";
+import { CalendarClockIcon, FileJsonIcon, GlobeIcon, LocateFixedIcon, NetworkIcon } from "lucide-react";
 import hostnameToIpImage from "@/assets/hostname-to-ip.webp";
 import ipToHostnameImage from "@/assets/ip-to-hostname.webp";
 import domainAgeImage from "@/assets/domain-age.webp";
@@ -40,6 +40,14 @@ export const TOOLS = [
     description: "See how old a domain is, when it was registered and when it expires.",
     icon: CalendarClockIcon,
     image: domainAgeImage,
+  },
+  {
+    slug: "v2ray-to-json",
+    href: "/tools/v2ray-to-json",
+    name: "V2Ray to JSON",
+    description: "Decode a vmess, vless, trojan or ss link to JSON and get a ready-to-use V2Ray/Xray config.",
+    icon: FileJsonIcon,
+    image: null,
   },
 ] as const;
 

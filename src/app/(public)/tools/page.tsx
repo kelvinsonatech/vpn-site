@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
   return pageMetadata({
     title: "Tools",
-    description: "Free network tools: check my IP, hostname to IP, IP to hostname (reverse DNS), domain age checker, and more on the way.",
+    description: "Free network tools: check my IP, hostname to IP, IP to hostname (reverse DNS), domain age checker, V2Ray to JSON, and more on the way.",
     path: "/tools",
     siteName: settings.siteName,
   });

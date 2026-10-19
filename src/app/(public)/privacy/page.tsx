@@ -99,7 +99,7 @@ export default async function PrivacyPage() {
         <p>
           The <Link href="/tools">network tools</Link> look names and addresses up in public DNS from our server; the owner of an IP address comes from
           Team Cymru&apos;s public lookup service, which receives only the address being looked up. Check My IP shows the address your request came from
-          and looks it up the same way; it isn&apos;t saved. The Domain Age Checker asks the domain&apos;s registry
+          and looks it up the same way; it isn&apos;t saved. V2Ray to JSON works entirely in your browser: the links you paste are never sent to us. The Domain Age Checker asks the domain&apos;s registry
           (over RDAP or WHOIS) for its public record; the registry receives only the domain name, and our server keeps the answer in memory for up to 30
           minutes. When you use Hostname to IP, we remember the hostname
           together with the public IP addresses it pointed to, so IP to Hostname can show which websites use an address. Anyone who looks up one of those
