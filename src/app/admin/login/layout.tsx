@@ -12,7 +12,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <main className="relative flex flex-1 items-center justify-center px-4 py-10 sm:py-16">
         <div className="w-full max-w-[28rem] animate-in duration-500 fade-in-0 zoom-in-95 slide-in-from-bottom-4 motion-reduce:animate-none">{children}</div>
       </main>
-      <footer className="relative flex items-center justify-center gap-1.5 pb-6 text-xs text-muted-foreground">
+      <footer className="relative flex items-center justify-center gap-1.5 pb-6 text-xs text-foreground/80">
         <ShieldCheckIcon className="size-3.5" aria-hidden /> Restricted area. All access is logged.
       </footer>
     </div>

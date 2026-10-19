@@ -245,7 +245,8 @@ function PasswordInput({
           type="button"
           onClick={() => setVisible((v) => !v)}
           disabled={disabled}
-          aria-label={visible ? "Hide password" : "Show password"}
+          // A toggle keeps one name; aria-pressed says whether the password is showing.
+          aria-label="Show password"
           aria-pressed={visible}
           className="absolute top-1/2 right-1 flex h-9 min-w-14 -translate-y-1/2 items-center justify-center rounded-lg px-2.5 text-xs font-medium text-primary transition-colors hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none disabled:opacity-50"
         >

@@ -168,7 +168,6 @@
   /* Admin sign-in: the greeting swaps words (in: from large and faint; out: fades), the waves drift. */
   --animate-title-in: title-in 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
   --animate-title-out: title-out 320ms ease-out both;
-  --animate-wave-drift: wave-drift 26s linear infinite;
 
   @keyframes float {
     0%,

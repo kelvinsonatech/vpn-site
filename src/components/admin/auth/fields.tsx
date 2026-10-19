@@ -5,9 +5,12 @@ import { EyeIcon, EyeOffIcon, LightbulbIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 
-/** The pill around a sign-in field: tinted with a soft ring while focused. */
+/**
+ * The pill around a sign-in field: tinted with a soft ring while its input has focus (not while
+ * the show/hide button does, which has a ring of its own).
+ */
 const PILL =
-  "flex h-12 items-center overflow-hidden rounded-full border border-input bg-card transition-[border-color,background-color,box-shadow] duration-200 focus-within:border-primary focus-within:bg-primary/5 focus-within:ring-4 focus-within:ring-primary/15 has-[input[aria-invalid=true]]:border-destructive";
+  "flex h-12 items-center overflow-hidden rounded-full border border-input bg-card transition-[border-color,background-color,box-shadow] duration-200 has-[input:focus]:border-primary has-[input:focus]:bg-primary/5 has-[input:focus]:ring-4 has-[input:focus]:ring-primary/15 has-[input[aria-invalid=true]]:border-destructive";
 const INPUT = "h-full min-w-0 flex-1 bg-transparent pr-4 pl-3 text-[15px] outline-none placeholder:text-muted-foreground/70";
 
 /** A rounded sign-in field with an icon in front; the visible placeholder doubles as a hidden label. */
@@ -38,9 +41,11 @@ export function PasswordPill({ icon, label, ...props }: Omit<React.ComponentProp
       <button
         type="button"
         onClick={() => setShown((s) => !s)}
-        aria-label={shown ? "Hide password" : "Show password"}
+        // A toggle keeps one name; aria-pressed says whether the password is showing.
+        aria-label="Show password"
         aria-pressed={shown}
-        className="flex h-full w-14 shrink-0 items-center justify-center border-l border-input bg-muted/50 text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:text-foreground [&_svg]:size-[18px]"
+        title={shown ? "Hide password" : "Show password"}
+        className="flex h-full w-14 shrink-0 items-center justify-center rounded-r-full border-l border-input bg-muted/50 text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset [&_svg]:size-[18px]"
       >
         {shown ? <EyeOffIcon aria-hidden /> : <EyeIcon aria-hidden />}
       </button>
