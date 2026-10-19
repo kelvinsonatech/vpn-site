@@ -2,6 +2,7 @@ import { CalendarClockIcon, GlobeIcon, LocateFixedIcon, NetworkIcon } from "luci
 import hostnameToIpImage from "@/assets/hostname-to-ip.webp";
 import ipToHostnameImage from "@/assets/ip-to-hostname.webp";
 import domainAgeImage from "@/assets/domain-age.webp";
+import myIpImage from "@/assets/my-ip.webp";
 
 /**
  * The public tools, in menu order: the /tools page lists them from here. `image`, when set, is the
@@ -14,7 +15,7 @@ export const TOOLS = [
     name: "Check My IP",
     description: "See your public IP address, its hostname and provider, and whether you're browsing through our servers.",
     icon: LocateFixedIcon,
-    image: null,
+    image: myIpImage,
   },
   {
     slug: "hostname-to-ip",

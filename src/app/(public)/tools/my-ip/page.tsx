@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { connection } from "next/server";
-import { InfoIcon, LocateFixedIcon, TriangleAlertIcon } from "lucide-react";
+import { InfoIcon, TriangleAlertIcon } from "lucide-react";
 import { CopyAction } from "@/components/public/account/copy-action";
 import { PageHeader } from "@/components/public/page-header";
 import { Container } from "@/components/public/section";
@@ -14,6 +14,7 @@ import { hashClientIp } from "@/server/crypto/hashing";
 import { parseIpInput } from "@/server/tools/reverse";
 import { loadSettings } from "../../_lib/data";
 import { MyIpDetailsPanel, MyIpDetailsSkeleton } from "./details";
+import toolImage from "@/assets/my-ip.webp";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
@@ -46,7 +47,10 @@ export default async function MyIpPage() {
     <>
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "Tools", href: "/tools" }, { label: "Check My IP" }]}
-        icon={<LocateFixedIcon />}
+        icon={
+          // eslint-disable-next-line @next/next/no-img-element -- small bundled picture; the header sizes it
+          <img src={toolImage.src} alt="" aria-hidden="true" width={64} height={64} draggable={false} className="rounded-2xl bg-white object-contain p-1" />
+        }
         eyebrow="Tool"
         title="Check My IP"
         description="The public IP address websites see when you visit them, who it belongs to, and whether you're browsing through one of our servers."
