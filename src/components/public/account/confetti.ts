@@ -1,19 +1,21 @@
 /**
- * Party-popper confetti for a newly created account: two short bursts from the lower left and
- * right corners towards the centre, falling and fading out within about 2.7 s. A fixed,
- * click-through canvas on top of the page that removes itself, so it never takes clicks, moves the
- * layout or widens the page. Callers check the visitor's reduced-motion preference first.
+ * Party-popper confetti (a newly created account; an admin signing in): two short bursts from the
+ * lower left and right corners towards the centre, falling and fading out within about 2.7 s. A
+ * fixed, click-through canvas on top of the page that removes itself, so it never takes clicks,
+ * moves the layout or widens the page. Callers check the visitor's reduced-motion preference first.
  */
 
+export type ConfettiPalette = readonly { color: string; weight: number }[];
+
 /** Royal blue, cyan and white with a few gold accents (the public palette). */
-export const CONFETTI_COLORS = [
+export const CONFETTI_COLORS: ConfettiPalette = [
   { color: "#1d4ce9", weight: 20 },
   { color: "#4f7bff", weight: 15 },
   { color: "#22d3ee", weight: 18 },
   { color: "#67e8f9", weight: 12 },
   { color: "#ffffff", weight: 25 },
   { color: "#f5c542", weight: 10 },
-] as const;
+];
 
 /** Every piece is gone this long after its burst starts. */
 export const MAX_LIFETIME_S = 2.4;
@@ -50,14 +52,14 @@ export interface Particle {
 export type Side = "left" | "right";
 type Rand = () => number;
 
-function pickColor(rand: Rand) {
-  const total = CONFETTI_COLORS.reduce((s, c) => s + c.weight, 0);
+function pickColor(rand: Rand, palette: ConfettiPalette) {
+  const total = palette.reduce((s, c) => s + c.weight, 0);
   let r = rand() * total;
-  for (const c of CONFETTI_COLORS) {
+  for (const c of palette) {
     r -= c.weight;
     if (r < 0) return c.color;
   }
-  return CONFETTI_COLORS[0].color;
+  return palette[0]!.color;
 }
 
 /** Pieces per burst: fewer on small screens. */
@@ -69,7 +71,15 @@ export function burstSize(width: number) {
  * One burst from a lower corner, aimed at a point a little above the middle of the viewport so the
  * pieces meet in the centre, then fall.
  */
-export function createBurst(side: Side, width: number, height: number, count: number, rand: Rand = Math.random, delay = 0): Particle[] {
+export function createBurst(
+  side: Side,
+  width: number,
+  height: number,
+  count: number,
+  rand: Rand = Math.random,
+  delay = 0,
+  palette: ConfettiPalette = CONFETTI_COLORS,
+): Particle[] {
   const x0 = side === "left" ? -8 : width + 8;
   const y0 = height + 8;
   const tx = width / 2;
@@ -91,7 +101,7 @@ export function createBurst(side: Side, width: number, height: number, count: nu
       vy: Math.sin(angle) * speed,
       w: circle ? size * 0.7 : size,
       h: circle ? size * 0.7 : size * (0.45 + rand() * 0.2),
-      color: pickColor(rand),
+      color: pickColor(rand, palette),
       shape: circle ? "circle" : "rect",
       rotation: rand() * Math.PI * 2,
       spin: (rand() - 0.5) * 12,
@@ -129,7 +139,7 @@ export function particleOpacity(p: Particle) {
   return left >= FADE_S ? 1 : Math.max(0, left / FADE_S);
 }
 
-function draw(ctx: CanvasRenderingContext2D, p: Particle, fade: number, scale: number) {
+function draw(ctx: CanvasRenderingContext2D, p: Particle, fade: number, scale: number, outline: string) {
   if (p.delay > 0) return;
   ctx.globalAlpha = particleOpacity(p) * fade;
   // Position, spin and the paper turning over (one axis squashed with the flip phase) in one transform.
@@ -146,16 +156,19 @@ function draw(ctx: CanvasRenderingContext2D, p: Particle, fade: number, scale: n
     ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
   }
   if (p.color === "#ffffff") {
-    // A faint blue edge keeps white pieces visible on the light theme.
+    // A faint coloured edge keeps white pieces visible on the light theme.
     ctx.lineWidth = 1;
-    ctx.strokeStyle = "rgba(29, 76, 233, 0.35)";
+    ctx.strokeStyle = outline;
     if (p.shape === "circle") ctx.stroke();
     else ctx.strokeRect(-p.w / 2, -p.h / 2, p.w, p.h);
   }
 }
 
-/** Start the two bursts. Returns a function that stops the effect and removes the canvas at once. */
-export function launchConfetti(): () => void {
+/**
+ * Start the two bursts, in `palette` (default: the public one); `outline` edges the white pieces.
+ * Returns a function that stops the effect and removes the canvas at once.
+ */
+export function launchConfetti({ palette = CONFETTI_COLORS, outline = "rgba(29, 76, 233, 0.35)" }: { palette?: ConfettiPalette; outline?: string } = {}): () => void {
   if (typeof window === "undefined" || typeof document === "undefined") return () => {};
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
@@ -187,7 +200,7 @@ export function launchConfetti(): () => void {
   document.body.appendChild(canvas);
 
   const n = burstSize(width);
-  let particles = [...createBurst("left", width, height, n), ...createBurst("right", width, height, n, Math.random, SECOND_BURST_DELAY_S)];
+  let particles = [...createBurst("left", width, height, n, Math.random, 0, palette), ...createBurst("right", width, height, n, Math.random, SECOND_BURST_DELAY_S, palette)];
 
   let frame = 0;
   // The clock starts with the first frame actually shown: a hidden tab runs no frames, so a result
@@ -212,7 +225,7 @@ export function launchConfetti(): () => void {
     const fade = Math.min(1, Math.max(0, (HARD_STOP_MS - elapsed) / HARD_FADE_MS));
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    for (const p of particles) draw(ctx, p, fade, scale);
+    for (const p of particles) draw(ctx, p, fade, scale, outline);
     if (!particles.length || elapsed >= HARD_STOP_MS) return stop();
     frame = requestAnimationFrame(tick);
   };

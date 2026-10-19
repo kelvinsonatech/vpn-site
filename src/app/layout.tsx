@@ -41,7 +41,8 @@ export const viewport: Viewport = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
-    <html lang="en" suppressHydrationWarning>
+    // data-scroll-behavior: Next turns the CSS smooth scrolling off while it scrolls to a new page.
+    <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth">
       <body className="min-h-dvh">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange nonce={nonce}>
           <TooltipProvider>

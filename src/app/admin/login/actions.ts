@@ -1,5 +1,6 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { ActionState } from "@/lib/action-state";
@@ -8,6 +9,13 @@ import { clearSessionCookie, readSessionCookie, setSessionCookie } from "@/serve
 import { requestContext } from "@/server/auth/request-context";
 import { revokeSession, validateSessionToken } from "@/server/auth/session";
 import { audit } from "@/server/audit";
+import { isProduction } from "@/server/env";
+import { ADMIN_WELCOME_COOKIE } from "@/lib/admin-welcome";
+
+/** Tells the panel to play the welcome confetti once (see WelcomeConfetti). */
+async function markWelcome() {
+  (await cookies()).set(ADMIN_WELCOME_COOKIE, "1", { path: "/admin", maxAge: 120, sameSite: "lax", secure: isProduction(), httpOnly: false });
+}
 
 const loginSchema = z.object({
   email: z.string().trim().min(3).max(254),
@@ -21,6 +29,7 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
   const result = await attemptLogin({ ...parsed.data, ...ctx });
   if (!result.ok) return { error: result.error };
   await setSessionCookie(result.token);
+  if (!result.mfaRequired) await markWelcome();
   redirect(result.mfaRequired ? "/admin/login/mfa" : "/admin");
 }
 
@@ -32,6 +41,7 @@ export async function mfaAction(_prev: ActionState, formData: FormData): Promise
   const ctx = await requestContext();
   const result = await completeMfa({ admin: s.admin, sessionId: s.session.id, code, ...ctx });
   if (!result.ok) return { error: result.error };
+  await markWelcome();
   redirect("/admin");
 }
 

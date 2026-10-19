@@ -7,6 +7,7 @@ import { siteConfig } from "@/lib/site";
 import { cn } from "@/lib/utils";
 import { AdminNav, SidebarFooter, WHEN_OPEN, type NavBadges, type NavKey } from "./nav";
 import { SIDEBAR_COOKIE } from "./sidebar-cookie";
+import { WelcomeConfetti } from "./welcome-confetti";
 
 /** iOS-like easing: quick start, long soft landing. */
 const EASE = "ease-[cubic-bezier(0.32,0.72,0,1)]";
@@ -117,6 +118,7 @@ export function AdminShell({
         <SidebarFooter logout={logout} pin={{ pinned, onToggle: togglePin }} />
       </aside>
       <div className="flex min-h-dvh min-w-0 flex-col">{children}</div>
+      <WelcomeConfetti />
     </div>
   );
 }
