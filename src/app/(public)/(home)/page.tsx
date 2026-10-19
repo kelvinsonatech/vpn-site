@@ -36,6 +36,7 @@ import { loadProtocols, loadSettings, loadStats, loadStatus, joinTimes, zoneLabe
 import chooseProtocolImage from "@/assets/step-choose-protocol.webp";
 import pickServerImage from "@/assets/step-pick-server.webp";
 import copyConfigImage from "@/assets/step-copy-config.webp";
+import profilesBandImage from "@/assets/profiles-band.webp";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
@@ -330,18 +331,39 @@ export default async function HomePage() {
         </Container>
       </section>
 
-      {/* DiceBear profiles */}
+      {/* DiceBear profiles, over a photo of eggs with drawn-on faces. A warm dark wash, strongest behind the text, keeps it readable. */}
       <section className="mt-24 sm:mt-32" aria-labelledby="profiles-title">
         <Container>
-          <div className="grid items-center gap-10 overflow-hidden rounded-[2rem] border bg-gradient-to-br from-card to-accent/60 p-6 shadow-[0_20px_50px_-30px_rgb(15_30_120/0.35)] sm:p-10 lg:grid-cols-2">
+          <div className="relative isolate grid items-center gap-10 overflow-hidden rounded-[2rem] p-6 text-white shadow-[0_20px_50px_-30px_rgb(15_30_120/0.45)] ring-1 ring-black/10 sm:p-10 lg:grid-cols-2 dark:ring-white/10">
+            {/* eslint-disable-next-line @next/next/no-img-element -- bundled background picture */}
+            <img
+              src={profilesBandImage.src}
+              alt=""
+              aria-hidden="true"
+              width={profilesBandImage.width}
+              height={profilesBandImage.height}
+              loading="lazy"
+              decoding="async"
+              draggable={false}
+              className="absolute inset-0 -z-20 size-full object-cover object-[40%_50%] lg:object-[50%_45%]"
+            />
+            {/* Frosted behind the words (top on phones, left on large screens), sharp behind the avatars. */}
+            <span
+              aria-hidden
+              className="absolute inset-0 -z-10 backdrop-blur-[6px] [mask-image:linear-gradient(to_bottom,#000_40%,transparent_55%)] lg:[mask-image:linear-gradient(to_right,#000_42%,transparent_62%)]"
+            />
+            <span
+              aria-hidden
+              className="absolute inset-0 -z-10 bg-[linear-gradient(to_bottom,rgb(28_18_10/0.86),rgb(28_18_10/0.74)_55%,rgb(28_18_10/0.4))] lg:bg-[linear-gradient(to_right,rgb(28_18_10/0.88),rgb(28_18_10/0.7)_50%,rgb(28_18_10/0.2))]"
+            />
             <div>
-              <p className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold tracking-wider text-primary uppercase">
+              <p className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold tracking-wider uppercase ring-1 ring-white/25 backdrop-blur-sm">
                 <UserRoundIcon className="size-3.5" /> Profiles
               </p>
-              <h2 id="profiles-title" className="text-2xl font-bold tracking-tight text-balance sm:text-3xl">
+              <h2 id="profiles-title" className="text-2xl font-bold tracking-tight text-balance drop-shadow-sm sm:text-3xl">
                 Every account gets its own face
               </h2>
-              <p className="mt-3 text-pretty text-muted-foreground">
+              <p className="mt-3 text-pretty text-white/85">
                 Each new account receives a unique avatar, drawn on our server the moment it is created. Your accounts on this device are listed under
                 My accounts with their avatar, server and a live expiry countdown, so telling them apart takes a glance. No uploads, no third-party
                 requests.
@@ -349,27 +371,26 @@ export default async function HomePage() {
               <div className="mt-6 flex flex-wrap gap-3">
                 <Link
                   href="/my-accounts"
-                  className="inline-flex h-11 items-center gap-2 rounded-full border bg-background px-5 text-sm font-semibold transition-colors hover:border-primary/40 hover:text-primary"
+                  className="inline-flex h-11 items-center gap-2 rounded-full border border-white/35 bg-black/35 px-5 text-sm font-semibold text-white backdrop-blur-sm transition-colors hover:bg-black/50"
                 >
                   <UserRoundIcon className="size-4" />
                   My accounts
                 </Link>
                 <Link
                   href={primaryHref}
-                  className="inline-flex h-11 items-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-md shadow-primary/20 transition-colors hover:bg-primary/90"
+                  className="inline-flex h-11 items-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-md shadow-black/25 transition-colors hover:bg-primary/90"
                 >
                   Create one now
                   <ArrowRightIcon className="size-4" />
                 </Link>
               </div>
             </div>
-            <div aria-hidden className="relative">
-              <div className="absolute inset-0 -z-0 rounded-full bg-[radial-gradient(closest-side,color-mix(in_oklch,var(--primary)_18%,transparent),transparent)]" />
-              <ul className="relative grid grid-cols-4 gap-2 sm:gap-4">
+            <div aria-hidden>
+              <ul className="grid grid-cols-4 gap-2 sm:gap-4">
                 {profiles.map((p, i) => (
                   <li
                     key={p.seed}
-                    className="flex min-w-0 animate-in flex-col items-center gap-2 rounded-2xl border bg-background/80 px-1 py-3 shadow-sm duration-500 fade-in fill-mode-both zoom-in-90 sm:p-3"
+                    className="flex min-w-0 animate-in flex-col items-center gap-2 rounded-2xl border border-white/60 bg-white/85 px-1 py-3 shadow-lg shadow-black/15 backdrop-blur-md duration-500 fade-in fill-mode-both zoom-in-90 sm:p-3 dark:border-white/10 dark:bg-card/80"
                     style={{ animationDelay: `${i * 70}ms` }}
                   >
                     {/* UserAvatar sizes itself inline; 52 px fits the narrowest (360 px) grid cell. */}
