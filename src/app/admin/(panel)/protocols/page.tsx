@@ -51,7 +51,7 @@ export default async function ProtocolsPage() {
               <TableRow key={p.id}>
                 <TableCell className="max-w-96">
                   <div className="flex items-center gap-3">
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground ring-1 ring-primary/10">
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted">
                       <ProtocolIcon name={p.icon} className="size-4" />
                     </span>
                     <span className="grid min-w-0 gap-0.5">

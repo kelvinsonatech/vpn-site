@@ -290,7 +290,7 @@ export function ProtocolEditor({
             </FormField>
             <FormField id="icon" label="Icon">
               <div className="flex items-center gap-2">
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-accent text-accent-foreground">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted">
                   <ProtocolIcon name={v.icon} className="size-4" />
                 </span>
                 <NativeSelect id="icon" value={v.icon} onChange={(e) => set("icon", e.target.value)} disabled={disabled}>
