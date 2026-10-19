@@ -3,7 +3,6 @@ import {
   AlertOctagonIcon,
   ArrowUpRightIcon,
   CalendarDaysIcon,
-  ConstructionIcon,
   ExternalLinkIcon,
   FlagIcon,
   PlusIcon,
@@ -32,6 +31,7 @@ import { getDashboardData } from "@/server/dashboard/queries";
 import { getSiteSettings } from "@/server/settings/service";
 import totalServersImage from "@/assets/total-servers.webp";
 import offlineServersImage from "@/assets/offline-servers.webp";
+import maintenanceServersImage from "@/assets/maintenance-servers.webp";
 
 const ACCOUNT_BADGE = { active: "success", pending: "info", expired: "muted", revoked: "warning", failed: "danger" } as const;
 
@@ -158,7 +158,10 @@ export default async function DashboardPage() {
         <MiniStat
           label="Maintenance"
           value={d.servers.maintenance}
-          icon={<ConstructionIcon />}
+          icon={
+            // eslint-disable-next-line @next/next/no-img-element -- small bundled picture
+            <img src={maintenanceServersImage.src} alt="" aria-hidden="true" width={28} height={28} draggable={false} className="size-7 object-contain" />
+          }
           tone={d.servers.maintenance ? "warning" : "default"}
           hint={d.servers.disabled ? `${d.servers.disabled} disabled` : undefined}
         />
