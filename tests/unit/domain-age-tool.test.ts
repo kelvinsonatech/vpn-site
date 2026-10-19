@@ -2,7 +2,24 @@ import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { calendarSpan, daysBetween, formatSpan } from "@/lib/date-span";
 import { ToolError } from "@/server/tools/errors";
-import { lookupDomainAge, parseRdap, parseRegistryDate, parseWhois, resetDomainAgeCaches } from "@/server/tools/domain-age";
+import {
+  lookupDomainAge,
+  parseRdap,
+  parseRegistryDate,
+  parseSuffixList,
+  parseWhois,
+  registeredDomain,
+  resetDomainAgeCaches,
+} from "@/server/tools/domain-age";
+
+// The per-registry budget lives in Redis; here each test decides whether it allows the query.
+const budget = vi.hoisted(() => ({ allowed: true, keys: [] as string[] }));
+vi.mock("@/server/auth/rate-limit", () => ({
+  rateLimit: async (key: string) => {
+    budget.keys.push(key);
+    return { allowed: budget.allowed, remaining: 1, resetSeconds: 60 };
+  },
+}));
 
 /** The "Domain Age" tool: registry date formats, RDAP and WHOIS parsing, lookup flow and the age arithmetic. */
 
@@ -39,6 +56,7 @@ describe("parseRegistryDate", () => {
     ["2001-01-13 00:12:14 UTC", "2001-01-13T00:12:14.000Z"],
     ["2019-11-15T07:46:06+01:00", "2019-11-15T06:46:06.000Z"],
     ["2019-11-15T07:46:06-0500", "2019-11-15T12:46:06.000Z"],
+    ["2002-12-04 00:00:00+02", "2002-12-03T22:00:00.000Z"],
     ["2001-01-13", "2001-01-13T00:00:00.000Z"],
     ["13-Jan-2001", "2001-01-13T00:00:00.000Z"],
     ["2001.01.13", "2001-01-13T00:00:00.000Z"],
@@ -159,6 +177,87 @@ describe("parseWhois", () => {
   });
 });
 
+describe("parseWhois: registry layouts", () => {
+  it("FRED/RIPE style: the domain's own date wins over contact objects' 'created' printed after it", () => {
+    const text = [
+      "domain:       example.cr",
+      "registrant:   CONTACT-1",
+      "nsset:        NSS-1",
+      "registered:   17.11.2000 00:00:00",
+      "expire:       17.11.2026",
+      "",
+      "contact:      CONTACT-1",
+      "created:      03.09.2018 10:00:00",
+      "",
+      "nsset:        NSS-1",
+      "nserver:      ns1.example.cr",
+      "created:      01.01.2019 10:00:00",
+    ].join("\n");
+    expect(parseWhois(text, "example.cr")).toMatchObject({ registered: "2000-11-17T00:00:00.000Z", expires: "2026-11-17T00:00:00.000Z", nameservers: ["ns1.example.cr"] });
+  });
+
+  it("EURid / DNS Belgium: nested 'Registrar: / Name:' block and multi-line name server lists", () => {
+    const text = [
+      "Domain: google.eu",
+      "Registrar:",
+      "        Name: MarkMonitor Inc.",
+      "        Website: https://www.markmonitor.com",
+      "",
+      "Name servers:",
+      "        ns1.google.com",
+      "        ns2.google.com",
+      "",
+      "Registered: Thu Jan 01 2004",
+    ].join("\n");
+    expect(parseWhois(text, "google.eu")).toMatchObject({ registrar: "MarkMonitor Inc.", nameservers: ["ns1.google.com", "ns2.google.com"] });
+  });
+
+  it("JPRS (.jp) bracketed lines and CNNIC (.cn) 'Expiration Time'", () => {
+    const jp = ["[ JPRS database provides information on network administration. ]", "a. [Domain Name]                GOOGLE.JP", "[Name Server]                   ns1.google.com", "[Created on]                    2005/05/30", "[Expires on]                    2027/05/31", "[Status]                        Active", "[Last Updated]                  2026/06/01 01:05:04 (JST)"].join("\n");
+    expect(parseWhois(jp, "google.jp")).toMatchObject({
+      registered: "2005-05-30T00:00:00.000Z",
+      expires: "2027-05-31T00:00:00.000Z",
+      updated: "2026-06-01T00:00:00.000Z",
+      nameservers: ["ns1.google.com"],
+      status: ["Active"],
+    });
+    const cn = "Domain Name: google.cn\nRegistration Time: 2003-03-17 12:20:05\nExpiration Time: 2027-03-17 12:48:36\nSponsoring Registrar: MarkMonitor Inc.\n";
+    expect(parseWhois(cn, "google.cn")).toMatchObject({ registered: "2003-03-17T12:20:05.000Z", expires: "2027-03-17T12:48:36.000Z", registrar: "MarkMonitor Inc." });
+  });
+
+  it("an answer with nothing recognisable parses to an empty record (the lookup refuses it)", () => {
+    expect(parseWhois("% Error: 55000000002 Connection refused; access control limit reached.", "x.de")).toMatchObject({ registered: null, status: [], nameservers: [] });
+    expect(parseWhois("", "x.de")).toMatchObject({ registered: null, registrar: null });
+  });
+});
+
+describe("Public Suffix List", () => {
+  const list = parseSuffixList(
+    ["// ===BEGIN ICANN DOMAINS===", "com", "uk", "co.uk", "ltd.uk", "io", "*.ck", "!www.ck", "jp", "*.kawasaki.jp", "!city.kawasaki.jp", "公司.cn", "cn", "// ===END ICANN DOMAINS===", "github.io"].join("\n"),
+  );
+  it.each([
+    ["www.google.com", "google.com"],
+    ["a.b.example.co.uk", "example.co.uk"],
+    ["www.example.ltd.uk", "example.ltd.uk"],
+    ["someone.github.io", "github.io"],
+    ["shop.example.co.ck", "example.co.ck"],
+    ["www.ck", "www.ck"],
+    ["a.city.kawasaki.jp", "city.kawasaki.jp"],
+    ["x.foo.kawasaki.jp", "x.foo.kawasaki.jp"],
+    ["xn--55qx5d.cn", null],
+    ["example.xn--55qx5d.cn", "example.xn--55qx5d.cn"],
+    ["co.uk", null],
+    ["uk", null],
+  ])("%s → %s", (host, domain) => {
+    expect(registeredDomain(list, host)).toBe(domain);
+  });
+  it("reads only the ICANN section", () => {
+    expect(list.rules.has("github.io")).toBe(false);
+    expect(list.wildcards.has("ck")).toBe(true);
+    expect(list.exceptions.has("www.ck")).toBe(true);
+  });
+});
+
 describe("calendarSpan / formatSpan", () => {
   const d = (s: string) => new Date(`${s}T12:00:00Z`);
   it.each([
@@ -193,12 +292,22 @@ describe("lookupDomainAge", () => {
       [["uk"], ["http://rdap.nominet.example/uk/", "https://rdap.nominet.example/uk/"]],
     ],
   };
+  // Enough rules to pass the sanity check, plus the ones the tests use.
+  const SUFFIXES = [
+    "// ===BEGIN ICANN DOMAINS===",
+    ...Array.from({ length: 1000 }, (_, i) => `filler${i}`),
+    ...["com", "net", "uk", "co.uk", "ltd.uk", "io", "de", "me", "zz"],
+    "// ===END ICANN DOMAINS===",
+  ].join("\n");
+  const PSL = "https://publicsuffix.org/list/public_suffix_list.dat";
 
   beforeEach(() => {
     resetDomainAgeCaches();
+    budget.allowed = true;
+    budget.keys.length = 0;
     whois.answers.clear();
     whois.queries.length = 0;
-    routes = { "https://data.iana.org/rdap/dns.json": [200, BOOTSTRAP] };
+    routes = { "https://data.iana.org/rdap/dns.json": [200, BOOTSTRAP], [PSL]: [200, SUFFIXES] };
     fetchMock.mockReset();
     fetchMock.mockImplementation(async (input: URL | string) => {
       const url = String(input);
@@ -210,79 +319,141 @@ describe("lookupDomainAge", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   const fetched = () => fetchMock.mock.calls.map(([u]) => String(u));
+  const VERISIGN = "https://rdap.verisign.example/com/v1/domain/";
 
   it("RDAP: subdomains are looked up as their registered domain; the https server is preferred", async () => {
-    routes["https://rdap.verisign.example/com/v1/domain/google.com"] = [200, GOOGLE];
+    routes[`${VERISIGN}google.com`] = [200, GOOGLE];
     await expect(lookupDomainAge("www.google.com")).resolves.toMatchObject({ domain: "google.com", registered: "1997-09-15T04:00:00.000Z", source: "rdap" });
     routes["https://rdap.nominet.example/uk/domain/bbc.co.uk"] = [200, { ldhName: "bbc.co.uk", events: [{ eventAction: "registration", eventDate: "1994-12-13T03:49:48Z" }] }];
     await expect(lookupDomainAge("news.bbc.co.uk")).resolves.toMatchObject({ domain: "bbc.co.uk" });
     expect(fetched()).not.toContain("http://rdap.nominet.example/uk/domain/bbc.co.uk");
   });
 
-  it("caches answers and IANA's list", async () => {
-    routes["https://rdap.verisign.example/com/v1/domain/google.com"] = [200, GOOGLE];
-    await lookupDomainAge("google.com");
-    await lookupDomainAge("google.com");
-    expect(fetched().filter((u) => u.includes("dns.json"))).toHaveLength(1);
-    expect(fetched().filter((u) => u.includes("domain/google.com"))).toHaveLength(1);
+  it("uses the Public Suffix List: one query for example.ltd.uk, never the zone (ltd.uk, co.uk) itself", async () => {
+    routes["https://rdap.nominet.example/uk/domain/example.ltd.uk"] = [200, { ldhName: "example.ltd.uk" }];
+    await expect(lookupDomainAge("www.example.ltd.uk")).resolves.toMatchObject({ domain: "example.ltd.uk" });
+    expect(fetched().filter((u) => u.includes("/domain/"))).toEqual(["https://rdap.nominet.example/uk/domain/example.ltd.uk"]);
+    routes["https://rdap.nominet.example/uk/domain/co.uk"] = [200, { ldhName: "co.uk" }];
+    await expect(lookupDomainAge("nope-zz.co.uk")).rejects.toMatchObject({ code: "NOT_REGISTERED" });
+    await expect(lookupDomainAge("co.uk")).rejects.toMatchObject({ code: "IS_SUFFIX", httpStatus: 400 });
+    expect(fetched()).not.toContain("https://rdap.nominet.example/uk/domain/co.uk");
   });
 
-  it("not registered → NOT_REGISTERED; a wrong first guess is retried one label longer", async () => {
-    const err = await lookupDomainAge("zzqx-nope.com").catch((e) => e);
-    expect(err).toBeInstanceOf(ToolError);
-    expect(err).toMatchObject({ code: "NOT_REGISTERED", httpStatus: 404 });
+  it("a made-up ending is refused before any registry is asked", async () => {
+    await expect(lookupDomainAge("a.q0001")).rejects.toMatchObject({ code: "UNKNOWN_TLD", httpStatus: 400 });
+    expect(whois.queries).toEqual([]);
+    expect(fetched().filter((u) => u.includes("/domain/"))).toEqual([]);
+  });
+
+  it("without the suffix list, a heuristic guess is used and retried one label longer", async () => {
+    routes[PSL] = [503, "down"];
     routes["https://rdap.nominet.example/uk/domain/example.ltd.uk"] = [200, { ldhName: "example.ltd.uk" }];
     await expect(lookupDomainAge("www.example.ltd.uk")).resolves.toMatchObject({ domain: "example.ltd.uk" });
     expect(fetched()).toContain("https://rdap.nominet.example/uk/domain/ltd.uk");
+    // The failed list isn't downloaded again on the next lookup.
+    await lookupDomainAge("www.example.ltd.uk");
+    expect(fetched().filter((u) => u === PSL)).toHaveLength(1);
   });
 
-  it("registry errors: 429 → REGISTRY_BUSY, 500 → REGISTRY_FAILED, broken JSON → REGISTRY_FAILED", async () => {
-    routes["https://rdap.verisign.example/com/v1/domain/busy.com"] = [429, {}];
-    routes["https://rdap.verisign.example/com/v1/domain/broken.com"] = [500, {}];
-    routes["https://rdap.verisign.example/com/v1/domain/garbage.com"] = [200, "<html>not json"];
+  it("caches answers and both lists; concurrent lookups of one name share a single query", async () => {
+    routes[`${VERISIGN}google.com`] = [200, GOOGLE];
+    await Promise.all([lookupDomainAge("google.com"), lookupDomainAge("www.google.com"), lookupDomainAge("mail.google.com")]);
+    await lookupDomainAge("google.com");
+    expect(fetched().filter((u) => u.includes("dns.json"))).toHaveLength(1);
+    expect(fetched().filter((u) => u === PSL)).toHaveLength(1);
+    expect(fetched().filter((u) => u.includes("domain/google.com"))).toHaveLength(1);
+  });
+
+  it("not registered → NOT_REGISTERED (and the miss is cached briefly)", async () => {
+    const err = await lookupDomainAge("zzqx-nope.com").catch((e) => e);
+    expect(err).toBeInstanceOf(ToolError);
+    expect(err).toMatchObject({ code: "NOT_REGISTERED", httpStatus: 404 });
+    await lookupDomainAge("zzqx-nope.com").catch(() => {});
+    expect(fetched().filter((u) => u.endsWith("zzqx-nope.com"))).toHaveLength(1);
+  });
+
+  it("registry errors: 429 → REGISTRY_BUSY and a cool-down, 500 → REGISTRY_FAILED, broken JSON → REGISTRY_FAILED", async () => {
+    routes[`${VERISIGN}busy.com`] = [429, {}, { "retry-after": "300" }];
+    routes[`${VERISIGN}broken.com`] = [500, {}];
+    routes[`${VERISIGN}garbage.com`] = [200, "<html>not json"];
     await expect(lookupDomainAge("busy.com")).rejects.toMatchObject({ code: "REGISTRY_BUSY", httpStatus: 503 });
+    // Cooling down: the registry isn't asked again, for any name.
+    routes[`${VERISIGN}google.com`] = [200, GOOGLE];
+    await expect(lookupDomainAge("google.com")).rejects.toMatchObject({ code: "REGISTRY_BUSY" });
+    expect(fetched().filter((u) => u.endsWith("google.com"))).toEqual([]);
+    resetDomainAgeCaches();
     await expect(lookupDomainAge("broken.com")).rejects.toMatchObject({ code: "REGISTRY_FAILED", httpStatus: 502 });
     await expect(lookupDomainAge("garbage.com")).rejects.toMatchObject({ code: "REGISTRY_FAILED" });
   });
 
+  it("every registry query passes the global per-host budget; over budget → REGISTRY_BUSY without a query", async () => {
+    routes[`${VERISIGN}google.com`] = [200, GOOGLE];
+    await lookupDomainAge("google.com");
+    expect(budget.keys).toContain("tools:domain-age:host:rdap.verisign.example");
+    budget.allowed = false;
+    await expect(lookupDomainAge("other.com")).rejects.toMatchObject({ code: "REGISTRY_BUSY" });
+    expect(fetched()).not.toContain(`${VERISIGN}other.com`);
+  });
+
   it("follows at most two redirects, only to named hosts on the default port", async () => {
-    const base = "https://rdap.verisign.example/com/v1/domain/";
-    routes[`${base}moved.com`] = [302, "", { location: "https://rdap2.example/domain/moved.com" }];
+    routes[`${VERISIGN}moved.com`] = [302, "", { location: "https://rdap2.example/domain/moved.com" }];
     routes["https://rdap2.example/domain/moved.com"] = [200, { ldhName: "moved.com" }];
     await expect(lookupDomainAge("moved.com")).resolves.toMatchObject({ domain: "moved.com" });
 
-    routes[`${base}internal.com`] = [302, "", { location: "http://127.0.0.1/domain/internal.com" }];
-    routes[`${base}port.com`] = [302, "", { location: "https://evil.example:8443/x" }];
-    routes[`${base}loop.com`] = [302, "", { location: `${base}loop.com` }];
-    for (const name of ["internal.com", "port.com", "loop.com"]) await expect(lookupDomainAge(name)).rejects.toMatchObject({ code: "REGISTRY_FAILED" });
+    routes[`${VERISIGN}internal.com`] = [302, "", { location: "http://127.0.0.1/domain/internal.com" }];
+    routes[`${VERISIGN}port.com`] = [302, "", { location: "https://evil.example:8443/x" }];
+    routes[`${VERISIGN}loop.com`] = [302, "", { location: `${VERISIGN}loop.com` }];
+    routes[`${VERISIGN}local.com`] = [302, "", { location: "http://localhost./x" }];
+    for (const name of ["internal.com", "port.com", "loop.com", "local.com"]) await expect(lookupDomainAge(name)).rejects.toMatchObject({ code: "REGISTRY_FAILED" });
     expect(fetched()).not.toContain("http://127.0.0.1/domain/internal.com");
     expect(fetched().filter((u) => u.endsWith("loop.com"))).toHaveLength(3);
   });
 
   it("refuses oversized answers", async () => {
-    routes["https://rdap.verisign.example/com/v1/domain/huge.com"] = [200, "x".repeat(600_000)];
+    routes[`${VERISIGN}huge.com`] = [200, "x".repeat(600_000)];
     await expect(lookupDomainAge("huge.com")).rejects.toMatchObject({ code: "REGISTRY_FAILED" });
   });
 
-  it("no IANA list (first start, network down) → REGISTRY_FAILED", async () => {
+  it("no IANA bootstrap (first start, network down) → REGISTRY_FAILED", async () => {
     routes["https://data.iana.org/rdap/dns.json"] = [503, {}];
     await expect(lookupDomainAge("google.com")).rejects.toMatchObject({ code: "REGISTRY_FAILED" });
   });
 
   it("TLDs without RDAP go to the WHOIS server IANA names for them", async () => {
-    whois.answers.set("whois.iana.org", (q) => (q === "io" ? "domain: IO\nwhois: whois.nic.io\n" : "domain: XX\n"));
+    whois.answers.set("whois.iana.org", (q) => (q === "io" ? "domain: IO\nwhois: whois.nic.io\n" : `domain: ${q.toUpperCase()}\n`));
     whois.answers.set("whois.nic.io", (q) => (q === "github.io" ? "Domain Name: github.io\nCreation Date: 2013-03-08T21:59:34Z\nRegistrar: MarkMonitor Inc.\n" : 'No match for "X".'));
     await expect(lookupDomainAge("someone.github.io")).resolves.toMatchObject({ domain: "github.io", registered: "2013-03-08T21:59:34.000Z", source: "whois" });
     await expect(lookupDomainAge("nope-123.io")).rejects.toMatchObject({ code: "NOT_REGISTERED" });
-    await expect(lookupDomainAge("example.xx")).rejects.toMatchObject({ code: "NO_REGISTRY_SERVICE", httpStatus: 422 });
+    await expect(lookupDomainAge("example.zz")).rejects.toMatchObject({ code: "NO_REGISTRY_SERVICE", httpStatus: 422 });
     // IANA asked once per TLD.
     expect(whois.queries.filter((q) => q === "whois.iana.org io")).toHaveLength(1);
+    expect(budget.keys).toContain("tools:domain-age:host:whois.nic.io");
   });
 
-  it("DENIC gets its '-T dn' query form; a refused WHOIS connection → REGISTRY_FAILED", async () => {
-    whois.answers.set("whois.iana.org", (q) => `whois: whois.${q === "de" ? "denic.de" : "nic.me"}\n`);
-    whois.answers.set("whois.denic.de", () => "Domain: example.de\nStatus: connect\n");
-    await expect(lookupDomainAge("example.de")).resolves.toMatchObject({ registered: null });
+  it("an odd IANA answer is not cached as 'no WHOIS server'", async () => {
+    let calls = 0;
+    whois.answers.set("whois.iana.org", () => (++calls === 1 ? "" : "domain: ME\nwhois: whois.nic.me\n"));
+    whois.answers.set("whois.nic.me", () => "Domain Name: example.me\nCreation Date: 2010-01-01T00:00:00Z\n");
+    await expect(lookupDomainAge("example.me")).rejects.toMatchObject({ code: "REGISTRY_FAILED" });
+    await expect(lookupDomainAge("example.me")).resolves.toMatchObject({ registered: "2010-01-01T00:00:00.000Z" });
+  });
+
+  it("empty or throttled WHOIS answers are refusals: REGISTRY_BUSY, never cached as a record", async () => {
+    whois.answers.set("whois.iana.org", (q) => `domain: ${q.toUpperCase()}\nwhois: whois.${q === "de" ? "denic.de" : "nic.me"}\n`);
+    whois.answers.set("whois.denic.de", () => "% Error: 55000000002 Connection refused; access control limit reached.");
+    await expect(lookupDomainAge("example.de")).rejects.toMatchObject({ code: "REGISTRY_BUSY" });
+    whois.answers.set("whois.nic.me", () => "");
+    await expect(lookupDomainAge("example.me")).rejects.toMatchObject({ code: "REGISTRY_BUSY" });
+    // Both servers now cool down; a later lookup asks again only after that.
+    resetDomainAgeCaches();
+    whois.answers.set("whois.nic.me", () => "Domain Name: example.me\nCreation Date: 2010-01-01T00:00:00Z\n");
+    await expect(lookupDomainAge("example.me")).resolves.toMatchObject({ registered: "2010-01-01T00:00:00.000Z" });
+  });
+
+  it("DENIC gets its '-T dn' query form; JPRS gets '/e'; a refused connection → REGISTRY_FAILED", async () => {
+    whois.answers.set("whois.iana.org", (q) => `domain: ${q.toUpperCase()}\nwhois: whois.${q === "de" ? "denic.de" : "nic.me"}\n`);
+    whois.answers.set("whois.denic.de", () => "Domain: example.de\nNserver: ns1.example.de\nStatus: connect\n");
+    await expect(lookupDomainAge("example.de")).resolves.toMatchObject({ registered: null, status: ["connect"] });
     expect(whois.queries).toContain("whois.denic.de -T dn example.de");
     await expect(lookupDomainAge("example.me")).rejects.toMatchObject({ code: "REGISTRY_FAILED" });
   });

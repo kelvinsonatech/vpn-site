@@ -70,7 +70,8 @@ export function DomainAgeChecker({ initialDomain }: { initialDomain: string }) {
   const result = state.phase === "done" ? state.result : null;
   const now = new Date();
   const age = result?.registered ? calendarSpan(new Date(result.registered), now) : null;
-  const ageDays = result?.registered ? daysBetween(new Date(result.registered), now) : 0;
+  // Clamped: a registry date written in local time, or a slow device clock, can put "registered" just ahead of now.
+  const ageDays = result?.registered ? Math.max(0, daysBetween(new Date(result.registered), now)) : 0;
 
   return (
     <div className="grid gap-5">
@@ -139,9 +140,10 @@ export function DomainAgeChecker({ initialDomain }: { initialDomain: string }) {
               </p>
               {age ? (
                 <>
-                  <p className="mt-2 text-2xl font-bold tracking-tight text-balance drop-shadow-md sm:text-4xl">{formatSpan(age)}</p>
+                  <p className="mt-2 text-2xl font-bold tracking-tight text-balance drop-shadow-md sm:text-4xl">{ageDays ? formatSpan(age) : "Registered today"}</p>
                   <p className="mt-1.5 text-sm text-white/85 tabular-nums drop-shadow">
-                    {ageDays.toLocaleString("en-US")} day{ageDays === 1 ? "" : "s"} since {formatDate(result.registered!)}
+                    {ageDays ? `${ageDays.toLocaleString("en-US")} day${ageDays === 1 ? "" : "s"} since ` : "on "}
+                    {formatDate(result.registered!)}
                   </p>
                 </>
               ) : (
