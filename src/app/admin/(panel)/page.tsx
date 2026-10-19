@@ -1,16 +1,5 @@
 import Link from "next/link";
-import {
-  AlertOctagonIcon,
-  ArrowUpRightIcon,
-  CalendarDaysIcon,
-  ExternalLinkIcon,
-  FlagIcon,
-  PlusIcon,
-  ShieldAlertIcon,
-  SignalIcon,
-  UserPlusIcon,
-  UsersIcon,
-} from "lucide-react";
+import { AlertOctagonIcon, ArrowUpRightIcon, ExternalLinkIcon, FlagIcon, PlusIcon, ShieldAlertIcon, SignalIcon, UserPlusIcon, UsersIcon } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { GrowthChart } from "@/components/admin/dashboard/growth-chart";
@@ -32,6 +21,7 @@ import { getSiteSettings } from "@/server/settings/service";
 import totalServersImage from "@/assets/total-servers.webp";
 import offlineServersImage from "@/assets/offline-servers.webp";
 import maintenanceServersImage from "@/assets/maintenance-servers.webp";
+import calendarImage from "@/assets/domain-age-result.webp";
 
 const ACCOUNT_BADGE = { active: "success", pending: "info", expired: "muted", revoked: "warning", failed: "danger" } as const;
 
@@ -165,7 +155,15 @@ export default async function DashboardPage() {
           tone={d.servers.maintenance ? "warning" : "default"}
           hint={d.servers.disabled ? `${d.servers.disabled} disabled` : undefined}
         />
-        <MiniStat label="This month" value={formatNumber(d.accounts.month)} icon={<CalendarDaysIcon />} tone="success" />
+        <MiniStat
+          label="This month"
+          value={formatNumber(d.accounts.month)}
+          icon={
+            // eslint-disable-next-line @next/next/no-img-element -- small bundled picture (the Domain Age calendar)
+            <img src={calendarImage.src} alt="" aria-hidden="true" width={28} height={28} draggable={false} className="size-7 object-contain" />
+          }
+          tone="success"
+        />
       </div>
 
       <div className="mt-6 grid items-start gap-6 lg:grid-cols-2 xl:grid-cols-3">
