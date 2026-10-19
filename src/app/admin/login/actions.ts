@@ -43,5 +43,5 @@ export async function logoutAction(): Promise<void> {
     await audit({ adminId: s.admin.id, email: s.admin.email, ...ctx }, "auth.logout");
   }
   await clearSessionCookie();
-  redirect("/admin/login");
+  redirect("/admin/login?signed_out=1");
 }

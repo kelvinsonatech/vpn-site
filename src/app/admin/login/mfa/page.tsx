@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
+import { AuthCard } from "@/components/admin/auth/auth-card";
 import { readSessionCookie } from "@/server/auth/cookies";
 import { validateSessionToken } from "@/server/auth/session";
 import { logoutAction } from "../actions";
@@ -13,19 +13,20 @@ export default async function MfaPage() {
   if (!s) redirect("/admin/login");
   if (!s.admin.mfaEnabled || s.session.mfaVerified) redirect("/admin");
   return (
-    <Card>
-      <CardHeader>
-        <h1 data-slot="card-title" className="text-xl leading-none font-semibold">Two-factor authentication</h1>
-        <CardDescription>Signed in as {s.admin.email}</CardDescription>
-      </CardHeader>
-      <CardContent className="grid gap-4">
-        <MfaForm />
-        <form action={logoutAction}>
-          <button type="submit" className="text-sm text-muted-foreground underline-offset-4 hover:underline">
-            Use a different account
-          </button>
-        </form>
-      </CardContent>
-    </Card>
+    <AuthCard
+      heading={
+        <div className="grid gap-1.5">
+          <h1 className="text-3xl font-bold tracking-tight">One more step</h1>
+          <p className="text-sm text-muted-foreground [overflow-wrap:anywhere]">Signed in as {s.admin.email}</p>
+        </div>
+      }
+    >
+      <MfaForm />
+      <form action={logoutAction} className="mt-4 text-center">
+        <button type="submit" className="rounded text-sm text-muted-foreground underline-offset-4 outline-none hover:text-foreground hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50">
+          Use a different account
+        </button>
+      </form>
+    </AuthCard>
   );
 }
