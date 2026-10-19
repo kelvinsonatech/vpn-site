@@ -42,7 +42,7 @@ export function GradientStat({
   );
   if (!href) return body;
   return (
-    <Link href={href} className="group rounded-[1.75rem] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
+    <Link href={href} className="group rounded-[1.75rem] focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-hidden">
       {body}
     </Link>
   );
@@ -55,17 +55,15 @@ const CHIP_TONES = {
   warning: "bg-warning-soft text-warning-strong",
 } as const;
 
-/** A compact white stat: coloured icon chip, number and label on one line. */
+/** A compact white stat: coloured icon chip, the number, its label and an optional note under it. */
 export function MiniStat({ label, value, hint, icon, tone = "default" }: { label: string; value: React.ReactNode; hint?: React.ReactNode; icon: React.ReactNode; tone?: keyof typeof CHIP_TONES }) {
   return (
-    <div className="flex items-center gap-3.5 rounded-[1.5rem] bg-card px-4 py-3.5 shadow-[0_10px_30px_-20px_rgb(15_23_42/0.2)] ring-1 ring-black/[0.04] dark:ring-white/10">
-      <span className={cn("flex size-11 shrink-0 items-center justify-center rounded-2xl [&_svg]:size-5", CHIP_TONES[tone])}>{icon}</span>
+    <div className="flex items-center gap-3 rounded-[1.5rem] bg-card px-3.5 py-3.5 sm:gap-3.5 sm:px-4 shadow-[0_10px_30px_-20px_rgb(15_23_42/0.2)] ring-1 ring-black/[0.04] dark:ring-white/10">
+      <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-2xl sm:size-11 [&_svg]:size-5", CHIP_TONES[tone])}>{icon}</span>
       <span className="min-w-0">
         <span className="block text-xl leading-tight font-bold tracking-tight tabular-nums">{value}</span>
-        <span className="block truncate text-xs text-muted-foreground">
-          {label}
-          {hint ? <> · {hint}</> : null}
-        </span>
+        <span className="block text-xs text-muted-foreground">{label}</span>
+        {hint ? <span className="block text-xs text-muted-foreground">{hint}</span> : null}
       </span>
     </div>
   );

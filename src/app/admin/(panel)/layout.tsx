@@ -53,7 +53,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
     >
       <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background/85 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/70 sm:px-6 desk:h-20 desk:px-8">
         <MobileNav allowed={allowed} badges={badges} siteName={settings.siteName} logout={logoutAction} />
-        <Link href="/admin" className="desk:hidden">
+        <Link href="/admin" className="min-w-0 desk:hidden">
           <Brand name={settings.siteName} />
         </Link>
         {/* Large screens: a greeting where the brand would be (the sidebar carries the logo). */}
@@ -68,10 +68,10 @@ export default async function PanelLayout({ children }: { children: React.ReactN
               href="/admin/reports"
               aria-label={openReports ? `Open reports: ${openReports}` : "Reports"}
               title={openReports ? `${openReports} open report${openReports === 1 ? "" : "s"}` : "No open reports"}
-              className="relative inline-flex size-9 items-center justify-center rounded-full border bg-card text-muted-foreground shadow-sm outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 [&_svg]:size-4"
+              className="relative inline-flex size-9 items-center justify-center rounded-full border bg-card text-muted-foreground shadow-sm transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-hidden [&_svg]:size-4"
             >
               <BellIcon aria-hidden />
-              {openReports ? <span aria-hidden className="absolute top-1.5 right-2 size-2 rounded-full bg-primary ring-2 ring-card" /> : null}
+              {openReports ? <span aria-hidden className="absolute top-1.5 right-2 size-2 rounded-full bg-primary ring-2 ring-card forced-colors:bg-[CanvasText]" /> : null}
             </Link>
           ) : null}
           <UserMenu name={admin.name} email={admin.email} roleLabel={ROLE_LABELS[admin.role]} avatar={avatar} logout={logoutAction} />

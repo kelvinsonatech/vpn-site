@@ -41,7 +41,7 @@ export function GrowthChart({ data }: { data: { day: string; count: number }[] }
               <span
                 aria-hidden
                 title={`${label(d.day, i)}: ${formatNumber(d.count)} account${d.count === 1 ? "" : "s"}`}
-                className={`w-full max-w-5 rounded-full transition-[filter] group-hover:brightness-110 ${d.count ? (i === data.length - 1 ? "bg-primary" : "bg-primary/70") : "bg-muted"}`}
+                className={`w-full max-w-5 rounded-full transition-[filter] group-hover:brightness-110 ${d.count ? (i === data.length - 1 ? "bg-primary forced-colors:bg-[Highlight]" : "bg-primary/80 forced-colors:bg-[CanvasText]") : "bg-muted forced-colors:bg-[GrayText]"}`}
                 style={{ height: d.count ? `max(${pct(d.count)}, 0.5rem)` : "0.5rem" }}
               />
               {d.count ? (

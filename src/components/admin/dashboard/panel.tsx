@@ -30,4 +30,4 @@ export function Panel({
 
 /** The small pill link in a panel's corner ("See all"). */
 export const panelLinkClass =
-  "inline-flex h-8 items-center gap-1 rounded-full bg-muted px-3.5 text-xs font-semibold text-foreground outline-none transition-colors hover:bg-muted/70 focus-visible:ring-[3px] focus-visible:ring-ring/50";
+  "inline-flex h-8 items-center gap-1 rounded-full bg-muted px-3.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted/70 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-hidden";

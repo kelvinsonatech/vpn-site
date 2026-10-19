@@ -42,7 +42,8 @@ export default async function DashboardPage() {
   const [d, settings] = await Promise.all([getDashboardData(), getSiteSettings()]);
   const viewAccounts = can(admin.role, "accounts:view");
 
-  const totalActive = d.protocolUsage.reduce((sum, p) => sum + p.active, 0);
+  // Out of every active account (the headline number), including any on a protocol switched off since.
+  const totalActive = d.accounts.active;
   const topProtocols = [...d.protocolUsage].sort((a, b) => b.active - a.active || b.month - a.month).slice(0, 6);
   const timezone = d.today.timezone.replace(/_/g, " ");
 
@@ -108,7 +109,7 @@ export default async function DashboardPage() {
           value={
             <>
               {d.servers.online}
-              <span className="text-lg font-semibold text-foreground/50"> / {d.servers.total}</span>
+              <span className="text-lg font-semibold text-foreground/70"> / {d.servers.total}</span>
             </>
           }
           icon={<SignalIcon />}
@@ -142,12 +143,12 @@ export default async function DashboardPage() {
         <MiniStat label="This month" value={formatNumber(d.accounts.month)} icon={<CalendarDaysIcon />} tone="success" />
       </div>
 
-      <div className="mt-6 grid items-start gap-6 lg:grid-cols-3">
+      <div className="mt-6 grid items-start gap-6 lg:grid-cols-2 xl:grid-cols-3">
         <Panel
           className="lg:col-span-2"
           title="Account growth"
           description={`Accounts created per day, last 14 days (${timezone})`}
-          action={<span className="inline-flex h-8 items-center rounded-full bg-primary/10 px-3.5 text-xs font-semibold text-primary">{formatNumber(d.accounts.today)} today</span>}
+          action={<span className="inline-flex h-8 items-center rounded-full bg-accent px-3.5 text-xs font-semibold text-accent-foreground">{formatNumber(d.accounts.today)} today</span>}
         >
           <GrowthChart data={d.trend} />
         </Panel>
@@ -157,7 +158,7 @@ export default async function DashboardPage() {
           description="Share of active accounts"
           action={
             can(admin.role, "protocols:view") ? (
-              <Link href="/admin/protocols" aria-label="All protocols" className="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50">
+              <Link href="/admin/protocols" aria-label="All protocols" className="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-hidden">
                 <ArrowUpRightIcon className="size-4" aria-hidden />
               </Link>
             ) : null
@@ -168,7 +169,6 @@ export default async function DashboardPage() {
               const share = totalActive ? (p.active / totalActive) * 100 : 0;
               return (
                 <li key={p.slug} className="flex items-center gap-3 rounded-2xl px-2 py-2">
-                  <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-primary/50" />
                   <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-muted">
                     <ProtocolIcon name={p.icon} className="size-6 text-muted-foreground" />
                   </span>
@@ -188,11 +188,11 @@ export default async function DashboardPage() {
 
         {viewAccounts ? (
           <Panel
-            className="lg:col-span-2"
+            className="xl:col-span-2"
             title="Latest accounts"
             action={
               <Link href="/admin/accounts" className={panelLinkClass}>
-                See all
+                See all<span className="sr-only"> accounts</span>
               </Link>
             }
           >
@@ -224,13 +224,13 @@ export default async function DashboardPage() {
           title="Server capacity"
           action={
             <Link href="/admin/servers" className={panelLinkClass}>
-              See all
+              See all<span className="sr-only"> servers</span>
             </Link>
           }
         >
           <div className="grid gap-2">
             {d.capacity.map((s) => (
-              <Link key={s.id} href={`/admin/servers/${s.id}`} className="-mx-2 grid gap-2 rounded-2xl px-2 py-2 outline-none hover:bg-muted/40 focus-visible:ring-[3px] focus-visible:ring-ring/50">
+              <Link key={s.id} href={`/admin/servers/${s.id}`} className="-mx-2 grid gap-2 rounded-2xl px-2 py-2 hover:bg-muted/40 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-hidden">
                 <span className="flex items-center justify-between gap-2 text-sm">
                   <span className="flex min-w-0 items-center gap-2.5 font-semibold">
                     <Flag code={s.countryCode} className="h-4 w-6 shrink-0 rounded-sm" />
@@ -274,7 +274,7 @@ export default async function DashboardPage() {
           title="Recent errors"
           action={
             <Link href="/admin/logs?level=error" className={panelLinkClass}>
-              View
+              View<span className="sr-only"> all errors</span>
             </Link>
           }
         >
