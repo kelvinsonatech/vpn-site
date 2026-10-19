@@ -7,7 +7,6 @@ import {
   ExternalLinkIcon,
   FlagIcon,
   PlusIcon,
-  ServerCrashIcon,
   ShieldAlertIcon,
   SignalIcon,
   UserPlusIcon,
@@ -32,6 +31,7 @@ import { can } from "@/server/auth/rbac";
 import { getDashboardData } from "@/server/dashboard/queries";
 import { getSiteSettings } from "@/server/settings/service";
 import totalServersImage from "@/assets/total-servers.webp";
+import offlineServersImage from "@/assets/offline-servers.webp";
 
 const ACCOUNT_BADGE = { active: "success", pending: "info", expired: "muted", revoked: "warning", failed: "danger" } as const;
 
@@ -146,7 +146,15 @@ export default async function DashboardPage() {
           }
           hint={d.servers.pending ? `${d.servers.pending} pending` : undefined}
         />
-        <MiniStat label="Offline" value={d.servers.offline} icon={<ServerCrashIcon />} tone={d.servers.offline ? "danger" : "default"} />
+        <MiniStat
+          label="Offline"
+          value={d.servers.offline}
+          icon={
+            // eslint-disable-next-line @next/next/no-img-element -- small bundled picture
+            <img src={offlineServersImage.src} alt="" aria-hidden="true" width={28} height={28} draggable={false} className="size-7 object-contain" />
+          }
+          tone={d.servers.offline ? "danger" : "default"}
+        />
         <MiniStat
           label="Maintenance"
           value={d.servers.maintenance}
