@@ -64,7 +64,6 @@ export default async function MyIpPage() {
                   Your public IP address
                 </h2>
                 <p
-                  aria-live="polite"
                   className={`mt-1 font-mono font-bold tracking-tight select-all ${v6 ? "text-xl [overflow-wrap:anywhere] sm:text-2xl" : "text-3xl sm:text-4xl"}`}
                 >
                   {v6 ? breakAtColons(parsed.ip) : parsed.ip}
@@ -78,7 +77,7 @@ export default async function MyIpPage() {
                 <CopyAction value={parsed.ip} label="Copy IP address" variant="outline" size="default" className="rounded-full">
                   Copy
                 </CopyAction>
-                <RecheckButton />
+                <RecheckButton ip={parsed.ip} />
               </div>
             </div>
             {/* Keyed by the address, so a new one (after connecting a tunnel) shows the placeholder rather than the old details. */}

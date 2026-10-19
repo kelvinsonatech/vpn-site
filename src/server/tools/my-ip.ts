@@ -1,3 +1,4 @@
+import { isIP } from "node:net";
 import { and, inArray, isNull } from "drizzle-orm";
 import { db } from "@/server/db";
 import { servers } from "@/server/db/schema";
@@ -18,39 +19,75 @@ export interface OurServer {
   countryCode: string;
 }
 
-export interface MyIpDetails {
+export interface ServerMatch {
+  /** The listed server at this address: the visitor is browsing through it. */
+  server: OurServer | null;
+  /**
+   * Each server is listed by one address. A tunnel reaching us over the other IP family (IPv6 traffic
+   * from a server listed by its IPv4) can't be recognised, so "not one of ours" is only certain when
+   * every listed server has an address in the visitor's family.
+   */
+  certain: boolean;
+  /** Some listed server has an address in the visitor's family (for wording the uncertain case). */
+  anyInFamily: boolean;
+}
+
+export interface AddressDetails {
   hostnames: ReverseHostname[];
   /** The reverse DNS lookup got no answer, so `hostnames` is unknown rather than none. */
   reverseDnsFailed: boolean;
   network: IpNetwork | null;
-  /** The public server this address belongs to, when the visitor is connected through it. */
-  server: OurServer | null;
 }
 
-/** The listed (active or maintenance) server whose address is `ip`, compared in canonical form. */
-export async function ourServerAt(ip: string): Promise<OurServer | null> {
+export interface MyIpDetails {
+  /** Null when the server list couldn't be read. */
+  match: ServerMatch | null;
+  /** Null when the DNS lookups were skipped (rate limit). */
+  dns: AddressDetails | null;
+}
+
+/** A stored server address in the form visitors' addresses are compared in: "::FFFF:45.33.32.156" → "45.33.32.156", IPv6 canonical. */
+function normalize(raw: string): string {
+  const s = raw.trim().toLowerCase();
+  const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/.exec(s);
+  return canonical(mapped ? mapped[1]! : s);
+}
+
+/** Matches `ip` (canonical, see parseIpInput) against the listed (active or maintenance) servers. */
+export async function matchServer(ip: string): Promise<ServerMatch> {
   const rows = await db()
     .select({ name: servers.name, countryCode: servers.countryCode, ipAddress: servers.ipAddress })
     .from(servers)
     .where(and(isNull(servers.deletedAt), inArray(servers.lifecycle, ["active", "maintenance"])));
-  const match = rows.find((s) => canonical(s.ipAddress.trim().toLowerCase()) === ip);
-  return match ? { name: match.name, countryCode: match.countryCode } : null;
+  const listed = rows.map((s) => ({ ...s, ip: normalize(s.ipAddress) }));
+  const match = listed.find((s) => s.ip === ip);
+  const family = isIP(ip);
+  return {
+    server: match ? { name: match.name, countryCode: match.countryCode } : null,
+    certain: !!match || listed.every((s) => isIP(s.ip) === family),
+    anyInFamily: listed.some((s) => isIP(s.ip) === family),
+  };
 }
 
-/** Details for a public address (already canonical, see parseIpInput). A failed DNS lookup or database read leaves its part empty. */
-export async function myIpDetails(ip: string): Promise<MyIpDetails> {
-  const [lookup, server] = await Promise.all([
-    reverseLookup(ip).then(
-      (r) => r.lookup,
-      (e: unknown) => {
-        if (e instanceof ToolError) return null;
-        throw e;
-      },
-    ),
-    ourServerAt(ip).catch((e: unknown) => {
+/** Reverse DNS and network for the address; a lookup that failed leaves its part empty. */
+async function addressDetails(ip: string): Promise<AddressDetails> {
+  try {
+    const { lookup } = await reverseLookup(ip);
+    return { hostnames: lookup.hostnames, reverseDnsFailed: lookup.reverseDnsFailed, network: lookup.network };
+  } catch (e) {
+    if (e instanceof ToolError) return { hostnames: [], reverseDnsFailed: true, network: null };
+    throw e;
+  }
+}
+
+/** Everything about the address: the server match always (one small query), the DNS lookups when `lookUpDns`. */
+export async function myIpDetails(ip: string, lookUpDns = true): Promise<MyIpDetails> {
+  const [match, dns] = await Promise.all([
+    matchServer(ip).catch((e: unknown) => {
       logger.warn("server address check unavailable", quietDbError(e));
       return null;
     }),
+    lookUpDns ? addressDetails(ip) : null,
   ]);
-  return { hostnames: lookup?.hostnames ?? [], reverseDnsFailed: lookup ? lookup.reverseDnsFailed : true, network: lookup?.network ?? null, server };
+  return { match, dns };
 }

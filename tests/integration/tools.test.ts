@@ -8,7 +8,7 @@ import { POST as hostnameToIp } from "@/app/api/public/tools/hostname-ip/route";
 import { POST as ipToHostname } from "@/app/api/public/tools/ip-hostname/route";
 import { POST as domainAge } from "@/app/api/public/tools/domain-age/route";
 import { resetDomainAgeCaches } from "@/server/tools/domain-age";
-import { myIpDetails, ourServerAt } from "@/server/tools/my-ip";
+import { matchServer, myIpDetails } from "@/server/tools/my-ip";
 import { createServer, resetDatabase, teardown } from "../helpers";
 
 /**
@@ -180,13 +180,16 @@ describe("DNS tools", () => {
       await db().update(servers).set({ ipAddress, lifecycle }).where(eq(servers.id, s.id));
       return s;
     };
+    const DE01 = { name: "Germany 01", countryCode: "DE" };
 
-    it("recognises a listed server's address, however its IPv6 form was typed", async () => {
+    it("recognises a listed server's address, however it was typed", async () => {
       await listServer("Germany 01", "45.33.32.156");
       await listServer("Germany 02", "2A01:4F8:0:0::10", "maintenance");
-      expect(await ourServerAt("45.33.32.156")).toEqual({ name: "Germany 01", countryCode: "DE" });
-      expect(await ourServerAt("2a01:4f8::10")).toEqual({ name: "Germany 02", countryCode: "DE" });
-      expect(await ourServerAt("45.33.32.157")).toBeNull();
+      await listServer("Germany 03", "::FFFF:45.33.32.200");
+      expect((await matchServer("45.33.32.156")).server).toEqual(DE01);
+      expect((await matchServer("2a01:4f8::10")).server).toEqual({ name: "Germany 02", countryCode: "DE" });
+      expect((await matchServer("45.33.32.200")).server).toEqual({ name: "Germany 03", countryCode: "DE" });
+      expect((await matchServer("45.33.32.157")).server).toBeNull();
     });
 
     it("ignores drafts, disabled and deleted servers", async () => {
@@ -194,21 +197,36 @@ describe("DNS tools", () => {
       await listServer("Off", "45.33.32.2", "disabled");
       const gone = await listServer("Gone", "45.33.32.3");
       await db().update(servers).set({ deletedAt: new Date() }).where(eq(servers.id, gone.id));
-      for (const ip of ["45.33.32.1", "45.33.32.2", "45.33.32.3"]) expect(await ourServerAt(ip)).toBeNull();
+      for (const ip of ["45.33.32.1", "45.33.32.2", "45.33.32.3"]) expect((await matchServer(ip)).server).toBeNull();
     });
 
-    it("adds the reverse DNS name, the network and the server match", async () => {
-      await listServer("Render Edge", "216.24.57.1");
+    it("is only sure an address isn't ours when every listed server has one in that IP family", async () => {
+      await listServer("Germany 01", "45.33.32.156");
+      expect(await matchServer("8.8.8.8")).toEqual({ server: null, certain: true, anyInFamily: true });
+      // Listed by IPv4 only: a tunnel reaching us over IPv6 can't be recognised.
+      expect(await matchServer("2001:4860:4860::8888")).toEqual({ server: null, certain: false, anyInFamily: false });
+      await listServer("Germany 02", "2a01:4f8::10");
+      expect(await matchServer("2001:4860:4860::8888")).toEqual({ server: null, certain: false, anyInFamily: true });
+      expect(await matchServer("8.8.8.8")).toMatchObject({ certain: false, anyInFamily: true });
+    });
+
+    it("adds the reverse DNS name and network, and skips only the DNS part when asked", async () => {
+      await listServer("Germany 01", "216.24.57.1");
+      const match = { server: DE01, certain: true, anyInFamily: true };
       expect(await myIpDetails("216.24.57.1")).toEqual({
-        hostnames: [{ name: "ip-216-24-57-1.ingress.render.com", confirmed: true }],
-        reverseDnsFailed: false,
-        network: { asn: 397273, name: "RENDER", prefix: "216.24.56.0/21", country: "US" },
-        server: { name: "Render Edge", countryCode: "DE" },
+        match,
+        dns: {
+          hostnames: [{ name: "ip-216-24-57-1.ingress.render.com", confirmed: true }],
+          reverseDnsFailed: false,
+          network: { asn: 397273, name: "RENDER", prefix: "216.24.56.0/21", country: "US" },
+        },
       });
+      // Over the rate limit: the server match still shows.
+      expect(await myIpDetails("216.24.57.1", false)).toEqual({ match, dns: null });
     });
 
     it("answers with empty details for an address DNS knows nothing about", async () => {
-      expect(await myIpDetails("9.9.9.9")).toEqual({ hostnames: [], reverseDnsFailed: false, network: null, server: null });
+      expect((await myIpDetails("9.9.9.9")).dns).toEqual({ hostnames: [], reverseDnsFailed: false, network: null });
     });
   });
 });
