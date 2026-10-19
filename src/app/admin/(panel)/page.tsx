@@ -8,7 +8,6 @@ import {
   FlagIcon,
   PlusIcon,
   ServerCrashIcon,
-  ServerIcon,
   ShieldAlertIcon,
   SignalIcon,
   UserPlusIcon,
@@ -32,6 +31,7 @@ import { requirePermission } from "@/server/auth/guards";
 import { can } from "@/server/auth/rbac";
 import { getDashboardData } from "@/server/dashboard/queries";
 import { getSiteSettings } from "@/server/settings/service";
+import totalServersImage from "@/assets/total-servers.webp";
 
 const ACCOUNT_BADGE = { active: "success", pending: "info", expired: "muted", revoked: "warning", failed: "danger" } as const;
 
@@ -126,12 +126,26 @@ export default async function DashboardPage() {
             href="/admin/reports"
           />
         ) : (
-          <GradientStat tone="aqua" label="Recent errors" value={d.recentErrors.length} icon={<AlertOctagonIcon />} hint="Latest provisioning & server errors" />
+          <GradientStat
+            tone="aqua"
+            label="Recent errors"
+            value={d.recentErrors.length}
+            icon={<AlertOctagonIcon />}
+            hint="Latest provisioning & server errors"
+          />
         )}
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <MiniStat label="Total servers" value={d.servers.total} icon={<ServerIcon />} hint={d.servers.pending ? `${d.servers.pending} pending` : undefined} />
+        <MiniStat
+          label="Total servers"
+          value={d.servers.total}
+          icon={
+            // eslint-disable-next-line @next/next/no-img-element -- small bundled picture
+            <img src={totalServersImage.src} alt="" aria-hidden="true" width={28} height={28} draggable={false} className="size-7 object-contain" />
+          }
+          hint={d.servers.pending ? `${d.servers.pending} pending` : undefined}
+        />
         <MiniStat label="Offline" value={d.servers.offline} icon={<ServerCrashIcon />} tone={d.servers.offline ? "danger" : "default"} />
         <MiniStat
           label="Maintenance"
@@ -148,7 +162,11 @@ export default async function DashboardPage() {
           className="lg:col-span-2"
           title="Account growth"
           description={`Accounts created per day, last 14 days (${timezone})`}
-          action={<span className="inline-flex h-8 items-center rounded-full bg-accent px-3.5 text-xs font-semibold text-accent-foreground">{formatNumber(d.accounts.today)} today</span>}
+          action={
+            <span className="inline-flex h-8 items-center rounded-full bg-accent px-3.5 text-xs font-semibold text-accent-foreground">
+              {formatNumber(d.accounts.today)} today
+            </span>
+          }
         >
           <GrowthChart data={d.trend} />
         </Panel>
@@ -158,7 +176,11 @@ export default async function DashboardPage() {
           description="Share of active accounts"
           action={
             can(admin.role, "protocols:view") ? (
-              <Link href="/admin/protocols" aria-label="All protocols" className="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-hidden">
+              <Link
+                href="/admin/protocols"
+                aria-label="All protocols"
+                className="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-hidden"
+              >
                 <ArrowUpRightIcon className="size-4" aria-hidden />
               </Link>
             ) : null
@@ -230,7 +252,11 @@ export default async function DashboardPage() {
         >
           <div className="grid gap-2">
             {d.capacity.map((s) => (
-              <Link key={s.id} href={`/admin/servers/${s.id}`} className="-mx-2 grid gap-2 rounded-2xl px-2 py-2 hover:bg-muted/40 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-hidden">
+              <Link
+                key={s.id}
+                href={`/admin/servers/${s.id}`}
+                className="-mx-2 grid gap-2 rounded-2xl px-2 py-2 hover:bg-muted/40 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-hidden"
+              >
                 <span className="flex items-center justify-between gap-2 text-sm">
                   <span className="flex min-w-0 items-center gap-2.5 font-semibold">
                     <Flag code={s.countryCode} className="h-4 w-6 shrink-0 rounded-sm" />
