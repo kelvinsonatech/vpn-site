@@ -1,11 +1,14 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { HeroWave } from "@/components/public/hero-wave";
+import { HeroPhoto, HeroPhotoWash } from "@/components/public/page-header";
 import { Container } from "@/components/public/section";
 
 /** Placeholder hero band matching PageHeader's "hero" variant. */
 function HeroSkeleton({ chips = 3 }: { chips?: number }) {
   return (
-    <div className="relative isolate overflow-hidden bg-hero">
+    <div className="relative isolate overflow-hidden bg-hero-photo">
+      <HeroPhoto />
+      <HeroPhotoWash />
       <div className="mx-auto flex max-w-6xl flex-col items-center px-4 pt-10 pb-24 sm:px-6 sm:pb-32">
         <div className="h-4 w-48 rounded-full bg-white/20" />
         <div className="mt-10 size-16 rounded-2xl bg-white/20" />

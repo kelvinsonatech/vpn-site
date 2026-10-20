@@ -1,13 +1,16 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { HeroWave } from "./hero-wave";
+import { HeroPhoto, HeroPhotoWash } from "./page-header";
 import { COUNTRY_GRID, Container, SERVER_GRID } from "./section";
 
-/** Loading state for browse pages: a hero band with placeholder text and a grid of card skeletons. */
+/** Loading state for browse pages: a hero band (the photo, as on PageHeader) with placeholder text and a grid of card skeletons. */
 export function PageSkeleton({ cards = 6, variant = "country" }: { cards?: number; variant?: "country" | "server" }) {
   return (
     <div aria-busy="true" aria-live="polite">
       <span className="sr-only">Loading…</span>
-      <div className="relative isolate overflow-hidden bg-hero">
+      <div className="relative isolate overflow-hidden bg-hero-photo">
+        <HeroPhoto />
+        <HeroPhotoWash />
         <div className="mx-auto flex max-w-6xl flex-col items-center px-4 pt-10 pb-24 sm:px-6 sm:pb-32">
           <div className="h-4 w-40 rounded-full bg-white/20" />
           <div className="mt-10 size-16 rounded-2xl bg-white/20" />
@@ -62,7 +65,9 @@ export function HomePageSkeleton() {
   return (
     <div aria-busy="true" aria-live="polite">
       <span className="sr-only">Loading…</span>
-      <div className="relative isolate overflow-hidden bg-hero">
+      <div className="relative isolate overflow-hidden bg-hero-photo">
+        <HeroPhoto />
+        <HeroPhotoWash align="start" />
         <Container className="relative grid items-center gap-12 pt-12 pb-28 sm:pt-16 sm:pb-36 lg:grid-cols-2 lg:gap-8 lg:pt-20 lg:pb-44">
           <div className="flex flex-col items-center lg:items-start">
             <div className="h-8 w-60 max-w-full rounded-full bg-white/15" />

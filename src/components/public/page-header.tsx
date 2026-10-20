@@ -1,4 +1,6 @@
 import { cn } from "@/lib/utils";
+import heroPhoto from "@/assets/hero-photo.webp";
+import heroPhotoSmall from "@/assets/hero-photo-960.webp";
 import { Breadcrumbs, type Crumb } from "./breadcrumbs";
 import { HeroWave } from "./hero-wave";
 
@@ -6,7 +8,7 @@ import { HeroWave } from "./hero-wave";
  * Standard header for public inner pages: breadcrumbs, optional eyebrow/icon, title, description
  * and an actions/meta slot. Keeps protocol, country, server, status and report pages consistent.
  *
- * variant "hero" (default): a full-width brand-gradient band with centred white text that closes
+ * variant "hero" (default): a full-width band over the hero photo with centred white text that closes
  * with a wave into the page. It breaks out of a centred page container on its own (full-bleed), so
  * it can be placed first inside the page's container or directly in <main>. Use <HeroChip> for
  * meta items in `children`; buttons work too (use variant="secondary" or a white style).
@@ -55,8 +57,10 @@ export function PageHeader({
   }
 
   return (
-    <header className={cn("full-bleed relative isolate overflow-hidden bg-hero text-hero-foreground", className)}>
-      <HeroDecor />
+    <header className={cn("full-bleed relative isolate overflow-hidden bg-hero-photo text-hero-foreground", className)}>
+      <HeroPhoto />
+      <HeroPhotoWash />
+      <HeroDecor overPhoto />
       <div className="relative mx-auto max-w-6xl px-4 pt-7 pb-20 text-center sm:px-6 sm:pt-10 sm:pb-28 lg:pb-32">
         {crumbs?.length ? <Breadcrumbs items={crumbs} tone="inverted" centered className="mb-8 sm:mb-10" /> : null}
         <div className="animate-in duration-500 fade-in fill-mode-both slide-in-from-bottom-3">
@@ -81,6 +85,64 @@ export function PageHeader({
       </div>
       <HeroWave className="absolute inset-x-0 -bottom-px" />
     </header>
+  );
+}
+
+/**
+ * The hero photo (pirate cut-outs on wood) in its own colours, behind a `relative isolate` band with
+ * `bg-hero-photo`. Lay a wash over it (<HeroPhotoWash>, or the home page's own) so white text stays readable.
+ */
+export function HeroPhoto() {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- bundled background picture, two sizes
+    <img
+      src={heroPhoto.src}
+      srcSet={`${heroPhotoSmall.src} ${heroPhotoSmall.width}w, ${heroPhoto.src} ${heroPhoto.width}w`}
+      sizes="100vw"
+      alt=""
+      aria-hidden="true"
+      width={heroPhoto.width}
+      height={heroPhoto.height}
+      fetchPriority="high"
+      decoding="async"
+      draggable={false}
+      className="pointer-events-none absolute inset-0 -z-20 size-full object-cover object-[50%_45%]"
+    />
+  );
+}
+
+/**
+ * Warm dark wash and light blur over <HeroPhoto>, so white text stays 4.5:1 or better over the brightest part
+ * of the photo. "center" (page headers): even on phones; from sm darkest and blurred in the middle, lighter
+ * towards the sides. "start" (home hero, words on the left from lg): even below lg; from lg both fade out
+ * towards the picture on the right.
+ */
+export function HeroPhotoWash({ align = "center" }: { align?: "center" | "start" }) {
+  if (align === "start") {
+    return (
+      <>
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 -z-[15] max-lg:bg-[rgb(22_15_9/0.66)] max-lg:backdrop-blur-[3px] max-lg:dark:bg-[rgb(10_7_4/0.7)] lg:bg-[linear-gradient(90deg,rgb(22_15_9/0.7),rgb(22_15_9/0.56)_45%,rgb(22_15_9/0.12)_72%,transparent)] lg:dark:bg-[linear-gradient(90deg,rgb(10_7_4/0.75),rgb(10_7_4/0.6)_45%,rgb(10_7_4/0.4)_72%,rgb(10_7_4/0.3))]"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 -z-[15] hidden backdrop-blur-[6px] [mask-image:linear-gradient(to_right,#000_40%,transparent_62%)] lg:block"
+        />
+      </>
+    );
+  }
+  return (
+    <>
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-[15] max-sm:bg-[rgb(22_15_9/0.7)] max-sm:backdrop-blur-[3px] max-sm:dark:bg-[rgb(10_7_4/0.74)] sm:bg-[radial-gradient(ellipse_70%_95%_at_50%_45%,rgb(22_15_9/0.72)_50%,rgb(22_15_9/0.42))] sm:dark:bg-[radial-gradient(ellipse_70%_95%_at_50%_45%,rgb(10_7_4/0.78)_50%,rgb(10_7_4/0.55))]"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-[15] hidden backdrop-blur-[5px] [mask-image:radial-gradient(ellipse_45%_60%_at_50%_50%,#000_45%,transparent_80%)] sm:block"
+      />
+    </>
   );
 }
 

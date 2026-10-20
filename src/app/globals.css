@@ -254,6 +254,11 @@
     linear-gradient(118deg, var(--hero-from), var(--hero-via) 52%, var(--hero-to));
 }
 
+/* Behind <HeroPhoto> (hero bands): the photo's mid tone, shown until the picture loads. */
+@utility bg-hero-photo {
+  background-color: #7d6a58;
+}
+
 /* Gradient header of the create-account and account-ready cards (white text stays readable). */
 @utility bg-card-band {
   background-color: var(--hero-via);

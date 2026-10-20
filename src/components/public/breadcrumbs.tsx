@@ -9,7 +9,7 @@ export interface Crumb {
 
 /**
  * Visible breadcrumb trail; pair it with breadcrumbJsonLd() for search engines.
- * `tone="inverted"` is for the gradient hero bands (white text); `centered` centres the trail.
+ * `tone="inverted"` is for the hero bands over the photo (white text); `centered` centres the trail.
  */
 export function Breadcrumbs({
   items,
@@ -24,7 +24,7 @@ export function Breadcrumbs({
 }) {
   const inverted = tone === "inverted";
   return (
-    <nav aria-label="Breadcrumb" className={cn("text-sm", inverted ? "text-white/75" : "text-muted-foreground", className)}>
+    <nav aria-label="Breadcrumb" className={cn("text-sm", inverted ? "text-white/85" : "text-muted-foreground", className)}>
       <ol className={cn("flex flex-wrap items-center gap-1", centered && "justify-center")}>
         {items.map((c, i) => {
           const last = i === items.length - 1;
