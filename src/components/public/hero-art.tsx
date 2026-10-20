@@ -60,7 +60,7 @@ export function HeroArt({ avatar, servers, sample }: { avatar: string; servers: 
         </g>
       </svg>
 
-      <div className="absolute top-[40%] left-1/2 flex size-36 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[2.4rem] bg-white/15 shadow-2xl ring-1 shadow-black/20 ring-white/30 backdrop-blur-md sm:size-40">
+      <div className="absolute top-[37%] left-1/2 flex size-36 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[2.4rem] bg-white/15 shadow-2xl ring-1 shadow-black/20 ring-white/30 backdrop-blur-md sm:size-40">
         {/* Wider than the tile, so the paw and the ear break out of the glass. */}
         {/* eslint-disable-next-line @next/next/no-img-element -- bundled cut-out picture */}
         <img
@@ -69,7 +69,7 @@ export function HeroArt({ avatar, servers, sample }: { avatar: string; servers: 
           width={heroCharacters.width}
           height={heroCharacters.height}
           draggable={false}
-          className="w-[135%] max-w-none shrink-0 drop-shadow-[0_8px_16px_rgb(0_0_0/0.35)]"
+          className="w-[155%] max-w-none shrink-0 drop-shadow-[0_8px_16px_rgb(0_0_0/0.35)]"
         />
       </div>
 
