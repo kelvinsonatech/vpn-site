@@ -38,6 +38,7 @@ import pickServerImage from "@/assets/step-pick-server.webp";
 import copyConfigImage from "@/assets/step-copy-config.webp";
 import profilesBandImage from "@/assets/profiles-band.webp";
 import serversOnlineImage from "@/assets/servers-online.webp";
+import v2rayToJsonImage from "@/assets/v2ray-to-json.webp";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
@@ -199,8 +200,8 @@ export default async function HomePage() {
                   { label: "Servers online", value: stats.serversOnline, image: serversOnlineImage },
                   { label: "Countries", value: stats.countries, flags: tileCountries },
                   settings.display.showStats
-                    ? { label: "Accounts today", value: stats.accountsToday }
-                    : { label: "Protocols", value: protocols.length },
+                    ? { label: "Accounts today", value: stats.accountsToday, image: v2rayToJsonImage }
+                    : { label: "Protocols", value: protocols.length, image: v2rayToJsonImage },
                 ].map((s) => (
                   <div
                     key={s.label}
