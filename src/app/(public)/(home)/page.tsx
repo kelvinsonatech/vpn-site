@@ -37,6 +37,7 @@ import chooseProtocolImage from "@/assets/step-choose-protocol.webp";
 import pickServerImage from "@/assets/step-pick-server.webp";
 import copyConfigImage from "@/assets/step-copy-config.webp";
 import profilesBandImage from "@/assets/profiles-band.webp";
+import serversOnlineImage from "@/assets/servers-online.webp";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
@@ -193,7 +194,7 @@ export default async function HomePage() {
             {stats ? (
               <dl className="mx-auto mt-10 grid max-w-lg grid-cols-3 gap-2 sm:gap-3 lg:mx-0">
                 {[
-                  { label: "Servers online", value: stats.serversOnline },
+                  { label: "Servers online", value: stats.serversOnline, image: serversOnlineImage },
                   { label: "Countries", value: stats.countries },
                   settings.display.showStats
                     ? { label: "Accounts today", value: stats.accountsToday }
@@ -204,8 +205,20 @@ export default async function HomePage() {
                     className="flex flex-col-reverse rounded-2xl bg-black/30 px-3 py-3 ring-1 ring-white/20 backdrop-blur-sm sm:px-4"
                   >
                     <dt className="mt-0.5 text-[11px] text-white/90 sm:text-xs">{s.label}</dt>
-                    <dd className="text-2xl font-bold tabular-nums sm:text-3xl">
+                    <dd className="flex items-center justify-center gap-2 text-2xl font-bold tabular-nums sm:text-3xl lg:justify-start">
                       <CountUp value={s.value} />
+                      {s.image ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- small bundled picture, sized with the number
+                        <img
+                          src={s.image.src}
+                          alt=""
+                          aria-hidden="true"
+                          width={s.image.width}
+                          height={s.image.height}
+                          draggable={false}
+                          className="h-[0.8em] w-auto"
+                        />
+                      ) : null}
                     </dd>
                   </div>
                 ))}
