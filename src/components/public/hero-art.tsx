@@ -1,6 +1,6 @@
-import { BrandMark } from "@/components/brand";
 import { UserAvatar } from "@/components/user-avatar";
 import { cn } from "@/lib/utils";
+import heroCharacters from "@/assets/hero-characters.webp";
 import { Flag } from "./flag";
 
 export interface HeroArtServer {
@@ -13,7 +13,7 @@ export interface HeroArtServer {
 }
 
 /**
- * Home hero illustration (original artwork): a globe of orbits with the brand shield in the middle,
+ * Home hero illustration: a globe of orbits with two toy characters (cut out of a Pexels photo) in the middle,
  * live server chips (real data from the status page) and an example account profile card with a
  * DiceBear avatar. Purely decorative for assistive technology: the same facts are on the page.
  */
@@ -61,7 +61,16 @@ export function HeroArt({ avatar, servers, sample }: { avatar: string; servers: 
       </svg>
 
       <div className="absolute top-[40%] left-1/2 flex size-32 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[2.2rem] bg-white/15 shadow-2xl ring-1 shadow-black/20 ring-white/30 backdrop-blur-md sm:size-36">
-        <BrandMark className="size-24 drop-shadow-lg sm:size-28" />
+        {/* Wider than the tile, so the paw and the ear break out of the glass. */}
+        {/* eslint-disable-next-line @next/next/no-img-element -- bundled cut-out picture */}
+        <img
+          src={heroCharacters.src}
+          alt=""
+          width={heroCharacters.width}
+          height={heroCharacters.height}
+          draggable={false}
+          className="w-[122%] max-w-none shrink-0 drop-shadow-[0_8px_16px_rgb(0_0_0/0.35)]"
+        />
       </div>
 
       {chips.map((s, i) => (
