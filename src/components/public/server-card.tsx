@@ -47,12 +47,11 @@ export function ServerCard({
     <article
       style={style}
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-[1.75rem] border bg-card shadow-[0_1px_2px_rgb(15_30_90/0.05),0_12px_32px_-18px_rgb(15_30_120/0.25)] before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-1.5 before:bg-gradient-to-r before:from-[var(--hero-from)] before:to-[var(--hero-to)] transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10 motion-reduce:hover:translate-y-0",
+        "group relative flex flex-col overflow-hidden rounded-[1.75rem] border bg-card shadow-[0_1px_2px_rgb(15_30_90/0.05),0_12px_32px_-18px_rgb(15_30_120/0.25)] transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10 motion-reduce:hover:translate-y-0",
         available ? "hover:border-primary/30" : "opacity-95",
         className,
       )}
     >
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-accent/70 to-transparent" />
       <div className="relative flex items-center justify-between gap-2 p-4 pb-0">
         <span className="inline-flex max-w-[60%] items-center gap-1.5 truncate rounded-full bg-card/80 px-2.5 py-1 text-[11px] font-semibold text-accent-foreground ring-1 ring-primary/15">
           <ProtocolIcon name={protocol.icon} className="size-3.5 text-primary" />
