@@ -7,6 +7,7 @@ import { Container, SectionHeading } from "@/components/public/section";
 import { mailtoHref, pageMetadata, safeHref } from "@/lib/seo";
 import { cn } from "@/lib/utils";
 import { loadSettings } from "@/app/(public)/_lib/data";
+import mailImage from "@/assets/contact-mail.webp";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
@@ -44,7 +45,10 @@ export default async function ContactPage() {
           { label: "Home", href: "/" },
           { label: "Contact", href: "/contact" },
         ]}
-        icon={<MailIcon />}
+        icon={
+          // eslint-disable-next-line @next/next/no-img-element -- small bundled picture; the header sizes it
+          <img src={mailImage.src} alt="" aria-hidden="true" width={64} height={64} draggable={false} className="rounded-2xl bg-white object-contain p-2" />
+        }
         eyebrow="Support"
         title="Get in touch"
         description="Something not working, or a question we haven't answered yet? Pick the channel that fits best."
