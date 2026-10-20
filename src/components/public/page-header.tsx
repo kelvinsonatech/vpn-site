@@ -90,7 +90,9 @@ export function PageHeader({
 
 /**
  * The hero photo (pirate cut-outs on wood) in its own colours, behind a `relative isolate` band with
- * `bg-hero-photo`. Lay a wash over it (<HeroPhotoWash>, or the home page's own) so white text stays readable.
+ * `bg-hero-photo`. Lay <HeroPhotoWash> over it so white text stays readable. Phones get the 960 px file: under
+ * the even wash and blur it looks the same as the 1920 px one at a third of the size. Hidden in forced colours,
+ * which drop the washes, so the band falls back to a plain Canvas fill.
  */
 export function HeroPhoto() {
   return (
@@ -98,7 +100,7 @@ export function HeroPhoto() {
     <img
       src={heroPhoto.src}
       srcSet={`${heroPhotoSmall.src} ${heroPhotoSmall.width}w, ${heroPhoto.src} ${heroPhoto.width}w`}
-      sizes="100vw"
+      sizes="(max-width: 639px) 320px, 100vw"
       alt=""
       aria-hidden="true"
       width={heroPhoto.width}
@@ -106,7 +108,7 @@ export function HeroPhoto() {
       fetchPriority="high"
       decoding="async"
       draggable={false}
-      className="pointer-events-none absolute inset-0 -z-20 size-full object-cover object-[50%_45%]"
+      className="pointer-events-none absolute inset-0 -z-20 size-full object-cover object-[50%_45%] forced-colors:hidden"
     />
   );
 }
