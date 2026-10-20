@@ -81,6 +81,8 @@ export default async function HomePage() {
   const allDays = protocols.flatMap((p) => p.durationOptions);
   const validity = allDays.length ? formatDayRange(allDays) : "3–30 days";
   const countries = stats?.countries ?? new Set(protocols.flatMap((p) => p.countries.map((c) => c.code))).size;
+  // Flags beside the Countries tile's number: the listed services' countries, once each, by name.
+  const tileCountries = [...new Map(protocols.flatMap((p) => p.countries).map((c) => [c.code, c])).values()].sort((a, b) => a.name.localeCompare(b.name));
   const resetText = `${joinTimes(settings.quota.resetTimes)} (${zoneLabel(settings.quota.timezone)})`;
 
   const sampleEntry = live[0];
@@ -195,7 +197,7 @@ export default async function HomePage() {
               <dl className="mx-auto mt-10 grid max-w-lg grid-cols-3 gap-2 sm:gap-3 lg:mx-0">
                 {[
                   { label: "Servers online", value: stats.serversOnline, image: serversOnlineImage },
-                  { label: "Countries", value: stats.countries },
+                  { label: "Countries", value: stats.countries, flags: tileCountries },
                   settings.display.showStats
                     ? { label: "Accounts today", value: stats.accountsToday }
                     : { label: "Protocols", value: protocols.length },
@@ -218,6 +220,20 @@ export default async function HomePage() {
                           draggable={false}
                           className="h-[0.8em] w-auto"
                         />
+                      ) : null}
+                      {/* Up to three overlapping flags (two on phones, where the tile is narrow); the number says how many. */}
+                      {s.flags?.length ? (
+                        <span aria-hidden className="flex -space-x-1.5">
+                          {s.flags.slice(0, 3).map((c, i) => (
+                            <Flag
+                              key={c.code}
+                              code={c.code}
+                              squared
+                              title={c.name}
+                              className={`size-[0.8em] rounded-full ring-2 ring-black/35 ${i === 2 ? "max-sm:hidden" : ""}`}
+                            />
+                          ))}
+                        </span>
                       ) : null}
                     </dd>
                   </div>
