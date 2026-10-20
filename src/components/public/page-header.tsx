@@ -84,19 +84,21 @@ export function PageHeader({
   );
 }
 
-/** Dot grid and soft glows layered over a `bg-hero` band (decorative). */
-export function HeroDecor() {
+/** Dot grid and soft glows layered over a `bg-hero` band (decorative). Over a photo, only the white glow: the dots and the brand-colour glow would tint it. */
+export function HeroDecor({ overPhoto = false }: { overPhoto?: boolean }) {
   return (
     <>
-      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-hero-dots opacity-70" />
+      {overPhoto ? null : <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-hero-dots opacity-70" />}
       <div
         aria-hidden
         className="pointer-events-none absolute -top-40 left-1/2 -z-10 h-80 w-[48rem] max-w-[140vw] -translate-x-1/2 animate-glow rounded-full bg-[radial-gradient(closest-side,rgb(255_255_255/0.22),transparent)]"
       />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -right-24 bottom-0 -z-10 size-72 rounded-full bg-[radial-gradient(closest-side,color-mix(in_oklch,var(--hero-from)_70%,transparent),transparent)] blur-2xl"
-      />
+      {overPhoto ? null : (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-24 bottom-0 -z-10 size-72 rounded-full bg-[radial-gradient(closest-side,color-mix(in_oklch,var(--hero-from)_70%,transparent),transparent)] blur-2xl"
+        />
+      )}
     </>
   );
 }

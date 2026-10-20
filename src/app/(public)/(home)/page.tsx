@@ -37,6 +37,8 @@ import chooseProtocolImage from "@/assets/step-choose-protocol.webp";
 import pickServerImage from "@/assets/step-pick-server.webp";
 import copyConfigImage from "@/assets/step-copy-config.webp";
 import profilesBandImage from "@/assets/profiles-band.webp";
+import heroPhoto from "@/assets/hero-photo.webp";
+import heroPhotoSmall from "@/assets/hero-photo-960.webp";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
@@ -150,8 +152,31 @@ export default async function HomePage() {
       <JsonLd data={jsonLd} nonce={nonce} />
 
       {/* Hero */}
-      <section className="relative isolate overflow-hidden bg-hero text-hero-foreground" aria-labelledby="hero-title">
-        <HeroDecor />
+      <section className="relative isolate overflow-hidden bg-[#7d6a58] text-hero-foreground" aria-labelledby="hero-title">
+        {/* The photo in its own colours. A warm dark wash and a light blur behind the words keep them crisp; on large screens both fade out towards the picture. */}
+        {/* eslint-disable-next-line @next/next/no-img-element -- bundled background picture, two sizes */}
+        <img
+          src={heroPhoto.src}
+          srcSet={`${heroPhotoSmall.src} ${heroPhotoSmall.width}w, ${heroPhoto.src} ${heroPhoto.width}w`}
+          sizes="100vw"
+          alt=""
+          aria-hidden="true"
+          width={heroPhoto.width}
+          height={heroPhoto.height}
+          fetchPriority="high"
+          decoding="async"
+          draggable={false}
+          className="pointer-events-none absolute inset-0 -z-20 size-full object-cover object-[50%_45%]"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 -z-[15] max-lg:bg-[rgb(22_15_9/0.66)] max-lg:backdrop-blur-[3px] max-lg:dark:bg-[rgb(10_7_4/0.7)] lg:bg-[linear-gradient(90deg,rgb(22_15_9/0.7),rgb(22_15_9/0.56)_45%,rgb(22_15_9/0.12)_72%,transparent)] lg:dark:bg-[linear-gradient(90deg,rgb(10_7_4/0.75),rgb(10_7_4/0.6)_45%,rgb(10_7_4/0.4)_72%,rgb(10_7_4/0.3))]"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 -z-[15] hidden backdrop-blur-[6px] [mask-image:linear-gradient(to_right,#000_40%,transparent_62%)] lg:block"
+        />
+        <HeroDecor overPhoto />
         <Container className="relative grid items-center gap-12 pt-12 pb-28 sm:pt-16 sm:pb-36 lg:grid-cols-2 lg:gap-8 lg:pt-20 lg:pb-44">
           <div className="animate-in text-center duration-700 fade-in fill-mode-both slide-in-from-bottom-4 lg:text-left">
             <p className="inline-flex items-center gap-2 rounded-full bg-white/12 px-3.5 py-1.5 text-xs font-medium ring-1 ring-white/25 backdrop-blur-sm sm:text-sm">
@@ -196,8 +221,11 @@ export default async function HomePage() {
                     ? { label: "Accounts today", value: stats.accountsToday }
                     : { label: "Protocols", value: protocols.length },
                 ].map((s) => (
-                  <div key={s.label} className="flex flex-col-reverse rounded-2xl bg-white/10 px-3 py-3 ring-1 ring-white/20 backdrop-blur-sm sm:px-4">
-                    <dt className="mt-0.5 text-[11px] text-white/75 sm:text-xs">{s.label}</dt>
+                  <div
+                    key={s.label}
+                    className="flex flex-col-reverse rounded-2xl bg-black/30 px-3 py-3 ring-1 ring-white/20 backdrop-blur-sm sm:px-4"
+                  >
+                    <dt className="mt-0.5 text-[11px] text-white/90 sm:text-xs">{s.label}</dt>
                     <dd className="text-2xl font-bold tabular-nums sm:text-3xl">
                       <CountUp value={s.value} />
                     </dd>
