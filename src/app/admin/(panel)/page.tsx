@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { AlertOctagonIcon, ArrowUpRightIcon, ExternalLinkIcon, FlagIcon, PlusIcon, ShieldAlertIcon, SignalIcon, UserPlusIcon, UsersIcon } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { GrowthChart } from "@/components/admin/dashboard/growth-chart";
 import { Panel, panelLinkClass } from "@/components/admin/dashboard/panel";
@@ -38,11 +37,12 @@ export default async function DashboardPage() {
   const timezone = d.today.timezone.replace(/_/g, " ");
 
   return (
-    <>
+    // A size container: the stat rows go to four across only when the content area (not the window) is wide enough.
+    <div className="@container">
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <p className="text-sm font-medium text-muted-foreground">Overview</p>
-          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Dashboard</h1>
+          <h1 className="text-[1.75rem] font-bold tracking-tight sm:text-3xl">Dashboard</h1>
           {/* Small screens: the top bar has no room for the greeting. */}
           <p className="mt-1 text-sm text-muted-foreground desk:hidden">Welcome back, {admin.name.split(" ")[0]}!</p>
         </div>
@@ -63,21 +63,19 @@ export default async function DashboardPage() {
       </div>
 
       {!admin.mfaEnabled ? (
-        <Alert variant="warning" className="mb-6 rounded-2xl">
-          <ShieldAlertIcon />
-          <AlertTitle>Protect your account with two-factor authentication</AlertTitle>
-          <AlertDescription>
-            <p>
-              Administrators can add servers and manage credentials.{" "}
-              <Link href="/admin/account#mfa" className="font-medium text-foreground underline underline-offset-4">
-                Enable 2FA
-              </Link>
-            </p>
-          </AlertDescription>
-        </Alert>
+        <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border border-warning/30 bg-warning-soft/70 px-4 py-2.5 text-[13px]">
+          <ShieldAlertIcon className="size-4 shrink-0 text-warning-strong" aria-hidden />
+          <p className="min-w-0 flex-1">
+            <span className="font-semibold">Protect your account with two-factor authentication.</span>{" "}
+            <span className="text-muted-foreground">Administrators can add servers and manage credentials.</span>
+          </p>
+          <Link href="/admin/account#mfa" className="font-semibold whitespace-nowrap text-warning-strong underline underline-offset-4 hover:no-underline">
+            Enable 2FA
+          </Link>
+        </div>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 @md:grid-cols-2 @3xl:grid-cols-4">
         <GradientStat
           tone="violet"
           label="Active accounts"
@@ -99,7 +97,7 @@ export default async function DashboardPage() {
           value={
             <>
               {d.servers.online}
-              <span className="text-lg font-semibold text-foreground/70"> / {d.servers.total}</span>
+              <span className="text-lg leading-none font-semibold text-foreground/70"> / {d.servers.total}</span>
             </>
           }
           icon={<SignalIcon />}
@@ -126,7 +124,7 @@ export default async function DashboardPage() {
         )}
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="mt-4 grid grid-cols-2 gap-4 @3xl:grid-cols-4">
         <MiniStat
           label="Total servers"
           value={d.servers.total}
@@ -290,7 +288,7 @@ export default async function DashboardPage() {
         >
           <ol className="relative ml-1 grid gap-3.5 border-l pl-4">
             {d.activity.map((a) => (
-              <li key={a.id} className="relative text-sm">
+              <li key={a.id} className="relative text-[13px]">
                 <span
                   className={`absolute top-1.5 -left-[21px] size-2 rounded-full ring-4 ring-card ${a.level === "error" ? "bg-destructive" : a.level === "warning" ? "bg-warning" : a.status === "success" ? "bg-success" : "bg-primary"}`}
                 />
@@ -326,6 +324,6 @@ export default async function DashboardPage() {
           </ul>
         </Panel>
       </div>
-    </>
+    </div>
   );
 }

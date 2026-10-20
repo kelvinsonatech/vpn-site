@@ -1,12 +1,17 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
+// Even pastels from corner to corner (a fade to white reads milky), deeper tints in dark mode.
 const TONES = {
-  violet: "from-violet-200/80 via-violet-100/70 to-fuchsia-50 dark:from-violet-500/25 dark:via-violet-500/15 dark:to-fuchsia-500/10",
-  blue: "from-sky-200/80 via-blue-100/70 to-indigo-50 dark:from-sky-500/25 dark:via-blue-500/15 dark:to-indigo-500/10",
-  mint: "from-emerald-200/80 via-emerald-100/70 to-teal-50 dark:from-emerald-500/25 dark:via-emerald-500/15 dark:to-teal-500/10",
-  aqua: "from-cyan-200/80 via-cyan-100/70 to-sky-50 dark:from-cyan-500/25 dark:via-cyan-500/15 dark:to-sky-500/10",
+  violet: "from-violet-200 to-violet-100 dark:from-violet-500/25 dark:to-violet-500/12",
+  blue: "from-blue-200 to-sky-100 dark:from-blue-500/25 dark:to-sky-500/12",
+  mint: "from-emerald-200 to-emerald-100 dark:from-emerald-500/25 dark:to-emerald-500/12",
+  aqua: "from-cyan-200 to-cyan-100 dark:from-cyan-500/25 dark:to-cyan-500/12",
 } as const;
+
+/** The cards' light, crisp edge: a hairline highlight inside and a soft, short shadow under. */
+export const cardSurface =
+  "shadow-[0_1px_2px_rgb(15_23_42/0.05),0_8px_20px_-12px_rgb(15_23_42/0.22)] ring-1 ring-black/[0.04] dark:shadow-none dark:ring-white/10";
 
 /** A headline number on a soft pastel gradient, with a white icon chip and label. */
 export function GradientStat({
@@ -27,22 +32,25 @@ export function GradientStat({
   const body = (
     <div
       className={cn(
-        "relative h-full overflow-hidden rounded-[1.75rem] bg-gradient-to-br px-5 py-5 shadow-[0_10px_30px_-18px_rgb(15_23_42/0.25)] ring-1 ring-black/[0.04] transition-transform duration-200 dark:ring-white/10",
+        "relative h-full overflow-hidden rounded-[1.25rem] bg-gradient-to-br p-4 transition-transform duration-200 sm:px-5",
+        cardSurface,
         TONES[tone],
         href && "group-hover:-translate-y-0.5 motion-reduce:group-hover:translate-y-0",
       )}
     >
-      <p className="flex items-center gap-2.5 text-sm font-semibold">
-        <span className="flex size-8 items-center justify-center rounded-full bg-white/80 text-foreground shadow-sm dark:bg-white/10 [&_svg]:size-4">{icon}</span>
+      <p className="flex items-center gap-2.5 text-[13px] font-semibold">
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-white/70 text-foreground dark:bg-white/10 [&_svg]:size-3.5">
+          {icon}
+        </span>
         {label}
       </p>
-      <p className="mt-4 text-3xl font-bold tracking-tight tabular-nums">{value}</p>
-      {hint ? <p className="mt-1.5 text-sm text-foreground/70">{hint}</p> : null}
+      <p className="mt-3 text-[1.75rem] leading-none font-bold tracking-tight tabular-nums">{value}</p>
+      {hint ? <p className="mt-2.5 text-[13px] text-foreground/70">{hint}</p> : null}
     </div>
   );
   if (!href) return body;
   return (
-    <Link href={href} className="group rounded-[1.75rem] focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-hidden">
+    <Link href={href} className="group rounded-[1.25rem] focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-hidden">
       {body}
     </Link>
   );
@@ -56,12 +64,24 @@ const CHIP_TONES = {
 } as const;
 
 /** A compact white stat: coloured icon chip, the number, its label and an optional note under it. */
-export function MiniStat({ label, value, hint, icon, tone = "default" }: { label: string; value: React.ReactNode; hint?: React.ReactNode; icon: React.ReactNode; tone?: keyof typeof CHIP_TONES }) {
+export function MiniStat({
+  label,
+  value,
+  hint,
+  icon,
+  tone = "default",
+}: {
+  label: string;
+  value: React.ReactNode;
+  hint?: React.ReactNode;
+  icon: React.ReactNode;
+  tone?: keyof typeof CHIP_TONES;
+}) {
   return (
-    <div className="flex items-center gap-3 rounded-[1.5rem] bg-card px-3.5 py-3.5 sm:gap-3.5 sm:px-4 shadow-[0_10px_30px_-20px_rgb(15_23_42/0.2)] ring-1 ring-black/[0.04] dark:ring-white/10">
-      <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-2xl sm:size-11 [&_svg]:size-5", CHIP_TONES[tone])}>{icon}</span>
+    <div className={cn("flex items-center gap-3 rounded-[1.25rem] bg-card px-3.5 py-3 sm:px-4", cardSurface)}>
+      <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-xl [&_svg]:size-5", CHIP_TONES[tone])}>{icon}</span>
       <span className="min-w-0">
-        <span className="block text-xl leading-tight font-bold tracking-tight tabular-nums">{value}</span>
+        <span className="block text-lg leading-tight font-bold tracking-tight tabular-nums">{value}</span>
         <span className="block text-xs text-muted-foreground">{label}</span>
         {hint ? <span className="block text-xs text-muted-foreground">{hint}</span> : null}
       </span>

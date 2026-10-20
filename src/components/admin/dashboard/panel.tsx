@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { cardSurface } from "./stats";
 
 /** A dashboard section: a large rounded white card with a bold title, optional subtitle and action. */
 export function Panel({
@@ -15,11 +16,11 @@ export function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <section className={cn("flex flex-col rounded-[1.75rem] bg-card p-5 text-card-foreground shadow-[0_10px_30px_-18px_rgb(15_23_42/0.18)] ring-1 ring-black/[0.04] sm:p-6 dark:ring-white/10", className)}>
+    <section className={cn("flex flex-col rounded-3xl bg-card p-5 text-card-foreground sm:p-6", cardSurface, className)}>
       <div className="mb-5 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-xl font-bold tracking-tight">{title}</h2>
-          {description ? <p className="mt-0.5 text-sm text-muted-foreground">{description}</p> : null}
+          <h2 className="text-lg font-bold tracking-tight sm:text-xl">{title}</h2>
+          {description ? <p className="mt-0.5 text-[13px] text-muted-foreground">{description}</p> : null}
         </div>
         {action ? <div className="shrink-0">{action}</div> : null}
       </div>

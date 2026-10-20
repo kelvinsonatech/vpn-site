@@ -47,7 +47,7 @@ export const WHEN_OPEN =
 /** One sidebar row: a 44px pill whose icon sits in the middle of the slim rail. */
 export function sidebarRowClass(active = false) {
   return cn(
-    "relative flex h-11 w-full items-center gap-3 overflow-hidden rounded-2xl px-3.5 text-sm font-medium whitespace-nowrap outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50 [&>svg]:size-5 [&>svg]:shrink-0",
+    "relative flex h-11 w-full items-center gap-3 overflow-hidden rounded-2xl px-3.5 text-sm font-medium whitespace-nowrap outline-none transition-colors focus-visible:ring-[3px] focus-visible:ring-ring/50 [&>svg]:size-5 [&>svg]:shrink-0 [&>svg]:stroke-[1.75]",
     active ? "bg-primary text-primary-foreground shadow-md shadow-primary/30" : "text-muted-foreground hover:bg-muted hover:text-foreground",
   );
 }
@@ -73,7 +73,10 @@ export function AdminNav({ allowed, badges, onNavigate }: { allowed: NavKey[]; b
                 />
                 <span
                   aria-hidden
-                  className={cn("min-w-5 rounded-full bg-warning-soft px-1.5 py-px text-center text-[11px] font-semibold text-warning-strong tabular-nums", WHEN_OPEN)}
+                  className={cn(
+                    "min-w-5 rounded-full bg-warning-soft px-1.5 py-px text-center text-[11px] font-semibold text-warning-strong tabular-nums",
+                    WHEN_OPEN,
+                  )}
                 >
                   {badge > 99 ? "99+" : badge}
                 </span>

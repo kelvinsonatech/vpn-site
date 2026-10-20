@@ -59,7 +59,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
         {/* Large screens: a greeting where the brand would be (the sidebar carries the logo). */}
         <div className="hidden min-w-0 desk:block">
           <p className="truncate text-lg font-bold tracking-tight">Welcome back, {admin.name.split(" ")[0]}!</p>
-          <p className="truncate text-sm text-muted-foreground">It&apos;s a good time to look after your servers.</p>
+          <p className="truncate text-[13px] text-muted-foreground">It&apos;s a good time to look after your servers.</p>
         </div>
         <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
           <ThemeToggle className="size-9 rounded-full border bg-card shadow-sm" />
@@ -71,7 +71,9 @@ export default async function PanelLayout({ children }: { children: React.ReactN
               className="relative inline-flex size-9 items-center justify-center rounded-full border bg-card text-muted-foreground shadow-sm transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-hidden [&_svg]:size-4"
             >
               <BellIcon aria-hidden />
-              {openReports ? <span aria-hidden className="absolute top-1.5 right-2 size-2 rounded-full bg-primary ring-2 ring-card forced-colors:bg-[CanvasText]" /> : null}
+              {openReports ? (
+                <span aria-hidden className="absolute top-1.5 right-2 size-2 rounded-full bg-primary ring-2 ring-card forced-colors:bg-[CanvasText]" />
+              ) : null}
             </Link>
           ) : null}
           <UserMenu name={admin.name} email={admin.email} roleLabel={ROLE_LABELS[admin.role]} avatar={avatar} logout={logoutAction} />
