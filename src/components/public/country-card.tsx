@@ -33,7 +33,6 @@ export function CountryCard({
         className,
       )}
     >
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-32 bg-[radial-gradient(90%_100%_at_50%_0%,color-mix(in_oklch,var(--primary)_16%,transparent),transparent)] before:absolute before:inset-x-0 before:top-0 before:h-1.5 before:bg-gradient-to-r before:from-[var(--hero-from)] before:to-[var(--hero-to)]" />
       {/* Badge row from 480 px; phones show the server count next to the region instead. */}
       <div className="hidden items-center justify-between gap-2 p-4 pb-0 min-[480px]:flex">
         <span className="max-w-[60%] truncate rounded-full bg-card/80 px-2.5 py-1 text-[11px] font-semibold text-accent-foreground ring-1 ring-primary/15">{protocolName}</span>
