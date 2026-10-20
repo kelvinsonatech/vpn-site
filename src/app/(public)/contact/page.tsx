@@ -8,6 +8,7 @@ import { mailtoHref, pageMetadata, safeHref } from "@/lib/seo";
 import { cn } from "@/lib/utils";
 import { loadSettings } from "@/app/(public)/_lib/data";
 import mailImage from "@/assets/contact-mail.webp";
+import supportImage from "@/assets/contact-support.webp";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
@@ -59,7 +60,10 @@ export default async function ContactPage() {
       <Container className={cn("pt-4", channels === 2 && "max-w-4xl")}>
         <div className={cn("grid gap-5 md:grid-cols-2", channels === 3 && "lg:grid-cols-3")}>
           <ContactCard
-            icon={<FlagIcon />}
+            icon={
+              // eslint-disable-next-line @next/next/no-img-element -- small bundled picture; the card's tile sizes it
+              <img src={supportImage.src} alt="" aria-hidden="true" width={supportImage.width} height={supportImage.height} draggable={false} />
+            }
             title="Report a problem"
             text="A server is down, slow or refuses your account? Tell us which one: reports go straight to the admin queue."
             highlight
@@ -158,7 +162,9 @@ function ContactCard({
   return (
     <div className={cn("relative flex flex-col overflow-hidden rounded-3xl border bg-card p-6 shadow-sm", highlight && "border-primary/30 shadow-md shadow-primary/10")}>
       {highlight ? <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-accent/80 to-transparent" /> : null}
-      <span className="relative flex size-12 items-center justify-center rounded-2xl bg-accent text-primary ring-1 ring-primary/10 [&_svg]:size-6">{icon}</span>
+      <span className="relative flex size-12 items-center justify-center rounded-2xl bg-accent text-primary ring-1 ring-primary/10 [&_img]:size-9 [&_svg]:size-6">
+        {icon}
+      </span>
       <h2 className="relative mt-5 text-lg font-semibold tracking-tight">{title}</h2>
       <p className="relative mt-1.5 flex-1 text-sm text-pretty text-muted-foreground">{text}</p>
       <div className="relative mt-6">{children}</div>
