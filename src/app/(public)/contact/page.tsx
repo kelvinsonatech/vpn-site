@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { loadSettings } from "@/app/(public)/_lib/data";
 import mailImage from "@/assets/contact-mail.webp";
 import supportImage from "@/assets/contact-support.webp";
+import questionsImage from "@/assets/contact-questions.webp";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
@@ -93,7 +94,10 @@ export default async function ContactPage() {
 
           {!email && !telegram ? (
             <ContactCard
-              icon={<MessageCircleQuestionIcon />}
+              icon={
+                // eslint-disable-next-line @next/next/no-img-element -- small bundled picture; the card's tile sizes it
+                <img src={questionsImage.src} alt="" aria-hidden="true" width={questionsImage.width} height={questionsImage.height} draggable={false} />
+              }
               title="Questions and feedback"
               text="Use the report form and choose “Other”: describe your question and, if you want an answer, leave an email address."
             >
