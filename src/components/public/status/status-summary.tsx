@@ -1,6 +1,11 @@
-import { CircleSlashIcon, LayersIcon, ServerIcon, WifiIcon, WifiOffIcon } from "lucide-react";
+import type { StaticImageData } from "next/image";
 import { cn } from "@/lib/utils";
 import type { StatusPageData } from "@/lib/public/types";
+import servicesImage from "@/assets/step-choose-protocol.webp";
+import serversImage from "@/assets/total-servers.webp";
+import onlineImage from "@/assets/servers-online.webp";
+import offlineImage from "@/assets/offline-servers.webp";
+import maintenanceImage from "@/assets/maintenance-servers.webp";
 
 const nf = new Intl.NumberFormat("en-US");
 
@@ -26,7 +31,7 @@ function Tile({
   }[tone];
   return (
     <div className={cn("flex items-center gap-3 rounded-2xl border bg-card p-4 shadow-xs", className)}>
-      <span className={cn("flex size-11 shrink-0 items-center justify-center rounded-xl [&_svg]:size-5", toneClass)} aria-hidden>
+      <span className={cn("flex size-11 shrink-0 items-center justify-center rounded-xl [&_img]:size-7 [&_svg]:size-5", toneClass)} aria-hidden>
         {icon}
       </span>
       <div className="min-w-0">
@@ -35,6 +40,12 @@ function Tile({
       </div>
     </div>
   );
+}
+
+/** A bundled picture as a tile icon (the tile sizes it). */
+function Picture({ image }: { image: StaticImageData }) {
+  // eslint-disable-next-line @next/next/no-img-element -- small bundled picture
+  return <img src={image.src} alt="" width={image.width} height={image.height} draggable={false} />;
 }
 
 /**
@@ -48,11 +59,11 @@ export function StatusSummary({ data, className }: { data: StatusPageData; class
   const paused = data.sections.reduce((n, s) => n + s.servers.filter((c) => c.availability === "maintenance" || c.availability === "full").length, 0);
   return (
     <div className={cn("grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5", className)}>
-      <Tile icon={<LayersIcon />} label="Services" value={totals.protocols} tone="primary" className="col-span-2 sm:col-span-1" />
-      <Tile icon={<ServerIcon />} label="Servers" value={totals.servers} tone="muted" />
-      <Tile icon={<WifiIcon />} label="Online" value={totals.online} tone="success" />
-      <Tile icon={<WifiOffIcon />} label="Offline" value={totals.offline} tone="danger" />
-      <Tile icon={<CircleSlashIcon />} label="Maintenance / full" value={paused} tone="warning" />
+      <Tile icon={<Picture image={servicesImage} />} label="Services" value={totals.protocols} tone="primary" className="col-span-2 sm:col-span-1" />
+      <Tile icon={<Picture image={serversImage} />} label="Servers" value={totals.servers} tone="muted" />
+      <Tile icon={<Picture image={onlineImage} />} label="Online" value={totals.online} tone="success" />
+      <Tile icon={<Picture image={offlineImage} />} label="Offline" value={totals.offline} tone="danger" />
+      <Tile icon={<Picture image={maintenanceImage} />} label="Maintenance / full" value={paused} tone="warning" />
     </div>
   );
 }
