@@ -40,6 +40,7 @@ function protocol(slug: string, category: string, fields: PublicFormField[]): Pu
     availableCount: 1,
     countries: [],
     durationOptions: [3, 7, 14, 30],
+    lockedDurations: [],
     defaultDurationDays: 7,
     href: `/${slug}`,
     fields,

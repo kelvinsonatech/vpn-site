@@ -13,6 +13,8 @@ import {
   GlobeIcon,
   InfoIcon,
   LoaderCircleIcon,
+  LockKeyholeIcon,
+  LockKeyholeOpenIcon,
   MailIcon,
   MegaphoneIcon,
   PaletteIcon,
@@ -35,6 +37,7 @@ import { TimeZonePicker, type TimeZoneOption } from "@/components/admin/timezone
 import type { AvatarStyle } from "@/lib/avatar-styles";
 import type { SiteSettings } from "@/lib/site-settings";
 import { cn } from "@/lib/utils";
+import { formatDays } from "@/components/public/format";
 import { saveSettingsAction } from "./actions";
 import { formatCountdown, minutesOfDay, resetSchedule } from "./schedule";
 
@@ -55,6 +58,7 @@ interface Draft {
   avatarStyle: AvatarStyle;
   contact: { email: string; telegramUrl: string };
   rules: Row[];
+  lockedDurations: number[];
   display: SiteSettings["display"];
 }
 
@@ -82,6 +86,7 @@ function toDraft(s: SiteSettings): Draft {
     avatarStyle: s.avatarStyle,
     contact: { email: s.contact.email ?? "", telegramUrl: s.contact.telegramUrl ?? "" },
     rules: s.rules.map((value, i) => ({ id: `r${i}`, value })),
+    lockedDurations: [...s.lockedDurations],
     display: { ...s.display },
   };
 }
@@ -114,6 +119,7 @@ function toPayload(d: Draft) {
     avatarStyle: d.avatarStyle,
     contact: { email: orNull(d.contact.email), telegramUrl: orNull(d.contact.telegramUrl) },
     rules: d.rules.map((r) => r.value),
+    lockedDurations: [...d.lockedDurations].sort((a, b) => a - b),
     display: { showHostnames: d.display.showHostnames, showStats: d.display.showStats },
   };
 }
@@ -152,6 +158,7 @@ const SECTIONS = [
   { id: "announcement", label: "Announcement bar", icon: MegaphoneIcon },
   { id: "display", label: "Public display", icon: EyeIcon },
   { id: "quotas", label: "Quotas & resets", icon: ClockIcon },
+  { id: "durations", label: "Durations", icon: LockKeyholeIcon },
   { id: "health", label: "Health monitor", icon: GaugeIcon },
   { id: "avatars", label: "Avatars", icon: PaletteIcon },
   { id: "contact", label: "Contact", icon: MailIcon },
@@ -250,15 +257,107 @@ export interface AvatarStyleOption {
   previews: string[];
 }
 
+/** A duration offered by at least one enabled protocol (or still locked from before). */
+export interface DurationUsage {
+  days: number;
+  protocols: string[];
+}
+
+/** One tile per duration: select it to lock or unlock it. Locked tiles get amber stripes and a closed padlock. */
+function DurationLocks({ usage, locked, onToggle, error }: { usage: DurationUsage[]; locked: number[]; onToggle: (days: number) => void; error?: string[] }) {
+  // Locked values no enabled protocol offers any more stay listed, so they can still be unlocked.
+  const all = [...usage, ...locked.filter((d) => !usage.some((u) => u.days === d)).map((days) => ({ days, protocols: [] }))].sort((a, b) => a.days - b.days);
+  const open = all.filter((u) => !locked.includes(u.days)).map((u) => u.days);
+  if (!all.length) return <p className="text-sm text-muted-foreground">No enabled protocol offers a duration yet.</p>;
+  return (
+    <div className="grid gap-3">
+      <div
+        role="group"
+        aria-label="Account durations"
+        aria-describedby={error ? "durations-error" : undefined}
+        data-invalid={error ? true : undefined}
+        className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+      >
+        {all.map((u) => {
+          const isLocked = locked.includes(u.days);
+          const unit = u.days === 1 ? "day" : "days";
+          return (
+            <button
+              key={u.days}
+              type="button"
+              aria-pressed={isLocked}
+              aria-label={`${u.days} ${unit}: ${isLocked ? "locked. Select to unlock" : "open. Select to lock"}`}
+              onClick={() => onToggle(u.days)}
+              className={cn(
+                "group flex flex-col items-start gap-3 rounded-xl border p-4 text-left outline-none transition-[border-color,background-color,box-shadow] duration-300 focus-visible:ring-[3px] focus-visible:ring-ring/50 motion-reduce:transition-none",
+                isLocked
+                  ? "border-warning/50 bg-warning-soft/70 bg-[repeating-linear-gradient(135deg,transparent_0_10px,color-mix(in_oklch,var(--warning)_12%,transparent)_10px_14px)] hover:border-warning"
+                  : "bg-card hover:border-primary/40 hover:bg-accent/30",
+              )}
+            >
+              <span className="flex w-full items-center justify-between gap-2">
+                {/* Keyed by the state, so the padlock snaps shut or springs open on every change. */}
+                <span
+                  key={isLocked ? "locked" : "open"}
+                  className={cn(
+                    "flex size-9 items-center justify-center rounded-full shadow-sm motion-safe:animate-in motion-safe:duration-300 motion-safe:zoom-in-50",
+                    isLocked ? "bg-warning text-white motion-safe:spin-in-12" : "bg-success-soft text-success",
+                  )}
+                >
+                  {isLocked ? <LockKeyholeIcon aria-hidden className="size-4.5" /> : <LockKeyholeOpenIcon aria-hidden className="size-4.5" />}
+                </span>
+                <span
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-[11px] font-semibold tracking-wide uppercase",
+                    isLocked ? "bg-warning/15 text-warning-strong" : "bg-success-soft text-success",
+                  )}
+                >
+                  {isLocked ? "Locked" : "Open"}
+                </span>
+              </span>
+              <span className="grid gap-1">
+                <span className="text-2xl leading-none font-bold tabular-nums">
+                  {u.days}
+                  <span className="ml-1 text-sm font-medium text-muted-foreground">{unit}</span>
+                </span>
+                <span className="line-clamp-2 text-xs text-muted-foreground">
+                  {u.protocols.length ? u.protocols.join(", ") : "No enabled protocol offers it"}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground" aria-live="polite">
+        <LockKeyholeOpenIcon aria-hidden className="size-3.5 text-success" />
+        Visitors can choose <span className="font-medium text-foreground">{open.length ? formatDays(open) : "nothing"}</span>
+        {locked.length ? (
+          <>
+            · locked: <span className="font-medium text-foreground">{formatDays(locked)}</span>
+          </>
+        ) : null}
+      </p>
+      {error ? (
+        <p id="durations-error" className="text-xs font-medium text-destructive" role="alert">
+          {error.join(" ")}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function SettingsForm({
   initial,
   zones,
   styles,
+  durations,
   siteHost,
 }: {
   initial: SiteSettings;
   zones: TimeZoneOption[];
   styles: AvatarStyleOption[];
+  /** Durations offered by enabled protocols, for the Durations section. */
+  durations: DurationUsage[];
   /** Host of the public site for the search preview, e.g. "vpn.example.com". */
   siteHost: string;
 }) {
@@ -293,7 +392,7 @@ export function SettingsForm({
         setErrors(r.fieldErrors ?? {});
         toast.error(r.error);
         requestAnimationFrame(() => {
-          formRef.current?.querySelector<HTMLElement>("[aria-invalid='true']")?.scrollIntoView({ behavior: "smooth", block: "center" });
+          formRef.current?.querySelector<HTMLElement>("[aria-invalid='true'], [data-invalid='true']")?.scrollIntoView({ behavior: "smooth", block: "center" });
         });
         return;
       }
@@ -734,6 +833,31 @@ export function SettingsForm({
           </div>
         </Section>
 
+        {/* Durations ----------------------------------------------------------------- */}
+        <Section
+          id="durations"
+          icon={LockKeyholeIcon}
+          title="Account durations"
+          description="Lock a duration to keep it off new accounts. Visitors still see it on the create form, with a padlock, but cannot choose it; the server refuses it too. It applies to every protocol that offers it. Existing accounts keep their validity."
+        >
+          <DurationLocks
+            usage={durations}
+            locked={draft.lockedDurations}
+            error={err("lockedDurations")}
+            onToggle={(days) =>
+              patch(
+                (d) => ({
+                  ...d,
+                  lockedDurations: d.lockedDurations.includes(days)
+                    ? d.lockedDurations.filter((x) => x !== days)
+                    : [...d.lockedDurations, days].sort((a, b) => a - b),
+                }),
+                ["lockedDurations"],
+              )
+            }
+          />
+        </Section>
+
         {/* Health -------------------------------------------------------------------- */}
         <Section
           id="health"
@@ -1011,6 +1135,8 @@ function sectionOf(key: string): string {
       return "contact";
     case "rules":
       return "rules";
+    case "lockedDurations":
+      return "durations";
     default:
       return "general";
   }

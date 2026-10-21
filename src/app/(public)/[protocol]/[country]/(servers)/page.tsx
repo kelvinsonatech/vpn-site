@@ -14,6 +14,7 @@ import { Container, EmptyState, SERVER_GRID, SectionHeading } from "@/components
 import { ServerCard } from "@/components/public/server-card";
 import { absoluteUrl, pageMetadata, siteOrigin } from "@/lib/seo";
 import { loadCountryPage, loadSettings } from "@/app/(public)/_lib/data";
+import { openDurations } from "@/lib/public/durations";
 
 type Props = { params: Promise<{ protocol: string; country: string }> };
 
@@ -24,7 +25,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { protocol: p, country: c, servers } = data;
   return pageMetadata({
     title: `${p.name} servers in ${c.name}`,
-    description: `Free ${p.name} accounts on ${plural(servers.length, "server")} in ${c.name}, valid for ${formatDays(p.durationOptions)}. Live status, ping and free slots.`,
+    description: `Free ${p.name} accounts on ${plural(servers.length, "server")} in ${c.name}, valid for ${formatDays(openDurations(p.durationOptions, p.lockedDurations))}. Live status, ping and free slots.`,
     path: `${p.href}/${c.slug}`,
     siteName: settings.siteName,
     // Every server here is offline right now: keep the page (empty state) out of search results.
@@ -74,11 +75,11 @@ export default async function CountryPage({ params }: Props) {
         icon={<Flag code={c.code} squared title={c.name} className="size-11 rounded-xl shadow-md" />}
         eyebrow={p.name}
         title={`${p.name} servers in ${c.name}`}
-        description={`Fast ${p.name} servers in ${c.name}. Accounts are valid for ${formatDays(p.durationOptions)} and created in seconds.`}
+        description={`Fast ${p.name} servers in ${c.name}. Accounts are valid for ${formatDays(openDurations(p.durationOptions, p.lockedDurations))} and created in seconds.`}
       >
         <HeroChip icon={<ServerIcon />}>{plural(servers.length, "server")}</HeroChip>
         <HeroChip icon={<span className={open > 0 ? "size-2 rounded-full bg-emerald-300" : "size-2 rounded-full bg-white/50"} />}>{open} open now</HeroChip>
-        <HeroChip icon={<ClockIcon />}>Valid {formatDays(p.durationOptions)}</HeroChip>
+        <HeroChip icon={<ClockIcon />}>Valid {formatDays(openDurations(p.durationOptions, p.lockedDurations))}</HeroChip>
         {nextReset ? (
           <HeroChip icon={<ActivityIcon />}>
             <Countdown iso={nextReset} label="Slots reset" doneText="Slots resetting" />

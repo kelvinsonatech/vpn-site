@@ -25,6 +25,7 @@ import { isNodeError, NodeError } from "@/server/nodes/errors";
 import { getProtocolWithFields } from "@/server/protocols/service";
 import { refreshServerStatus } from "@/server/servers/status";
 import { getSiteSettings } from "@/server/settings/service";
+import { effectiveDefaultDuration } from "@/lib/public/durations";
 import { AdapterResponseError } from "./adapters/base";
 import { getAdapter } from "./adapters/registry";
 import { releaseCapacity, reserveCapacity } from "./capacity";
@@ -147,6 +148,24 @@ export async function requestAccount(p: AccountRequestParams): Promise<AccountRe
     throw new ProvisioningError("VALIDATION_FAILED", "Please correct the highlighted fields.", 422, zodFieldErrors(parsed.error.issues));
   }
   const input = toNormalizedInput(parsed.data as Record<string, unknown>, def);
+
+  // LOCKED DURATIONS (Admin → Settings → Durations): visitors see them on the form but cannot choose them.
+  if (!p.actor) {
+    const { lockedDurations } = await getSiteSettings();
+    if (lockedDurations.includes(input.durationDays)) {
+      const durationKey = def.fields.find((f) => f.type === "duration")?.key;
+      const open = effectiveDefaultDuration(def.durationOptions, def.defaultDurationDays, lockedDurations);
+      // A protocol without a duration field uses its default; when that one is locked, the shortest open one.
+      if (!durationKey && open !== undefined) input.durationDays = open;
+      else {
+        const days = `${input.durationDays} ${input.durationDays === 1 ? "day" : "days"}`;
+        const message =
+          open === undefined ? "No account duration is available right now. Please try again later." : `${days} is locked right now. Choose an open duration.`;
+        throw new ProvisioningError("VALIDATION_FAILED", "Please correct the highlighted fields.", 422, { [durationKey ?? "_form"]: [message] });
+      }
+    }
+  }
+
   const digest = sha256Hex(
     stableStringify({ serverId: p.serverId, protocol: def.slug, username: input.username, durationDays: input.durationDays, options: input.options }),
   );

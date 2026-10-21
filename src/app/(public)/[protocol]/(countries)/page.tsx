@@ -17,6 +17,7 @@ import { guideFor } from "@/lib/protocol-guides";
 import { absoluteUrl, pageMetadata, siteOrigin } from "@/lib/seo";
 import { loadProtocolPage, loadSettings } from "@/app/(public)/_lib/data";
 import { CountriesGrid } from "./countries-client";
+import { openDurations } from "@/lib/public/durations";
 
 type Props = { params: Promise<{ protocol: string }> };
 
@@ -28,7 +29,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const where = data.countries.length ? ` in ${plural(data.countries.length, "country", "countries")}` : "";
   return pageMetadata({
     title: `Free ${p.name} accounts`,
-    description: `${p.description} Create a free ${p.name} account valid for ${formatDays(p.durationOptions)} on servers${where}. Live status and free slots for every server.`.slice(0, 300),
+    description: `${p.description} Create a free ${p.name} account valid for ${formatDays(openDurations(p.durationOptions, p.lockedDurations))} on servers${where}. Live status and free slots for every server.`.slice(0, 300),
     path: p.href,
     siteName: settings.siteName,
     // Enabled but no server offers it yet: the empty state stays reachable, out of search results.
@@ -73,7 +74,7 @@ export default async function ProtocolPage({ params }: Props) {
         title={`${p.name} accounts`}
         description={`${p.description} Pick a location below: every server shows live status, ping and free slots.`}
       >
-        <HeroChip icon={<ClockIcon />}>Valid {formatDays(p.durationOptions)}</HeroChip>
+        <HeroChip icon={<ClockIcon />}>Valid {formatDays(openDurations(p.durationOptions, p.lockedDurations))}</HeroChip>
         <HeroChip icon={<ServerIcon />}>
           {plural(p.serverCount, "server")} in {plural(countries.length, "country", "countries")}
         </HeroChip>

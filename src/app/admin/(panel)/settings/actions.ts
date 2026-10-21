@@ -6,6 +6,7 @@ import type { ActionState } from "@/lib/action-state";
 import { fieldErrors, safeAction } from "@/server/action-helpers";
 import { authorize } from "@/server/auth/guards";
 import { UserFacingError } from "@/server/errors";
+import { protocolsWithoutOpenDuration } from "@/server/protocols/service";
 import { updateSiteSettings } from "@/server/settings/service";
 
 /** Friendlier messages for numeric fields than zod's generic "Too small: expected number to be >=30". */
@@ -40,6 +41,17 @@ export async function saveSettingsAction(json: string): Promise<ActionState> {
       throw new UserFacingError("Invalid payload.");
     }
     const extra = editorIssues(raw);
+    // Locking every duration of an enabled protocol would leave visitors nothing to choose.
+    const locked = (raw as { lockedDurations?: unknown } | null)?.lockedDurations;
+    if (Array.isArray(locked) && locked.every((d): d is number => Number.isInteger(d))) {
+      const stuck = await protocolsWithoutOpenDuration(locked);
+      if (stuck.length) {
+        const names = stuck.length > 3 ? `${stuck.slice(0, 3).join(", ")} and ${stuck.length - 3} more` : stuck.join(", ");
+        extra.lockedDurations = [
+          `${names} would have no duration left. Keep at least one of ${stuck.length === 1 ? "its" : "their"} durations open, or change the protocol's durations first.`,
+        ];
+      }
+    }
     try {
       if (Object.keys(extra).length) return { error: "Please correct the highlighted fields.", fieldErrors: extra };
       const saved = await updateSiteSettings(raw, actor);

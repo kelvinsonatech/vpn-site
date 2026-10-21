@@ -39,6 +39,7 @@ import copyConfigImage from "@/assets/step-copy-config.webp";
 import profilesBandImage from "@/assets/profiles-band.webp";
 import serversOnlineImage from "@/assets/servers-online.webp";
 import v2rayToJsonImage from "@/assets/v2ray-to-json.webp";
+import { openDurations } from "@/lib/public/durations";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
@@ -79,7 +80,7 @@ export default async function HomePage() {
   const best = [...protocols].sort((a, b) => b.availableCount - a.availableCount || b.serverCount - a.serverCount)[0];
   const primaryHref = best && best.availableCount > 0 ? best.href : "/#protocols";
   const live = liveEntries(status, 6);
-  const allDays = protocols.flatMap((p) => p.durationOptions);
+  const allDays = protocols.flatMap((p) => openDurations(p.durationOptions, p.lockedDurations));
   const validity = allDays.length ? formatDayRange(allDays) : "3–30 days";
   const countries = stats?.countries ?? new Set(protocols.flatMap((p) => p.countries.map((c) => c.code))).size;
   // Flags beside the Countries tile's number: the listed services' countries, once each, by name.

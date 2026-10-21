@@ -168,7 +168,23 @@
   /* Admin sign-in: the greeting swaps words (in: from large and faint; out: fades), the waves drift. */
   --animate-title-in: title-in 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
   --animate-title-out: title-out 320ms ease-out both;
+  /* Locked account duration: a short "no" shake when tapped (used with motion-safe: only). */
+  --animate-lock-shake: lock-shake 420ms cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
 
+  @keyframes lock-shake {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    20%,
+    60% {
+      transform: translateX(-3px);
+    }
+    40%,
+    80% {
+      transform: translateX(3px);
+    }
+  }
   @keyframes float {
     0%,
     100% {

@@ -1,3 +1,4 @@
+import { effectiveDefaultDuration, openDurations } from "@/lib/public/durations";
 import type { PublicFormField, PublicProtocolDetail } from "@/lib/public/types";
 
 /**
@@ -18,7 +19,7 @@ const PASSWORD_CHARS = /^[A-Za-z0-9@#%^*_+=.,:~-]*$/;
 const BUG_HOST = /^(?=.{3,128}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/;
 const REMARK_PROTOCOLS = new Set(["shadowsocks", "wireguard"]);
 
-type ValidationContext = Pick<PublicProtocolDetail, "durationOptions"> & Partial<Pick<PublicProtocolDetail, "slug" | "category">>;
+type ValidationContext = Pick<PublicProtocolDetail, "durationOptions"> & Partial<Pick<PublicProtocolDetail, "lockedDurations" | "slug" | "category">>;
 
 function usesRemarkNames(protocol: ValidationContext): boolean {
   return protocol.category === "v2ray" || (!!protocol.slug && REMARK_PROTOCOLS.has(protocol.slug));
@@ -32,7 +33,8 @@ export function initialValues(protocol: PublicProtocolDetail): Record<string, st
   const out: Record<string, string> = {};
   for (const f of protocol.fields) {
     if (f.type === "duration") {
-      const d = protocol.durationOptions.includes(protocol.defaultDurationDays) ? protocol.defaultDurationDays : protocol.durationOptions[0];
+      // Start on the default unless it is locked (then the shortest open one; nothing when all are locked).
+      const d = effectiveDefaultDuration(protocol.durationOptions, protocol.defaultDurationDays, protocol.lockedDurations);
       out[f.key] = d !== undefined ? String(d) : "";
     } else if (f.type === "select") {
       const def = f.defaultValue && f.options.some((o) => o.value === f.defaultValue) ? f.defaultValue : null;
@@ -65,6 +67,9 @@ function compilePattern(pattern: string | undefined): RegExp | null {
 export function validateField(f: PublicFormField, raw: string, protocol: ValidationContext): string | null {
   const value = f.type === "password" ? raw : raw.trim();
   if (f.type === "duration") {
+    const locked = protocol.lockedDurations ?? [];
+    if (!openDurations(protocol.durationOptions, locked).length) return "No duration is available right now. Please try again later.";
+    if (locked.includes(Number(value))) return "That duration is locked right now. Choose an open one.";
     return protocol.durationOptions.includes(Number(value)) ? null : "Choose how long the account should last.";
   }
   if (f.type === "select") {

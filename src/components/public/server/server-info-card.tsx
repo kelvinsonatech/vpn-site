@@ -1,5 +1,17 @@
 import Link from "next/link";
-import { ActivityIcon, BanIcon, CalendarClockIcon, ClockIcon, FlagIcon, GaugeIcon, MapPinIcon, NetworkIcon, ServerIcon, TimerIcon } from "lucide-react";
+import {
+  ActivityIcon,
+  BanIcon,
+  CalendarClockIcon,
+  ClockIcon,
+  FlagIcon,
+  GaugeIcon,
+  LockKeyholeIcon,
+  MapPinIcon,
+  NetworkIcon,
+  ServerIcon,
+  TimerIcon,
+} from "lucide-react";
 import { AvailabilityBadge } from "@/components/public/availability-badge";
 import { Flag } from "@/components/public/flag";
 import { Latency } from "@/components/public/latency";
@@ -51,7 +63,7 @@ export function ServerInfoCard({
   resetLabel,
   className,
 }: {
-  protocol: Pick<PublicProtocolDetail, "slug" | "durationOptions" | "defaultDurationDays">;
+  protocol: Pick<PublicProtocolDetail, "slug" | "durationOptions" | "lockedDurations" | "defaultDurationDays">;
   country: PublicCountry;
   server: PublicServerCard;
   rules: string[];
@@ -136,17 +148,27 @@ export function ServerInfoCard({
 
       <Section icon={<CalendarClockIcon />} title="Validity">
         <ul className="flex flex-wrap gap-1.5">
-          {protocol.durationOptions.map((d) => (
-            <li
-              key={d}
-              className={cn(
-                "rounded-full border px-2.5 py-0.5 text-xs font-medium tabular-nums",
-                d === protocol.defaultDurationDays ? "border-primary/40 bg-accent text-accent-foreground" : "bg-muted/40 text-muted-foreground",
-              )}
-            >
-              {d} {d === 1 ? "day" : "days"}
-            </li>
-          ))}
+          {protocol.durationOptions.map((d) => {
+            const locked = protocol.lockedDurations.includes(d);
+            return (
+              <li
+                key={d}
+                title={locked ? "Locked" : undefined}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium tabular-nums",
+                  locked
+                    ? "border-dashed text-muted-foreground/75"
+                    : d === protocol.defaultDurationDays
+                      ? "border-primary/40 bg-accent text-accent-foreground"
+                      : "bg-muted/40 text-muted-foreground",
+                )}
+              >
+                {locked ? <LockKeyholeIcon aria-hidden className="size-3" /> : null}
+                {d} {d === 1 ? "day" : "days"}
+                {locked ? <span className="sr-only">(locked)</span> : null}
+              </li>
+            );
+          })}
         </ul>
       </Section>
 

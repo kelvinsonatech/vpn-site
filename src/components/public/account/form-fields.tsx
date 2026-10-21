@@ -1,11 +1,13 @@
 "use client";
 
 import { useId, useState } from "react";
-import { ChevronDownIcon, DicesIcon, SlidersHorizontalIcon } from "lucide-react";
+import { ChevronDownIcon, DicesIcon, LockKeyholeIcon, SlidersHorizontalIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
 import type { PublicFormField, PublicProtocolDetail } from "@/lib/public/types";
+import { openDurations } from "@/lib/public/durations";
+import { formatDays } from "../format";
 import { generatePassword, isAdvancedField, normalizeInput } from "./form-validation";
 
 /**
@@ -91,7 +93,11 @@ function describedBy(field: PublicFormField, error?: string) {
   return [field.helpText ? `${id}-help` : null, error ? `${id}-error` : null].filter(Boolean).join(" ") || undefined;
 }
 
-/** Native radios styled as a segmented control (arrow keys move between options). */
+/**
+ * Native radios styled as a segmented control (arrow keys move between options). Locked options stay
+ * visible with a padlock but cannot be chosen (their radio is disabled, so arrow keys skip them);
+ * tapping one gives a short shake and a note naming what is open.
+ */
 function Segmented({
   name,
   options,
@@ -99,41 +105,88 @@ function Segmented({
   onChange,
   disabled,
   invalid,
+  lockedNote,
 }: {
   name: string;
-  options: { value: string; label: string; hint?: string }[];
+  options: { value: string; label: string; hint?: string; locked?: boolean }[];
   value: string;
   onChange: (v: string) => void;
   disabled?: boolean;
   invalid?: boolean;
+  /** Note shown after tapping a locked option, e.g. "7 days is locked right now. You can choose 3 days." */
+  lockedNote?: (label: string) => string;
 }) {
+  // Which locked option was tapped last; `n` restarts the shake on every tap.
+  const [nudge, setNudge] = useState<{ value: string; label: string; n: number } | null>(null);
   // Up to four choices share one row even on 360 px phones; longer lists wrap.
   const columns = options.length <= 4 ? `repeat(${options.length}, minmax(0, 1fr))` : undefined;
   return (
-    <div
-      className={cn(
-        "grid grid-cols-[repeat(auto-fit,minmax(5rem,1fr))] gap-1 rounded-xl border bg-muted/60 p-1",
-        invalid && "border-destructive",
-      )}
-      style={columns ? { gridTemplateColumns: columns } : undefined}
-    >
-      {options.map((o) => (
-        <label key={o.value} className={cn("relative", disabled && "cursor-not-allowed opacity-60")}>
-          <input
-            type="radio"
-            name={name}
-            value={o.value}
-            checked={value === o.value}
-            onChange={() => onChange(o.value)}
-            disabled={disabled}
-            className="peer sr-only"
-          />
-          <span className="flex min-h-10 cursor-pointer flex-col items-center justify-center rounded-lg px-1 py-1.5 text-center text-[13px] font-medium whitespace-nowrap sm:px-2 sm:text-sm text-muted-foreground transition-[background-color,color,box-shadow] peer-checked:bg-card peer-checked:text-foreground peer-checked:shadow-sm peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/50 hover:text-foreground motion-reduce:transition-none">
-            <span className="tabular-nums">{o.label}</span>
-            {o.hint ? <span className="text-[11px] font-normal text-muted-foreground">{o.hint}</span> : null}
+    <div className="grid gap-2">
+      <div
+        className={cn(
+          "grid grid-cols-[repeat(auto-fit,minmax(5rem,1fr))] gap-1 rounded-xl border bg-muted/60 p-1",
+          invalid && "border-destructive",
+        )}
+        style={columns ? { gridTemplateColumns: columns } : undefined}
+      >
+        {options.map((o) =>
+          o.locked ? (
+            <label
+              key={o.value}
+              title="Locked"
+              className={cn("group/lock relative", disabled && "opacity-60")}
+              onClick={() => !disabled && setNudge((p) => ({ value: o.value, label: o.label, n: (p?.n ?? 0) + 1 }))}
+            >
+              <input type="radio" name={name} value={o.value} checked={false} disabled readOnly className="peer sr-only" />
+              <span
+                key={nudge?.value === o.value ? nudge.n : 0}
+                className={cn(
+                  "flex min-h-10 cursor-not-allowed items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-center text-[13px] font-medium whitespace-nowrap text-muted-foreground/75 sm:gap-1.5 sm:px-2 sm:text-sm",
+                  "bg-[repeating-linear-gradient(135deg,transparent_0_7px,color-mix(in_oklch,var(--foreground)_5%,transparent)_7px_9px)] ring-1 ring-border/60 ring-inset",
+                  nudge?.value === o.value && "motion-safe:animate-lock-shake",
+                )}
+              >
+                <LockKeyholeIcon
+                  aria-hidden
+                  className="size-3.5 shrink-0 transition-[transform,color] duration-300 group-hover/lock:-rotate-12 group-hover/lock:text-warning-strong motion-reduce:transition-none sm:size-4"
+                />
+                <span className="tabular-nums">{o.label}</span>
+                <span className="sr-only">(locked)</span>
+              </span>
+            </label>
+          ) : (
+            <label key={o.value} className={cn("relative", disabled && "cursor-not-allowed opacity-60")}>
+              <input
+                type="radio"
+                name={name}
+                value={o.value}
+                checked={value === o.value}
+                onChange={() => {
+                  setNudge(null);
+                  onChange(o.value);
+                }}
+                disabled={disabled}
+                className="peer sr-only"
+              />
+              <span className="flex min-h-10 cursor-pointer flex-col items-center justify-center rounded-lg px-1 py-1.5 text-center text-[13px] font-medium whitespace-nowrap sm:px-2 sm:text-sm text-muted-foreground transition-[background-color,color,box-shadow] peer-checked:bg-card peer-checked:text-foreground peer-checked:shadow-sm peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/50 hover:text-foreground motion-reduce:transition-none">
+                <span className="tabular-nums">{o.label}</span>
+                {o.hint ? <span className="text-[11px] font-normal text-muted-foreground">{o.hint}</span> : null}
+              </span>
+            </label>
+          ),
+        )}
+      </div>
+      <p aria-live="polite" className="empty:hidden">
+        {nudge && lockedNote ? (
+          <span
+            key={nudge.n}
+            className="flex animate-in items-start gap-1.5 rounded-lg bg-warning-soft px-2.5 py-1.5 text-xs font-medium text-warning-strong duration-300 fade-in slide-in-from-top-1"
+          >
+            <LockKeyholeIcon aria-hidden className="mt-px size-3.5 shrink-0" />
+            {lockedNote(nudge.label)}
           </span>
-        </label>
-      ))}
+        ) : null}
+      </p>
     </div>
   );
 }
@@ -287,7 +340,15 @@ function FieldControl({
           onChange={onChange}
           disabled={disabled}
           invalid={!!error}
-          options={protocol.durationOptions.map((d) => ({ value: String(d), label: `${d} ${d === 1 ? "day" : "days"}` }))}
+          options={protocol.durationOptions.map((d) => ({
+            value: String(d),
+            label: `${d} ${d === 1 ? "day" : "days"}`,
+            locked: protocol.lockedDurations.includes(d),
+          }))}
+          lockedNote={(label) => {
+            const open = openDurations(protocol.durationOptions, protocol.lockedDurations);
+            return open.length ? `${label} is locked right now. You can choose ${formatDays(open)}.` : `${label} is locked right now.`;
+          }}
         />
       </FieldShell>
     );

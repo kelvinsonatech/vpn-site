@@ -8,6 +8,7 @@ import type { PublicProtocolSummary } from "@/lib/public/types";
 import { FlagStack } from "./flag-stack";
 import { formatDayRange, plural } from "./format";
 import { categoryLabel } from "./nav";
+import { openDurations } from "@/lib/public/durations";
 
 /**
  * Home page protocol card: category and server-count badges, icon medallion, name, three
@@ -77,7 +78,7 @@ export function ProtocolCard({ protocol: p, className, style }: { protocol: Publ
           <span className="flex items-center gap-3 text-muted-foreground">
             <span className="inline-flex items-center gap-1">
               <ClockIcon className="size-3.5" aria-hidden />
-              {formatDayRange(p.durationOptions)}
+              {formatDayRange(openDurations(p.durationOptions, p.lockedDurations))}
             </span>
             <span className={cn("inline-flex items-center gap-1.5 font-medium", available ? "text-success" : "text-muted-foreground")}>
               <span className={cn("size-1.5 rounded-full", available ? "bg-success" : "bg-muted-foreground/50")} />

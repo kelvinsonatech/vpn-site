@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import type { PublicServerCard } from "@/lib/public/types";
 import { getCountryPage } from "@/server/public/catalog";
 import { loadServerPage as loadServer, loadSettings, resetSchedule } from "@/app/(public)/_lib/data";
+import { openDurations } from "@/lib/public/durations";
 
 type Params = { protocol: string; country: string; server: string };
 
@@ -42,7 +43,7 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
   const where = [server.city, country.name].filter(Boolean).join(", ");
   return pageMetadata({
     title: `Create ${protocol.name} account · ${server.name} (${country.name})`,
-    description: `Free ${protocol.name} account on ${server.name} in ${where}. Valid for ${formatDayRange(protocol.durationOptions)}, created in seconds, no sign-up.`,
+    description: `Free ${protocol.name} account on ${server.name} in ${where}. Valid for ${formatDayRange(openDurations(protocol.durationOptions, protocol.lockedDurations))}, created in seconds, no sign-up.`,
     path: server.href,
     siteName: settings.siteName,
   });
@@ -111,7 +112,7 @@ export default async function ServerPage({ params }: { params: Promise<Params> }
         </HeroChip>
         {server.latencyMs !== null ? <HeroChip icon={<ActivityIcon />}>{server.latencyMs} ms</HeroChip> : null}
         <HeroChip icon={<GaugeIcon />}>{remaining === null ? "Unlimited slots" : `${remaining} ${remaining === 1 ? "slot" : "slots"} left`}</HeroChip>
-        <HeroChip icon={<CalendarClockIcon />}>Valid {formatDayRange(protocol.durationOptions)}</HeroChip>
+        <HeroChip icon={<CalendarClockIcon />}>Valid {formatDayRange(openDurations(protocol.durationOptions, protocol.lockedDurations))}</HeroChip>
       </PageHeader>
 
       <Container className="relative pt-2 pb-16 sm:pb-24">

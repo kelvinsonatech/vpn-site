@@ -11,6 +11,7 @@ import { Latency } from "./latency";
 import { Countdown, RelativeTime } from "./live-time";
 import { describePorts, transportLabel } from "./port-rows";
 import { RemainingMeter } from "./remaining-meter";
+import { openDurations } from "@/lib/public/durations";
 
 const UNAVAILABLE: Record<Exclude<Availability, "available">, { label: string; reason: string; icon: React.ReactNode }> = {
   full: { label: "Full", reason: "All slots are taken for now.", icon: <BanIcon /> },
@@ -33,7 +34,7 @@ export function ServerCard({
   style,
 }: {
   server: PublicServerCard;
-  protocol: { name: string; icon: string; durationOptions: number[] };
+  protocol: { name: string; icon: string; durationOptions: number[]; lockedDurations: number[] };
   className?: string;
   style?: React.CSSProperties;
 }) {
@@ -103,7 +104,7 @@ export function ServerCard({
           </Row>
         ) : null}
         <Row icon={<ClockIcon />} label="Validity">
-          <span className="font-medium">{formatDays(protocol.durationOptions)}</span>
+          <span className="font-medium">{formatDays(openDurations(protocol.durationOptions, protocol.lockedDurations))}</span>
         </Row>
         <Row icon={<GaugeIcon />} label="Status">
           <span className="flex min-w-0 flex-wrap items-center justify-end gap-x-2">

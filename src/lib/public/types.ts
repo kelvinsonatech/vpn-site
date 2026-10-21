@@ -73,7 +73,11 @@ export interface PublicProtocolSummary {
   /** Servers where an account can be created right now. */
   availableCount: number;
   countries: PublicCountry[];
+  /** Every duration the protocol offers (days, ascending), locked ones included. */
   durationOptions: number[];
+  /** The ones visitors can see but not choose right now (Admin → Settings → Durations). */
+  lockedDurations: number[];
+  /** Where the form starts: the protocol default, or the shortest open duration when the default is locked. */
   defaultDurationDays: number;
   href: string;
 }

@@ -8,6 +8,8 @@ import { getAdapter } from "@/server/provisioning/adapters/registry";
 import type { ProtocolDefinition } from "@/server/provisioning/types";
 import { normalizeIdentifier } from "./identifiers";
 import { protocolSchema, type ProtocolInput } from "./validation";
+import { openDurations } from "@/lib/public/durations";
+import { getSiteSettings } from "@/server/settings/service";
 
 import { clearPublicCache } from "@/server/public/cache";
 export function toDefinition(p: Protocol, fields: ProtocolField[]): ProtocolDefinition {
@@ -60,8 +62,45 @@ export async function listProtocolsForAdmin() {
 }
 
 /** Checks that cut across fields: adapter requirements and identifier collisions. */
+/** An enabled protocol needs at least one duration that is not locked (Admin → Settings → Durations). */
+async function assertOpenDuration(name: string, durationOptions: number[]) {
+  const { lockedDurations } = await getSiteSettings();
+  if (!openDurations(durationOptions, lockedDurations).length) {
+    throw new UserFacingError(
+      `Every duration of ${name} is locked in Settings → Durations, so nobody could create an account. Unlock one there, or add another duration.`,
+    );
+  }
+}
+
+/**
+ * Enabled protocols whose every duration is in `locked`: locking those would leave visitors nothing to
+ * choose. Checked before Admin → Settings saves locked durations.
+ */
+export async function protocolsWithoutOpenDuration(locked: number[]): Promise<string[]> {
+  if (!locked.length) return [];
+  const rows = await db()
+    .select({ name: protocols.name, durationOptions: protocols.durationOptions })
+    .from(protocols)
+    .where(eq(protocols.enabled, true))
+    .orderBy(asc(protocols.displayOrder), asc(protocols.name));
+  return rows.filter((r) => !openDurations(r.durationOptions, locked).length).map((r) => r.name);
+}
+
+/** Every duration an enabled protocol offers, with the protocols offering it (for Admin → Settings → Durations). */
+export async function durationUsage(): Promise<{ days: number; protocols: string[] }[]> {
+  const rows = await db()
+    .select({ name: protocols.name, durationOptions: protocols.durationOptions })
+    .from(protocols)
+    .where(eq(protocols.enabled, true))
+    .orderBy(asc(protocols.displayOrder), asc(protocols.name));
+  const byDays = new Map<number, string[]>();
+  for (const r of rows) for (const d of new Set(r.durationOptions)) byDays.set(d, [...(byDays.get(d) ?? []), r.name]);
+  return [...byDays].map(([days, names]) => ({ days, protocols: names })).sort((a, b) => a.days - b.days);
+}
+
 async function validateSemantics(input: ProtocolInput, exceptId?: string) {
   const adapter = getAdapter(input.adapterKey);
+  if (input.enabled) await assertOpenDuration(input.name, input.durationOptions);
   const keys = new Set(input.fields.map((f) => f.key));
   const missing = adapter.requiredInputs.filter((k) => !keys.has(k));
   if (missing.length) {
@@ -185,6 +224,10 @@ export async function createProtocol(raw: unknown, actor: AuditActor): Promise<s
 }
 
 export async function setProtocolEnabled(id: string, enabled: boolean, actor: AuditActor) {
+  if (enabled) {
+    const [p] = await db().select({ name: protocols.name, durationOptions: protocols.durationOptions }).from(protocols).where(eq(protocols.id, id)).limit(1);
+    if (p) await assertOpenDuration(p.name, p.durationOptions);
+  }
   const [row] = await db().update(protocols).set({ enabled }).where(eq(protocols.id, id)).returning({ name: protocols.name });
   if (!row) throw new UserFacingError("Protocol not found.");
   await logEvent({

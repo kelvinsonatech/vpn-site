@@ -73,6 +73,14 @@ export const siteSettingsSchema = z.object({
   }),
   /** Short usage rules shown next to every account form ("No torrenting", ...). */
   rules: z.array(z.string().trim().min(1).max(80)).max(10),
+  /**
+   * Account durations (in days) visitors can see but not choose ("Locked" on the create form); the
+   * server refuses them too. Applies to every protocol that offers that duration.
+   */
+  lockedDurations: z
+    .array(z.number().int().min(1).max(365))
+    .max(20)
+    .transform((v) => [...new Set(v)].sort((a, b) => a - b)),
   display: z.object({
     /**
      * Show each server's VPN hostname on public listings (users receive it with their account anyway).
@@ -98,5 +106,6 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   avatarStyle: DEFAULT_AVATAR_STYLE,
   contact: { email: null, telegramUrl: null },
   rules: ["No torrenting or P2P", "No DDoS, hacking or carding", "One device per account"],
+  lockedDurations: [],
   display: { showHostnames: false, showStats: true },
 };

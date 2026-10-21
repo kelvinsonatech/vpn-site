@@ -5,6 +5,7 @@ import { captchaSiteKey } from "@/server/captcha";
 import { quotaWindow, startOfLocalDay, type QuotaWindow } from "@/server/provisioning/quota";
 import { getSiteSettings } from "@/server/settings/service";
 import { countryName } from "@/lib/countries";
+import { effectiveDefaultDuration } from "@/lib/public/durations";
 import { countryCodeFromSlug, countrySlug, SERVER_SLUG_PATTERN } from "@/lib/slug";
 import type {
   Availability,
@@ -108,6 +109,8 @@ interface Snapshot {
   protocolsByServer: Map<string, Set<string>>;
   window: QuotaWindow;
   showHostnames: boolean;
+  /** Admin → Settings → Durations: shown on the form with a lock, not selectable. */
+  lockedDurations: number[];
 }
 
 async function loadSnapshot(): Promise<Snapshot> {
@@ -177,7 +180,14 @@ async function loadSnapshot(): Promise<Snapshot> {
   ]);
   const protocolsByServer = new Map<string, Set<string>>();
   for (const r of rows) protocolsByServer.set(r.server.id, (protocolsByServer.get(r.server.id) ?? new Set()).add(r.protocolId));
-  return { protocols: protocolRows, rows: rows as Row[], protocolsByServer, window, showHostnames: settings.display.showHostnames };
+  return {
+    protocols: protocolRows,
+    rows: rows as Row[],
+    protocolsByServer,
+    window,
+    showHostnames: settings.display.showHostnames,
+    lockedDurations: settings.lockedDurations,
+  };
 }
 
 function snapshot(): Promise<Snapshot> {
@@ -274,7 +284,9 @@ function summary(snap: Snapshot, p: ProtocolRow): PublicProtocolSummary {
     availableCount: cards.filter((c) => c.availability === "available").length,
     countries: [...countries.values()].sort(byName),
     durationOptions: p.durationOptions,
-    defaultDurationDays: p.defaultDurationDays,
+    lockedDurations: p.durationOptions.filter((d) => snap.lockedDurations.includes(d)),
+    // Never start the form on a locked duration (falls back to the stored default when every one is locked).
+    defaultDurationDays: effectiveDefaultDuration(p.durationOptions, p.defaultDurationDays, snap.lockedDurations) ?? p.defaultDurationDays,
     href: `/${p.slug}`,
   };
 }

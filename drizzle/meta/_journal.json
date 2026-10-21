@@ -36,6 +36,13 @@
       "when": 1792346883630,
       "tag": "0004_dns_sightings",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792587495948,
+      "tag": "0005_lock_long_durations",
+      "breakpoints": true
     }
   ]
 }

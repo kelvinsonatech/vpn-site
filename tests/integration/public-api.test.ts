@@ -112,6 +112,27 @@ describe("public API route handlers", () => {
     expect(b.claimToken).toBe(a.claimToken);
   });
 
+  it("locked durations: shown as locked, refused by the API, the form starts on an open one", async () => {
+    await setSettings({ lockedDurations: [7, 14, 30] });
+    try {
+      const page = (await (await protocolRoute(new Request(`${ORIGIN}/api/public/protocols/vless`), params({ slug: "vless" }))).json()) as {
+        protocol: { durationOptions: number[]; lockedDurations: number[]; defaultDurationDays: number };
+      };
+      expect(page.protocol).toMatchObject({ durationOptions: [3, 7, 14, 30], lockedDurations: [7, 14, 30], defaultDurationDays: 3 });
+
+      const locked = await createAccount(post("/api/public/accounts", accountBody({ username: "api_locked", transport: "ws", duration: "7" })));
+      expect(locked.status).toBe(422);
+      const err = (await locked.json()) as PublicApiError;
+      expect(err.error.code).toBe("VALIDATION_FAILED");
+      expect(err.error.fieldErrors?.duration?.[0]).toMatch(/7 days is locked/);
+
+      const open = await createAccount(post("/api/public/accounts", accountBody({ username: "api_open", transport: "ws", duration: "3" })));
+      expect(open.status).toBe(202);
+    } finally {
+      await setSettings({ lockedDurations: [] });
+    }
+  });
+
   it("validation errors: 422 with field errors, 400 for malformed requests", async () => {
     const res = await createAccount(post("/api/public/accounts", accountBody({ username: "root", transport: "ws", duration: "5", sni_bug: "not a host" })));
     expect(res.status).toBe(422);
