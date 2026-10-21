@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
-import { ArrowRightIcon, SparklesIcon, WrenchIcon } from "lucide-react";
+import { ArrowRightIcon, SparklesIcon } from "lucide-react";
 import { PageHeader } from "@/components/public/page-header";
 import { Container } from "@/components/public/section";
 import { TOOLS } from "@/components/public/tools/registry";
 import { pageMetadata } from "@/lib/seo";
 import { loadSettings } from "../_lib/data";
+import toolsImage from "@/assets/tools.webp";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
@@ -24,7 +25,10 @@ export default async function ToolsPage() {
     <>
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "Tools" }]}
-        icon={<WrenchIcon />}
+        icon={
+          // eslint-disable-next-line @next/next/no-img-element -- small bundled picture; the header sizes it
+          <img src={toolsImage.src} alt="" aria-hidden="true" width={64} height={64} draggable={false} className="rounded-2xl bg-white object-contain p-2" />
+        }
         eyebrow="Free"
         title="Network tools"
         description="Handy tools for setting up your SSH and VPN apps. Free, no sign-up."
