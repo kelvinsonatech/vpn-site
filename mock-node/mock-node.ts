@@ -66,6 +66,8 @@ export interface MockNodeState {
   maintenance: boolean;
   /** Artificial delay before every API answer (±20 % jitter), ms. */
   latencyMs: number;
+  /** Answer GET /accounts/{id} like an agent without that route (404 NOT_FOUND), for the account check tests. */
+  noAccountLookup: boolean;
 }
 
 const SSH_FAMILY = new Set(["ssh", "ssh-ws", "ssh-websocket", "stunnel", "ssh-ssl", "slowdns", "udp-custom", "openvpn", "noobzvpn"]);
@@ -306,6 +308,7 @@ export async function startMockNode(opts: MockNodeOptions) {
     failNextCreates: 0,
     requestLog: [],
     maintenance: false,
+    noAccountLookup: false,
     latencyMs: Math.max(0, opts.latencyMs ?? 0),
   };
   const secrets: NodeSecrets = {
@@ -487,6 +490,7 @@ export async function startMockNode(opts: MockNodeOptions) {
     const one = /^\/accounts\/([^/]+)$/.exec(route);
     if (one) {
       const a = state.accounts.get(decodeURIComponent(one[1]!));
+      if (method === "GET" && state.noAccountLookup) return fail(res, 404, "NOT_FOUND", "Unknown path");
       if (method === "GET") return a ? ok(res, { account: view(a, false) }) : fail(res, 404, "ACCOUNT_NOT_FOUND", "Unknown account");
       if (method === "DELETE") {
         if (!a || a.status === "revoked") return fail(res, 404, "ACCOUNT_NOT_FOUND", "Unknown account");

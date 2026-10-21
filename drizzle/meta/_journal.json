@@ -43,6 +43,13 @@
       "when": 1792587495948,
       "tag": "0005_lock_long_durations",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792625333165,
+      "tag": "0006_account_check",
+      "breakpoints": true
     }
   ]
 }

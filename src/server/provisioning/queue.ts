@@ -3,7 +3,7 @@ import { Redis } from "ioredis";
 import { env } from "@/server/env";
 
 export const PROVISIONING_QUEUE = "provisioning";
-/** Scheduled background work (health monitor, expiry, retention); never blocks account creation. */
+/** Scheduled background work (health monitor, expiry, account check, retention); never blocks account creation. */
 export const MAINTENANCE_QUEUE = "maintenance";
 
 export type ProvisioningJob =
@@ -11,7 +11,7 @@ export type ProvisioningJob =
   | { type: "reconcile"; requestId: string }
   | { type: "sweep" };
 
-export type MaintenanceJob = { type: "health" } | { type: "expiry" } | { type: "purge" };
+export type MaintenanceJob = { type: "health" } | { type: "expiry" } | { type: "accounts" } | { type: "purge" };
 
 const g = globalThis as unknown as { __vlQueue?: Queue<ProvisioningJob>; __vlMaintQueue?: Queue<MaintenanceJob>; __vlQueueConn?: Redis };
 

@@ -59,6 +59,11 @@ export const siteSettingsSchema = z.object({
     intervalSeconds: z.number().int().min(30).max(3600),
     /** Consecutive failed checks before a server is shown as offline. */
     failureThreshold: z.number().int().min(1).max(10),
+    /**
+     * How often (minutes) the worker asks each server whether an active account still exists, so
+     * accounts the server deleted itself (e.g. its multi-login limiter) show as removed. 0 = off.
+     */
+    accountCheckMinutes: z.number().int().min(0).max(60),
   }),
   avatarStyle: z.enum(AVATAR_STYLE_KEYS),
   contact: z.object({
@@ -102,7 +107,7 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   seoDescription: "Free SSH, SSH SSL, SlowDNS, VMess, VLESS, Trojan, Hysteria and ZIVPN UDP accounts on fast servers worldwide.",
   announcement: { enabled: false, text: "", tone: "info", linkLabel: null, linkUrl: null },
   quota: { resetTimes: ["00:00", "12:00"], timezone: "UTC", defaultLimit: null },
-  health: { intervalSeconds: 60, failureThreshold: 3 },
+  health: { intervalSeconds: 60, failureThreshold: 3, accountCheckMinutes: 5 },
   avatarStyle: DEFAULT_AVATAR_STYLE,
   contact: { email: null, telegramUrl: null },
   rules: ["No torrenting or P2P", "No DDoS, hacking or carding", "One device per account"],

@@ -242,6 +242,17 @@ export type AccountStatusResponse =
   | { status: "failed"; error: { code: string; message: string } }
   | { status: "active"; account: PublicAccountResult | null };
 
+/**
+ * POST /api/public/accounts/status `{ ids: [requestId…] }` (at most 50) → what became of accounts
+ * saved in My accounts. Only ids of created accounts appear; `removed` covers accounts the server
+ * deleted early (e.g. its multi-login limiter) and accounts an administrator revoked.
+ */
+export type SavedAccountServerStatus = { status: "active" } | { status: "expired" } | { status: "removed"; removedAt: string | null };
+
+export interface SavedAccountStatusResponse {
+  accounts: Record<string, SavedAccountServerStatus>;
+}
+
 export type ReportCategory = "connection" | "slow" | "account" | "other";
 
 /** POST /api/public/reports (JSON, same-origin only) → 201 { id }. */

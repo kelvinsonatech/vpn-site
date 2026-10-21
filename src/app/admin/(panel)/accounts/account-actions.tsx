@@ -128,9 +128,13 @@ export function AccountDetailsDialog({ account, open, onOpenChange }: { account:
           </Item>
           <Item label="Validity">{account.durationDays} days</Item>
           {account.revokedAt ? (
-            <Item label="Revoked">
+            <Item label={account.status === "removed" ? "Removed" : "Revoked"}>
               <When iso={account.revokedAt} />
-              {account.revokedByEmail ? <span className="block text-xs text-muted-foreground">by {account.revokedByEmail}</span> : null}
+              {account.status === "removed" ? (
+                <span className="block text-xs text-muted-foreground">by the server itself, before it expired (for example its multi-login limiter)</span>
+              ) : account.revokedByEmail ? (
+                <span className="block text-xs text-muted-foreground">by {account.revokedByEmail}</span>
+              ) : null}
             </Item>
           ) : null}
           <Item label="Server">

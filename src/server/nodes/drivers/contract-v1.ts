@@ -112,7 +112,9 @@ export function contractV1Driver(conn: NodeConnection): NodeDriver {
         const res = await call({ method: "GET", path: `/accounts/${idSegment(accountId)}` });
         return toNodeAccount(parse(nodeAccountEnvelopeWire, res.data, "account").account);
       } catch (e) {
-        if (isNotFound(e)) return null;
+        // Only the contract's own answer means "gone": a bare 404 (wrong base path, a proxy page)
+        // must never make the account check mark live accounts as removed.
+        if (e instanceof NodeError && e.code === "ACCOUNT_NOT_FOUND") return null;
         throw e;
       }
     },

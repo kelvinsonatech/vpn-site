@@ -438,7 +438,7 @@ export async function getStatusPage(): Promise<StatusPageData> {
   }, PINNED);
 }
 
-/** Accounts ever activated (active, expired or revoked), in total and since local midnight, per protocol. */
+/** Accounts ever activated (active, expired, revoked or removed), in total and since local midnight, per protocol. */
 export async function getSiteStats(): Promise<SiteStats> {
   return cached("stats", CACHE_MS, async () => {
     const settings = await getSiteSettings();
@@ -452,7 +452,7 @@ export async function getSiteStats(): Promise<SiteStats> {
           today: sql<number>`(count(*) filter (where ${vpnAccounts.createdAt} >= ${since.toISOString()}::timestamptz))::int`,
         })
         .from(vpnAccounts)
-        .where(inArray(vpnAccounts.status, ["active", "expired", "revoked"]))
+        .where(inArray(vpnAccounts.status, ["active", "expired", "revoked", "removed"]))
         .groupBy(vpnAccounts.protocolId),
     ]);
     const byId = new Map(counts.map((c) => [c.protocolId, c]));

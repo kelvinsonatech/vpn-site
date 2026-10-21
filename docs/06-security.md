@@ -26,7 +26,7 @@ The browser never reaches a VPN server; VPN servers never receive anything but p
 ### Public site and account creation
 Details: [09-public-site.md § Security notes](09-public-site.md#security-notes).
 * Public listings, the status page and the public API never carry server IPs, management API ports or credentials; the VPN hostname only when the admin enables it (Site settings → Public display).
-* Public POST endpoints (`/api/public/accounts`, `/api/public/reports`): same-origin check, JSON only, body size limits, strict zod schemas.
+* Public POST endpoints (`/api/public/accounts`, `/api/public/accounts/status`, `/api/public/reports`): same-origin check, JSON only, body size limits, strict zod schemas. The status lookup reads the database only and answers nothing but each account's status, so a stream of lookups never reaches the VPN servers.
 * Strict input validation from the protocol definition **plus** non-relaxable adapter guards (safe character sets, reserved usernames such as `root`).
 * Rate limits per client IP (burst + per protocol per day for accounts, per hour and day for reports), failing closed if Redis is down; Cloudflare Turnstile (`CAPTCHA_PROVIDER=turnstile`) verified server side and failing closed.
 * Idempotency keys; capacity and creation-quota reservation under row locks; maintenance/offline/full/quota enforced in the backend, not only the UI.

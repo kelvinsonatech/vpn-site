@@ -22,7 +22,7 @@ import offlineServersImage from "@/assets/offline-servers.webp";
 import maintenanceServersImage from "@/assets/maintenance-servers.webp";
 import calendarImage from "@/assets/domain-age-result.webp";
 
-const ACCOUNT_BADGE = { active: "success", pending: "info", expired: "muted", revoked: "warning", failed: "danger" } as const;
+const ACCOUNT_BADGE = { active: "success", pending: "info", expired: "muted", revoked: "warning", failed: "danger", removed: "danger" } as const;
 
 export const metadata = { title: "Dashboard" };
 

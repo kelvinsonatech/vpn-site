@@ -54,7 +54,7 @@ interface Draft {
   seoDescription: string;
   announcement: { enabled: boolean; text: string; tone: Tone; linkLabel: string; linkUrl: string };
   quota: { resetTimes: Row[]; timezone: string; defaultLimit: string };
-  health: { intervalSeconds: string; failureThreshold: string };
+  health: { intervalSeconds: string; failureThreshold: string; accountCheckMinutes: string };
   avatarStyle: AvatarStyle;
   contact: { email: string; telegramUrl: string };
   rules: Row[];
@@ -82,7 +82,11 @@ function toDraft(s: SiteSettings): Draft {
       timezone: s.quota.timezone,
       defaultLimit: s.quota.defaultLimit == null ? "" : String(s.quota.defaultLimit),
     },
-    health: { intervalSeconds: String(s.health.intervalSeconds), failureThreshold: String(s.health.failureThreshold) },
+    health: {
+      intervalSeconds: String(s.health.intervalSeconds),
+      failureThreshold: String(s.health.failureThreshold),
+      accountCheckMinutes: String(s.health.accountCheckMinutes),
+    },
     avatarStyle: s.avatarStyle,
     contact: { email: s.contact.email ?? "", telegramUrl: s.contact.telegramUrl ?? "" },
     rules: s.rules.map((value, i) => ({ id: `r${i}`, value })),
@@ -115,7 +119,11 @@ function toPayload(d: Draft) {
       timezone: d.quota.timezone,
       defaultLimit: d.quota.defaultLimit.trim() ? int(d.quota.defaultLimit) : null,
     },
-    health: { intervalSeconds: int(d.health.intervalSeconds), failureThreshold: int(d.health.failureThreshold) },
+    health: {
+      intervalSeconds: int(d.health.intervalSeconds),
+      failureThreshold: int(d.health.failureThreshold),
+      accountCheckMinutes: int(d.health.accountCheckMinutes),
+    },
     avatarStyle: d.avatarStyle,
     contact: { email: orNull(d.contact.email), telegramUrl: orNull(d.contact.telegramUrl) },
     rules: d.rules.map((r) => r.value),
@@ -466,6 +474,7 @@ export function SettingsForm({
   const nowMinutes = now === null ? null : minutesOfDay(now, draft.quota.timezone);
   const interval = Number(draft.health.intervalSeconds);
   const threshold = Number(draft.health.failureThreshold);
+  const accountCheck = draft.health.accountCheckMinutes.trim() === "" ? NaN : Number(draft.health.accountCheckMinutes);
   const sortedTimes = [...new Set(draft.quota.resetTimes.map((r) => r.value).filter((v) => /^\d{2}:\d{2}$/.test(v)))].sort();
 
   return (
@@ -880,7 +889,7 @@ export function SettingsForm({
           id="health"
           icon={GaugeIcon}
           title="Health monitor"
-          description="The background worker checks every published server and records its status and latency for the public status page."
+          description="The background worker checks every published server and records its status and latency for the public status page. It also asks each server whether its accounts still exist."
         >
           <div className="grid gap-4 sm:grid-cols-2">
             <FormField
@@ -930,6 +939,30 @@ export function SettingsForm({
               </span>
             </p>
           ) : null}
+          <FormField
+            id="health-account-check"
+            label="Account check"
+            errors={err("health.accountCheckMinutes")}
+            hint={
+              accountCheck === 0
+                ? "Off: accounts a server deletes itself stay Active here until they expire. 0 to 60 minutes."
+                : Number.isInteger(accountCheck) && accountCheck > 0 && accountCheck <= 60
+                  ? `Every active account is looked up on its server every ${accountCheck === 1 ? "minute" : `${accountCheck} minutes`}. An account the server deleted itself (for example its multi-login limiter) shows as Removed about a minute after that and its slot is freed. 0 turns it off · 0 to 60 minutes.`
+                  : "0 to 60 minutes; 0 turns it off."
+            }
+          >
+            <div className="flex items-center gap-2">
+              <Input
+                id="health-account-check"
+                inputMode="numeric"
+                value={draft.health.accountCheckMinutes}
+                className="w-28 tabular-nums"
+                onChange={(e) => patch((d) => ({ ...d, health: { ...d.health, accountCheckMinutes: e.target.value } }), ["health.accountCheckMinutes"])}
+                aria-invalid={!!err("health.accountCheckMinutes")}
+              />
+              <span className="text-sm text-muted-foreground">minutes</span>
+            </div>
+          </FormField>
         </Section>
 
         {/* Avatars ------------------------------------------------------------------- */}

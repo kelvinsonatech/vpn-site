@@ -27,6 +27,7 @@ export interface NodeDriver {
   getProtocols(): Promise<NodeProtocol[] | null>;
   getStats(): Promise<NodeStats | null>;
   createAccount(spec: AccountSpec, requestId: string): Promise<NodeAccount>;
+  /** null only when the node answers ACCOUNT_NOT_FOUND; anything else unexpected throws. */
   getAccount(accountId: string): Promise<NodeAccount | null>;
   /** Look up the result of a create request (used after an uncertain outcome). */
   findAccountByRequestId(requestId: string): Promise<NodeAccount | null>;

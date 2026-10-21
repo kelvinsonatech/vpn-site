@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import {
   ActivityIcon,
   ArrowRightIcon,
+  BanIcon,
   CalendarPlusIcon,
   EraserIcon,
   HistoryIcon,
@@ -25,17 +26,19 @@ import { Flag } from "@/components/public/flag";
 import { RelativeTime, useNow } from "@/components/public/live-time";
 import { EmptyState } from "@/components/public/section";
 import { cn } from "@/lib/utils";
-import type { SavedAccountSummary } from "@/lib/public/types";
+import type { SavedAccountServerStatus, SavedAccountSummary } from "@/lib/public/types";
 import { CopyAction } from "./copy-action";
 import { DetailRow } from "./detail-row";
 import { readSavedAccounts, removeSavedAccounts, restoreSavedAccounts, useSavedAccounts, clearSavedAccounts } from "./saved-accounts";
 import { ExpiryCountdown, LocalDateTime } from "./time";
+import { useSavedStatuses } from "./use-saved-statuses";
 
 /**
  * /my-accounts: the accounts created in this browser as DiceBear profile cards (non-secret
  * summaries from localStorage only). Active accounts first with a live expiry countdown and a
- * lifetime bar, expired ones below; "Details" shows the saved non-secret connection details.
- * Removing is instant with an "Undo" toast.
+ * lifetime bar, ended ones below; "Details" shows the saved non-secret connection details.
+ * Removing is instant with an "Undo" toast. The website is asked which accounts the server removed
+ * early (e.g. its multi-login limiter); those show as Removed.
  */
 
 /** Removes summaries and offers to put them back where they were. */
@@ -60,6 +63,13 @@ function displayName(a: SavedAccountSummary) {
   return a.username ?? `${a.protocol.name} account`;
 }
 
+/** The server removed this account before it expired: when, if known. */
+type Removal = { removedAt: string | null } | null;
+
+function removalOf(status: SavedAccountServerStatus | undefined): Removal {
+  return status?.status === "removed" ? { removedAt: status.removedAt } : null;
+}
+
 /** Share of the account's lifetime that is left (1 = just created, 0 = expired). */
 function lifeLeft(a: SavedAccountSummary, now: number) {
   const start = Date.parse(a.createdAt);
@@ -69,7 +79,7 @@ function lifeLeft(a: SavedAccountSummary, now: number) {
 }
 
 /** The saved non-secret details in the same "Label  value" format as the one-time result. */
-function DetailsDialog({ account: a, expired }: { account: SavedAccountSummary; expired: boolean }) {
+function DetailsDialog({ account: a, expired, removal }: { account: SavedAccountSummary; expired: boolean; removal: Removal }) {
   const details = a.details ?? [];
   if (!details.length) return null;
   const text = () =>
@@ -115,11 +125,16 @@ function DetailsDialog({ account: a, expired }: { account: SavedAccountSummary; 
               <LocalDateTime iso={a.createdAt} />
             </span>
           </DetailRow>
-          <DetailRow label={expired ? "Expired" : "Expires"}>
+          <DetailRow label={expired ? "Expired" : removal ? "Was due to expire" : "Expires"}>
             <span className="font-sans">
               <LocalDateTime iso={a.expiresAt} />
             </span>
           </DetailRow>
+          {removal ? (
+            <DetailRow label="Removed">
+              <span className="font-sans">{removal.removedAt ? <LocalDateTime iso={removal.removedAt} /> : "By the server, before its expiry date"}</span>
+            </DetailRow>
+          ) : null}
         </ul>
         <CopyAction value={text} label="Copy all details" variant="outline" size="lg" successMessage="Details copied" className="h-11 w-full rounded-xl">
           Copy all details
@@ -129,18 +144,20 @@ function DetailsDialog({ account: a, expired }: { account: SavedAccountSummary; 
   );
 }
 
-function ProfileCard({ account: a, now, onRemove }: { account: SavedAccountSummary; now: number; onRemove: () => void }) {
+function ProfileCard({ account: a, now, removal, onRemove }: { account: SavedAccountSummary; now: number; removal: Removal; onRemove: () => void }) {
   const expired = Date.parse(a.expiresAt) <= now;
-  const left = lifeLeft(a, now);
+  const removed = !expired && !!removal;
+  const ended = expired || removed;
+  const left = removed ? 0 : lifeLeft(a, now);
   const name = displayName(a);
-  const tone = expired ? "bg-muted-foreground/40" : left <= 0.15 ? "bg-warning" : "bg-primary";
+  const tone = ended ? "bg-muted-foreground/40" : left <= 0.15 ? "bg-warning" : "bg-primary";
 
   return (
     <article
-      aria-label={`${name}, ${a.protocol.name} on ${a.server.name}${expired ? ", expired" : ""}`}
+      aria-label={`${name}, ${a.protocol.name} on ${a.server.name}${expired ? ", expired" : removed ? ", removed by the server" : ""}`}
       className={cn(
         "group relative flex flex-col overflow-hidden rounded-2xl border bg-card shadow-xs transition-[transform,box-shadow,border-color] duration-300 animate-in fade-in-0 slide-in-from-bottom-1 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg hover:shadow-primary/5 motion-reduce:animate-none motion-reduce:transition-none motion-reduce:hover:translate-y-0",
-        expired && "bg-card/70",
+        ended && "bg-card/70",
       )}
     >
       {/* Profile cover */}
@@ -148,7 +165,7 @@ function ProfileCard({ account: a, now, onRemove }: { account: SavedAccountSumma
         aria-hidden
         className={cn(
           "h-16 bg-[radial-gradient(120%_120%_at_0%_0%,color-mix(in_oklch,var(--primary)_30%,transparent),transparent_60%),radial-gradient(120%_120%_at_100%_0%,color-mix(in_oklch,var(--info)_22%,transparent),transparent_60%)]",
-          expired && "opacity-40 grayscale",
+          ended && "opacity-40 grayscale",
         )}
       />
       <div className="-mt-9 flex items-end justify-between gap-3 px-5">
@@ -160,27 +177,34 @@ function ProfileCard({ account: a, now, onRemove }: { account: SavedAccountSumma
             width={68}
             height={68}
             draggable={false}
-            className={cn("size-17 rounded-2xl bg-[color-mix(in_oklch,var(--primary)_14%,white)] shadow-md ring-4 ring-card", expired && "opacity-60 grayscale")}
+            className={cn("size-17 rounded-2xl bg-[color-mix(in_oklch,var(--primary)_14%,white)] shadow-md ring-4 ring-card", ended && "opacity-60 grayscale")}
           />
           <span
             aria-hidden
-            className={cn("absolute -right-1 -bottom-1 size-4 rounded-full ring-4 ring-card", expired ? "bg-muted-foreground/50" : "bg-success")}
+            className={cn(
+              "absolute -right-1 -bottom-1 size-4 rounded-full ring-4 ring-card",
+              removed ? "bg-destructive" : expired ? "bg-muted-foreground/50" : "bg-success",
+            )}
           />
         </div>
         <span
           className={cn(
             "mb-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium",
-            expired ? "bg-muted text-muted-foreground" : "bg-success-soft text-success",
+            removed ? "bg-destructive/10 text-destructive" : expired ? "bg-muted text-muted-foreground" : "bg-success-soft text-success",
           )}
         >
-          <span className={cn("size-1.5 rounded-full", expired ? "bg-muted-foreground/60" : "bg-success")} aria-hidden />
-          {expired ? "Expired" : "Valid"}
+          {removed ? (
+            <BanIcon className="size-3" aria-hidden />
+          ) : (
+            <span className={cn("size-1.5 rounded-full", expired ? "bg-muted-foreground/60" : "bg-success")} aria-hidden />
+          )}
+          {removed ? "Removed" : expired ? "Expired" : "Valid"}
         </span>
       </div>
 
       <div className="px-5 pt-3">
         <div className="flex min-w-0 items-center gap-1">
-          <h3 className={cn("min-w-0 truncate font-mono text-lg font-semibold tracking-tight", expired && "text-muted-foreground")} title={name}>
+          <h3 className={cn("min-w-0 truncate font-mono text-lg font-semibold tracking-tight", ended && "text-muted-foreground")} title={name}>
             {name}
           </h3>
           {a.username ? <CopyAction value={a.username} label={`Copy username ${a.username}`} className="-my-1 size-10 shrink-0" /> : null}
@@ -209,19 +233,23 @@ function ProfileCard({ account: a, now, onRemove }: { account: SavedAccountSumma
         </div>
         <div className="bg-card px-5 py-3">
           <dt className="flex items-center gap-1.5 text-muted-foreground">
-            <TimerIcon className="size-3.5" aria-hidden />
-            {expired ? "Expired" : "Expires"}
+            {removed ? <BanIcon className="size-3.5" aria-hidden /> : <TimerIcon className="size-3.5" aria-hidden />}
+            {removed ? "Removed" : expired ? "Expired" : "Expires"}
           </dt>
           <dd className="mt-0.5 truncate font-medium">
-            <LocalDateTime iso={a.expiresAt} />
+            {removed ? removal?.removedAt ? <LocalDateTime iso={removal.removedAt} /> : "Before its expiry" : <LocalDateTime iso={a.expiresAt} />}
           </dd>
         </div>
       </dl>
 
       <div className="px-5 py-4">
         <div className="flex items-baseline justify-between gap-2 text-xs">
-          <span className="text-muted-foreground">{expired ? "This account has ended" : "Time left"}</span>
-          {expired ? (
+          <span className="text-muted-foreground">{removed ? "Removed by the server" : expired ? "This account has ended" : "Time left"}</span>
+          {removed ? (
+            removal?.removedAt ? (
+              <RelativeTime iso={removal.removedAt} className="text-muted-foreground" />
+            ) : null
+          ) : expired ? (
             <RelativeTime iso={a.expiresAt} className="text-muted-foreground" />
           ) : (
             <ExpiryCountdown iso={a.expiresAt} suffix="" className="font-semibold text-foreground" />
@@ -230,16 +258,21 @@ function ProfileCard({ account: a, now, onRemove }: { account: SavedAccountSumma
         <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden>
           <div className={cn("h-full rounded-full transition-[width] duration-1000 ease-linear motion-reduce:transition-none", tone)} style={{ width: `${left * 100}%` }} />
         </div>
+        {removed ? (
+          <p className="mt-2.5 text-xs text-pretty text-muted-foreground">
+            It stopped working before its expiry date, for example because it was used on more devices at once than the server allows.
+          </p>
+        ) : null}
       </div>
 
       <div className="mt-auto flex items-center justify-between gap-2 border-t bg-muted/30 px-3 py-2">
         <Button asChild variant="ghost" size="sm" className="h-10 text-primary hover:text-primary">
           <Link href={a.server.href}>
-            {expired ? <SparklesIcon aria-hidden /> : <PlusIcon aria-hidden />}
-            {expired ? "Create a new one" : "Create another"}
+            {ended ? <SparklesIcon aria-hidden /> : <PlusIcon aria-hidden />}
+            {ended ? "New account" : "Create another"}
           </Link>
         </Button>
-        <DetailsDialog account={a} expired={expired} />
+        <DetailsDialog account={a} expired={expired} removal={removed ? removal : null} />
         <Button
           type="button"
           variant="ghost"
@@ -250,7 +283,7 @@ function ProfileCard({ account: a, now, onRemove }: { account: SavedAccountSumma
           title="Remove from this device"
         >
           <Trash2Icon aria-hidden />
-          <span className="hidden sm:inline">Remove</span>
+          <span className="hidden sm:inline lg:hidden xl:inline">Remove</span>
         </Button>
       </div>
     </article>
@@ -320,6 +353,7 @@ export function MyAccountsList() {
   const accounts = useSavedAccounts();
   const now = useNow();
   const [announcement, setAnnouncement] = useState("");
+  const statuses = useSavedStatuses(accounts?.map((a) => a.id) ?? null);
 
   const live = (
     <p className="sr-only" aria-live="polite" role="status">
@@ -364,8 +398,12 @@ export function MyAccountsList() {
     );
   }
 
-  const active = accounts.filter((a) => Date.parse(a.expiresAt) > now);
-  const expired = accounts.filter((a) => Date.parse(a.expiresAt) <= now);
+  const removalFor = (a: SavedAccountSummary) => removalOf(statuses.get(a.id));
+  const active = accounts.filter((a) => Date.parse(a.expiresAt) > now && !removalFor(a));
+  const ended = accounts.filter((a) => Date.parse(a.expiresAt) <= now || removalFor(a));
+  const removedCount = ended.filter((a) => Date.parse(a.expiresAt) > now).length;
+  const expiredCount = ended.length - removedCount;
+  const endedWord = removedCount ? "ended" : "expired";
   const remove = (a: SavedAccountSummary) => removeWithUndo([a.id], `Removed ${displayName(a)} from this device.`, setAnnouncement);
 
   return (
@@ -380,8 +418,14 @@ export function MyAccountsList() {
           </span>
           <span className="inline-flex items-center gap-1.5 text-muted-foreground">
             <span className="size-2 rounded-full bg-muted-foreground/50" aria-hidden />
-            <span className="tabular-nums">{expired.length}</span> expired
+            <span className="tabular-nums">{expiredCount}</span> expired
           </span>
+          {removedCount ? (
+            <span className="inline-flex items-center gap-1.5 text-destructive">
+              <span className="size-2 rounded-full bg-destructive" aria-hidden />
+              <span className="tabular-nums">{removedCount}</span> removed
+            </span>
+          ) : null}
         </p>
         <div className="flex flex-wrap items-center gap-1">
           <Button asChild variant="outline" className="h-10">
@@ -419,14 +463,14 @@ export function MyAccountsList() {
           <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {active.map((a) => (
               <li key={a.id} className="grid">
-                <ProfileCard account={a} now={now} onRemove={() => remove(a)} />
+                <ProfileCard account={a} now={now} removal={removalFor(a)} onRemove={() => remove(a)} />
               </li>
             ))}
           </ul>
         </section>
       ) : (
         <div className="flex flex-col items-start gap-3 rounded-2xl border border-dashed bg-card/60 p-5 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-muted-foreground">All of your accounts have expired. Creating a new one takes a few seconds.</p>
+          <p className="text-sm text-muted-foreground">All of your accounts have {endedWord}. Creating a new one takes a few seconds.</p>
           <Button asChild className="h-10">
             <Link href="/#protocols">
               <SparklesIcon aria-hidden />
@@ -436,13 +480,13 @@ export function MyAccountsList() {
         </div>
       )}
 
-      {expired.length ? (
+      {ended.length ? (
         <section aria-labelledby="my-expired" className="grid gap-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 id="my-expired" className="flex items-center gap-2 text-lg font-semibold tracking-tight">
               <HistoryIcon className="size-4.5 text-muted-foreground" aria-hidden />
-              Expired
-              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground tabular-nums">{expired.length}</span>
+              {removedCount ? "Ended" : "Expired"}
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground tabular-nums">{ended.length}</span>
             </h2>
             <Button
               type="button"
@@ -451,20 +495,20 @@ export function MyAccountsList() {
               className="h-10 text-muted-foreground hover:text-destructive"
               onClick={() =>
                 removeWithUndo(
-                  expired.map((a) => a.id),
-                  `Removed ${expired.length === 1 ? "1 expired account" : `${expired.length} expired accounts`}.`,
+                  ended.map((a) => a.id),
+                  `Removed ${ended.length === 1 ? `1 ${endedWord} account` : `${ended.length} ${endedWord} accounts`}.`,
                   setAnnouncement,
                 )
               }
             >
               <Trash2Icon aria-hidden />
-              Remove expired
+              Remove {endedWord}
             </Button>
           </div>
           <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {expired.map((a) => (
+            {ended.map((a) => (
               <li key={a.id} className="grid">
-                <ProfileCard account={a} now={now} onRemove={() => remove(a)} />
+                <ProfileCard account={a} now={now} removal={removalFor(a)} onRemove={() => remove(a)} />
               </li>
             ))}
           </ul>
@@ -486,8 +530,8 @@ export function MyAccountsList() {
           <p className="flex items-start gap-2 text-pretty text-muted-foreground">
             <KeyRoundIcon className="mt-0.5 size-4 shrink-0 text-warning-strong" aria-hidden />
             Passwords, UUIDs, keys, links and config files are not saved in this list, and our encrypted copy is erased within an hour of
-            creation. If you lost them, create a new account. The status here comes from the expiry date only: an account can stop working
-            earlier if it is removed for breaking the rules.
+            creation. If you lost them, create a new account. An account the server removes before its expiry date, for example for being
+            used on too many devices at once, shows here as Removed.
           </p>
           <Link href="/report" className="inline-flex min-h-10 items-center gap-1.5 justify-self-start font-medium text-primary hover:underline">
             Account not working? Report a problem

@@ -43,7 +43,7 @@ describe("health monitor", () => {
 
   beforeAll(async () => {
     await resetDatabase();
-    await setSettings({ health: { intervalSeconds: 60, failureThreshold: 3 } });
+    await setSettings({ health: { intervalSeconds: 60, failureThreshold: 3, accountCheckMinutes: 5 } });
     node = await startNode({ protocols: ["ssh", "vless"], latencyMs: 40 });
     const s = await createServer(node.port, { name: "Health FR", countryCode: "FR" });
     await syncServer(s.id);

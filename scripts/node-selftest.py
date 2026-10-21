@@ -13,8 +13,11 @@ What it checks:
   2. GET /info, /health, /protocols have the fields the website expects.
   3. Unsafe usernames ("root", "a; reboot") are refused with VALIDATION_FAILED.
   4. Per protocol: create a 1-day test account, retry with the same request id (must return the same
-     account), reuse the request id with other details (must be refused), look it up by request id,
-     check the config keys the website reads, delete it, delete again (must be 404).
+     account), reuse the request id with other details (must be refused), look it up by request id
+     and by account id, check the config keys the website reads, delete it, delete again (must be
+     404), then look it up again: it must be reported gone (404 ACCOUNT_NOT_FOUND). The website's
+     account check relies on that answer to notice accounts the server deleted itself, e.g. with a
+     multi-login limiter.
   5. Expiry: expires_at is exactly 1 day after creation (not rounded to midnight), and for SSH-family
      Linux users the account expiry date (chage -l) is the day AFTER that, so Linux never cuts a
      user off early.
@@ -293,10 +296,26 @@ def account_test(c, protocol):
     for line in json.dumps(mask(cfg), indent=2, ensure_ascii=False).splitlines():
         print("      " + line)
 
+    one = "/accounts/" + quote(acc["account_id"], safe="")
+    g1 = c.call("GET", one)
+    ga = (data_of(g1) or {}).get("account") or {}
+    record(
+        "look up by account id finds it, active",
+        g1["status"] == 200 and ga.get("account_id") == acc["account_id"] and ga.get("status", "active") == "active",
+        f"HTTP {g1['status']} {err_code(g1) or ga.get('status') or ''}",
+    )
+
     d1 = c.call("DELETE", "/accounts/" + quote(acc["account_id"], safe=""), idem=str(uuid.uuid4()))
     record("delete account", d1["status"] == 200 and (data_of(d1) or {}).get("revoked") is True, f"HTTP {d1['status']} {err_code(d1) or ''}")
     d2 = c.call("DELETE", "/accounts/" + quote(acc["account_id"], safe=""), idem=str(uuid.uuid4()))
     record("second delete says not found", d2["status"] == 404, f"HTTP {d2['status']} {err_code(d2) or ''}")
+    g2 = c.call("GET", one)
+    g2a = (data_of(g2) or {}).get("account") or {}
+    record(
+        "deleted account is reported gone (404 ACCOUNT_NOT_FOUND)",
+        (g2["status"] == 404 and err_code(g2) == "ACCOUNT_NOT_FOUND") or (g2["status"] == 200 and g2a.get("status") == "revoked"),
+        f"HTTP {g2['status']} {err_code(g2) or g2a.get('status') or ''}",
+    )
 
 
 def main():

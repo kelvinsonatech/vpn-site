@@ -5,9 +5,10 @@
  *
  * Consumes two queues so slow VPN servers never block web requests:
  *  - `provisioning`: account creation, uncertain-outcome reconciliation, the one-minute sweeper;
- *  - `maintenance`: scheduled jobs — health monitor tick (30 s), account expiry (1 min) and
- *    retention of health history, resolved reports and the tools' DNS sightings (hourly). Every job
- *    re-reads the database, so duplicates are harmless.
+ *  - `maintenance`: scheduled jobs — health monitor tick (30 s), account expiry (1 min), the
+ *    account check that notices accounts a server deleted itself (1 min) and retention of health
+ *    history, resolved reports and the tools' DNS sightings (hourly). Every job re-reads the
+ *    database, so duplicates are harmless.
  */
 import { Worker } from "bullmq";
 import { closeDb } from "@/server/db";
@@ -26,6 +27,7 @@ import {
 } from "@/server/provisioning/queue";
 import { executeCreate, reconcile, sweep } from "@/server/provisioning/service";
 import { expireAccounts, processExpiredRevokes } from "@/server/provisioning/expiry";
+import { checkAccounts } from "@/server/provisioning/account-check";
 import { HEALTH_TICK_MS, purgeHealthHistory, runDueHealthChecks } from "@/server/servers/health";
 import { purgeExpiredSessions } from "@/server/auth/session";
 import { purgeResolvedReports } from "@/server/reports/service";
@@ -53,7 +55,7 @@ const worker = new Worker<ProvisioningJob>(
   { connection: queueConnection(), concurrency },
 );
 
-// Two slots: a long health tick (many slow servers) never delays expiry, and vice versa.
+// Three slots: a long health tick or account check (many slow servers) never delays expiry, and vice versa.
 const maintenance = new Worker<MaintenanceJob>(
   MAINTENANCE_QUEUE,
   async (job) => {
@@ -69,11 +71,16 @@ const maintenance = new Worker<MaintenanceJob>(
         if (expired.expired || revokes.removed || revokes.retrying || revokes.failed) logger.info("expiry", { ...expired, ...revokes });
         return { ...expired, ...revokes };
       }
+      case "accounts": {
+        const result = await checkAccounts();
+        if (result.missing || result.removed || result.held || result.failed) logger.info("account check", { ...result });
+        return result;
+      }
       case "purge":
         return { deleted: await purgeHealthHistory(), reportsDeleted: await purgeResolvedReports(), sightingsDeleted: await purgeDnsSightings() };
     }
   },
-  { connection: queueConnection(), concurrency: 2 },
+  { connection: queueConnection(), concurrency: 3 },
 );
 
 for (const w of [worker, maintenance]) {
@@ -84,6 +91,7 @@ for (const w of [worker, maintenance]) {
 await provisioningQueue().upsertJobScheduler("sweep-every-minute", { every: 60_000 }, { name: "sweep", data: { type: "sweep" } });
 await maintenanceQueue().upsertJobScheduler("health-tick", { every: HEALTH_TICK_MS }, { name: "health", data: { type: "health" } });
 await maintenanceQueue().upsertJobScheduler("expiry-every-minute", { every: 60_000 }, { name: "expiry", data: { type: "expiry" } });
+await maintenanceQueue().upsertJobScheduler("account-check-every-minute", { every: 60_000 }, { name: "accounts", data: { type: "accounts" } });
 await maintenanceQueue().upsertJobScheduler("purge-hourly", { every: 3_600_000 }, { name: "purge", data: { type: "purge" } });
 logger.info("worker started", { queues: [PROVISIONING_QUEUE, MAINTENANCE_QUEUE], concurrency });
 

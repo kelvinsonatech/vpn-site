@@ -291,10 +291,26 @@ async function main() {
       console.log(`    kept: account ${acc.account_id}`);
       continue;
     }
+    const one = `/accounts/${encodeURIComponent(acc.account_id)}`;
+    const found = await call("GET", one);
+    const foundEnv = dataOf(found, nodeAccountEnvelopeWire);
+    record(
+      "look up by account id finds it, active",
+      found.status === 200 && foundEnv.ok && foundEnv.data.account.account_id === acc.account_id && foundEnv.data.account.status === "active",
+      foundEnv.ok ? `HTTP ${found.status} ${foundEnv.data.account.status}` : `HTTP ${found.status} ${errorCode(found) ?? foundEnv.why}`,
+    );
     const del = await call("DELETE", `/accounts/${encodeURIComponent(acc.account_id)}`, { idempotencyKey: randomUUID() });
     record("delete account", del.status === 200, `HTTP ${del.status} ${errorCode(del) ?? ""}`.trim());
     const del2 = await call("DELETE", `/accounts/${encodeURIComponent(acc.account_id)}`, { idempotencyKey: randomUUID() });
     record("second delete says not found", del2.status === 404, `HTTP ${del2.status} ${errorCode(del2) ?? ""}`.trim());
+    // The website's account check relies on this answer to notice accounts the server deleted itself.
+    const gone = await call("GET", one);
+    const goneEnv = gone.status === 200 ? dataOf(gone, nodeAccountEnvelopeWire) : null;
+    record(
+      "deleted account is reported gone (404 ACCOUNT_NOT_FOUND)",
+      (gone.status === 404 && errorCode(gone) === "ACCOUNT_NOT_FOUND") || (!!goneEnv?.ok && goneEnv.data.account.status === "revoked"),
+      `HTTP ${gone.status} ${errorCode(gone) ?? (goneEnv?.ok ? goneEnv.data.account.status : "")}`.trim(),
+    );
   }
 }
 

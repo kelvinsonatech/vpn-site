@@ -206,6 +206,17 @@ then marks each account expired at its `expires_at` and sends `DELETE /api/v1/ac
 for it within about a minute (failures are retried with backoff for several hours). The delete must
 use the same live, no-restart method as above.
 
+### Accounts removed by the server itself (multi-login limiter and similar)
+
+If anything on the server deletes an account outside the API (a multi-login limiter, a cleanup
+script, a manual delete), `GET /api/v1/accounts/{account_id}` must answer `404` with the error code
+`ACCOUNT_NOT_FOUND` from then on (or return the account with `"status": "revoked"`). The website
+looks every active account up that way every few minutes and shows it as removed, frees its slot
+and logs it only on that answer. So the agent's lookup must check that the account really still
+exists (for SSH-family protocols: the Linux user; for Xray: the client entry), not only its own
+records, or the limiter must remove the agent's record too. Keep the lookup cheap: no service
+restarts and no slow commands.
+
 ## 3. Transport
 
 - Base URL: `https://<server-hostname>:<port>/api/v1`
@@ -427,7 +438,10 @@ whether the account was created before it retries.
 
 ### `GET /api/v1/accounts/{account_id}`
 
-Returns `{"account": {...}}` (`config` may be omitted), or 404.
+Returns `{"account": {...}}` (`config` may be omitted), or 404 `ACCOUNT_NOT_FOUND` when the account
+does not exist (any more). The website calls it every few minutes for each active account to notice
+accounts removed on the server itself, e.g. by a multi-login limiter (see "Accounts removed by the
+server itself" above), so it must reflect the real state and stay cheap.
 
 ### `DELETE /api/v1/accounts/{account_id}`
 
@@ -571,7 +585,10 @@ section 4, and check:
 5. Same `request_id`, different username → 409 `IDEMPOTENCY_CONFLICT`.
 6. `GET /accounts/by-request/<request_id>` → the account. An unknown id → 404.
 7. `DELETE /accounts/<account_id>` → `{"revoked": true}`; that user can no longer connect; a second
-   DELETE → 404.
+   DELETE → 404, and `GET /accounts/<account_id>` → 404 `ACCOUNT_NOT_FOUND` (or the account with
+   `"status": "revoked"`). The same must hold when the account is removed **outside** the API, for
+   example by a multi-login limiter: the website's account check asks `GET /accounts/<account_id>`
+   every few minutes and marks the account removed only on that answer.
 8. A username `root` or `a; reboot` → 422 `VALIDATION_FAILED`, and nothing was executed.
 9. **No-disconnect test (most important):**
    - Before the test, record every VPN service's start time:

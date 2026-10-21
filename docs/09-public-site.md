@@ -14,7 +14,7 @@ Code: pages in `src/app/(public)`, components in `src/components/public`, data i
 | `/<protocol>/<country>/<server>` | Account form (fields defined per protocol in Admin → Protocols) → progress → one-time result, in place. Side card: live status, ping, last check, slots and reset countdown, ports, validity options, the site's rules, other protocols, "Report a problem". When the server cannot take accounts, the form is replaced by the reason and other available servers in the same country | `getServerPage()` |
 | `/server-status` | Every published server per protocol (offline ones included): status, ping, last check, remaining slots, Create / Full action; filters (protocol, country, availability, text); auto-refresh every 30 s (paused while the tab is hidden), "Refresh now"; `?protocol=<slug>` preselects a protocol | `getStatusPage()`, then `GET /api/public/status` |
 | `/report` | "Report a problem" form; `?server=<id>&protocol=<slug>` preselects the server (linked from server pages) | `getStatusPage()` for the server list, `POST /api/public/reports` |
-| `/my-accounts` | Accounts created **in this browser** (non-secret summaries from `localStorage`): avatar, protocol, server, username, live expiry countdown; remove with undo | Browser only |
+| `/my-accounts` | Accounts created **in this browser** (non-secret summaries from `localStorage`): avatar, protocol, server, username, live expiry countdown; accounts the server removed early show as **Removed**; remove with undo | Browser only (status from `POST /api/public/accounts/status`) |
 | `/about`, `/contact`, `/privacy`, `/terms`, `/acceptable-use` | Static pages; contact options from the settings. The legal pages are template text marked **owner review required** (`src/app/(public)/_lib/legal.ts`) | Settings |
 | `/sitemap.xml`, `/robots.txt` | Every published protocol, country and server page; `/admin` and `/api/` are disallowed | `listSitemapEntries()` |
 
@@ -77,6 +77,7 @@ The query never selects the server's IP address, management API port or credenti
 | `GET /api/public/servers` | Same data, for other consumers | cached 30 s |
 | `POST /api/public/accounts` | Create an account → `202 {requestId, claimToken, state}` | same-origin JSON ≤ 16 KB, strict zod schema, captcha, rate limits; a locked duration → `422 VALIDATION_FAILED` with `fieldErrors.duration` naming the open ones |
 | `GET /api/public/accounts/<requestId>` | Poll with header `x-claim-token` → `pending` / `failed` / `active` | `no-store`, 120 polls/min per IP; unknown ids and wrong tokens get the same 404 |
+| `POST /api/public/accounts/status` | `{ids: [requestId…]}` (≤ 50, the ids My accounts keeps) → `{accounts: {<id>: {status: "active" \| "expired" \| "removed", removedAt?}}}` | same-origin JSON ≤ 4 KB, `no-store`, 30/min per IP; database only (never asks a server), status only (no username, server or credentials); unknown ids are left out. `removed` = removed by the server (account check) or revoked by an administrator |
 | `POST /api/public/reports` | Report a problem → `201 {id}` | same-origin JSON ≤ 8 KB, captcha, 3/hour and 10/day per IP |
 
 Errors always have the shape `{"error": {"code", "message", "fieldErrors"?, "retryAfterSeconds"?, "resetsAt"?}}` (`PublicApiError`).
@@ -120,6 +121,7 @@ The worker (`src/worker/index.ts`, `npm run worker`) runs two BullMQ queues so s
 | Sweeper: re-enqueue lost jobs, reconcile interrupted requests, erase expired one-time results, purge admin sessions | every minute | `sweep()` |
 | Health monitor | tick every 30 s | `src/server/servers/health.ts` |
 | Account expiry and node-side removal | every minute | `src/server/provisioning/expiry.ts` |
+| Account check (accounts a server deleted itself) | every minute | `src/server/provisioning/account-check.ts` |
 | Health history retention (7 days) | hourly | `purgeHealthHistory()` |
 
 ### Health monitor
@@ -134,6 +136,16 @@ Each check adds a `server_health` row (kept 7 days; Admin → server detail show
 ### Account expiry
 
 Every minute, active accounts whose `expires_at` has passed become `expired` (batches of 100, `FOR UPDATE SKIP LOCKED`, safe with several workers) and release their capacity slot. When the server does not remove expired accounts itself (`capabilities.expiry_managed_by_node` is not true; the owner's nodes report `false`), a `revoke` request is recorded in the same transaction and the job sends the predefined `DELETE /accounts/<id>` with that request's id as idempotency key. A 404 counts as already removed; other failures retry with backoff (1, 2, 4 … 60 minutes, up to 12 attempts); a failure is logged in Admin → Logs.
+
+### Account check
+
+A server can delete an account on its own before it expires, for example when its multi-login limiter catches the account on too many devices. The website only learns about that by asking, so every minute the worker looks up active accounts with the predefined `GET /accounts/<id>`, each one once per **Settings → Health monitor → Account check** interval (default 5 minutes; 0 turns it off). New accounts are first looked up one interval after activation.
+
+* **Missing** means the server answered `404` with the contract error code `ACCOUNT_NOT_FOUND`, or returned the account with `"status": "revoked"`. A bare 404 (wrong base path, a proxy page, an agent without that route), a timeout or any other error changes nothing.
+* The first miss only records `vpn_accounts.missing_since`. About a minute later the account is looked up again; still missing → status **`removed`** (`revoked_at` = when), its slot is released, and Admin → Logs gets an `account.removed` event. Found again → the miss is forgotten.
+* **Safety valves** against a lookup that wrongly says "not found": a server's misses count only after it has found at least one account (`servers.account_lookup_ok_at`), and when at least 5 accounts and at least half of a server's active accounts are missing at the same time, that looks like a broken lookup rather than a limiter. Either way nothing on that server is removed and Admin → Logs gets one warning per hour. Accounts the server really lost can be revoked in Admin → Accounts (a 404 on revoke counts as success).
+* **Load:** one short request per account per interval, at most one request in flight per server, at most 40 lookups per server and 200 in total per minute (a bigger fleet takes more than one interval to go round), servers marked offline are skipped, and the first connection failure stops that server's lookups for the run. Nothing secret is sent or logged.
+* A removed account is never sent a `DELETE` by the expiry job (it is no longer active), and My accounts shows it as **Removed** with the time.
 
 ## DiceBear avatars
 
@@ -177,7 +189,7 @@ With `turnstile`, the form renders the Cloudflare Turnstile widget and the serve
 | Public display | Show server hostnames; show account statistics in the footer |
 | Quotas & resets | Reset times (`HH:MM`, up to 24), time zone, default quota for new protocol rows (preview of the next reset) |
 | Account durations | Lock or unlock each duration the enabled protocols offer (one tile per duration). Locked ones stay on the create form with a padlock but cannot be chosen, the API refuses them, and "valid for" texts list only open ones. Saving is refused when an enabled protocol would have no open duration left. Migration `0005` locks 7, 14 and 30 days on an existing site |
-| Health monitor | Check interval, failures before offline |
+| Health monitor | Check interval, failures before offline, **account check** interval (minutes, default 5, 0 = off; see [Account check](#account-check)) |
 | Avatars | DiceBear style with previews and licence |
 | Contact | Support email, Telegram `https://t.me/…` link |
 | Account rules | Up to 10 short rules shown next to every account form |

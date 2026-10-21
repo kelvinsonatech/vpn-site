@@ -27,6 +27,7 @@ export type ProvisioningEvent =
   | "account.uncertain"
   | "account.revoked"
   | "account.expired"
+  | "account.removed"
   | "account.renewed";
 
 export interface LogEventInput {

@@ -42,7 +42,8 @@ export const serverStatus = pgEnum("server_status", ["pending", "online", "offli
 export const serverCompatibility = pgEnum("server_compatibility", ["unknown", "compatible", "outdated", "unsupported"]);
 export const nodeAuthMethod = pgEnum("node_auth_method", ["hmac_sha256", "bearer_token"]);
 export const nodeTlsMode = pgEnum("node_tls_mode", ["system_ca", "custom_ca", "pinned_fingerprint", "insecure_http"]);
-export const accountStatus = pgEnum("account_status", ["pending", "active", "expired", "revoked", "failed"]);
+/** `removed`: the VPN server deleted the account before it expired (e.g. its multi-login limiter). */
+export const accountStatus = pgEnum("account_status", ["pending", "active", "expired", "revoked", "failed", "removed"]);
 export const provisioningOperation = pgEnum("provisioning_operation", ["create", "renew", "revoke"]);
 export const provisioningState = pgEnum("provisioning_state", ["queued", "in_flight", "uncertain", "succeeded", "failed"]);
 export const logLevel = pgEnum("log_level", ["info", "warning", "error"]);
@@ -219,6 +220,11 @@ export const servers = pgTable(
     /** Safe, user-presentable description of the last failure. */
     lastError: text("last_error"),
     consecutiveFailures: integer("consecutive_failures").notNull().default(0),
+    /**
+     * Last time the account check found an account on this server. Until the server has confirmed one
+     * account exists, its "not found" answers are not trusted (a broken lookup could say that of all).
+     */
+    accountLookupOkAt: timestamp("account_lookup_ok_at", { withTimezone: true }),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     createdBy: uuid("created_by").references(() => admins.id, { onDelete: "set null" }),
     ...timestamps,
@@ -394,8 +400,13 @@ export const vpnAccounts = pgTable(
     durationDays: integer("duration_days").notNull(),
     activatedAt: timestamp("activated_at", { withTimezone: true }),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
+    /** When an administrator revoked it, or when it was found removed from the server (status `removed`). */
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
     revokedBy: uuid("revoked_by").references(() => admins.id, { onDelete: "set null" }),
+    /** Last time the account check asked the server whether this account still exists. */
+    checkedAt: timestamp("checked_at", { withTimezone: true }),
+    /** First check that found the account missing on the server; cleared when it is found again. */
+    missingSince: timestamp("missing_since", { withTimezone: true }),
     /** Safe (non-secret) connection metadata: host, ports, transport, SNI, path... */
     metadata: jsonb("metadata").$type<JsonObject>().notNull().default({}),
     failureCode: text("failure_code"),
