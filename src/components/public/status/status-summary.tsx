@@ -9,29 +9,10 @@ import maintenanceImage from "@/assets/maintenance-servers.webp";
 
 const nf = new Intl.NumberFormat("en-US");
 
-function Tile({
-  icon,
-  label,
-  value,
-  tone,
-  className,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-  tone: "primary" | "success" | "danger" | "warning" | "muted";
-  className?: string;
-}) {
-  const toneClass = {
-    primary: "bg-accent text-accent-foreground",
-    success: "bg-success-soft text-success",
-    danger: "bg-danger-soft text-destructive",
-    warning: "bg-warning-soft text-warning-strong",
-    muted: "bg-muted text-muted-foreground",
-  }[tone];
+function Tile({ icon, label, value, className }: { icon: React.ReactNode; label: string; value: number; className?: string }) {
   return (
     <div className={cn("flex items-center gap-3 rounded-2xl border bg-card p-4 shadow-xs", className)}>
-      <span className={cn("flex size-11 shrink-0 items-center justify-center rounded-xl [&_img]:size-7 [&_svg]:size-5", toneClass)} aria-hidden>
+      <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-muted [&_img]:size-7" aria-hidden>
         {icon}
       </span>
       <div className="min-w-0">
@@ -59,11 +40,11 @@ export function StatusSummary({ data, className }: { data: StatusPageData; class
   const paused = data.sections.reduce((n, s) => n + s.servers.filter((c) => c.availability === "maintenance" || c.availability === "full").length, 0);
   return (
     <div className={cn("grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5", className)}>
-      <Tile icon={<Picture image={servicesImage} />} label="Services" value={totals.protocols} tone="primary" className="col-span-2 sm:col-span-1" />
-      <Tile icon={<Picture image={serversImage} />} label="Servers" value={totals.servers} tone="muted" />
-      <Tile icon={<Picture image={onlineImage} />} label="Online" value={totals.online} tone="success" />
-      <Tile icon={<Picture image={offlineImage} />} label="Offline" value={totals.offline} tone="danger" />
-      <Tile icon={<Picture image={maintenanceImage} />} label="Maintenance / full" value={paused} tone="warning" />
+      <Tile icon={<Picture image={servicesImage} />} label="Services" value={totals.protocols} className="col-span-2 sm:col-span-1" />
+      <Tile icon={<Picture image={serversImage} />} label="Servers" value={totals.servers} />
+      <Tile icon={<Picture image={onlineImage} />} label="Online" value={totals.online} />
+      <Tile icon={<Picture image={offlineImage} />} label="Offline" value={totals.offline} />
+      <Tile icon={<Picture image={maintenanceImage} />} label="Maintenance / full" value={paused} />
     </div>
   );
 }
