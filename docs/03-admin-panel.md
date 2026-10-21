@@ -14,14 +14,14 @@ The admin panel lives under `/admin` (route group `src/app/admin/(panel)`). Ever
 | Server detail | `/admin/servers/:id` | `servers:view` | Status, hostname, IP, URL name, country/city, provider, script & API versions, CPU/RAM/disk/load/uptime, health sparkline and latency, recent checks, accounts current/max, protocols with quota usage this period, links to the public pages, last connection / sync / health check, notes, recent activity |
 | Edit server | `/admin/servers/:id/edit` | `servers:edit` | Details incl. URL name; connection & credential rotation (secret write-only) |
 | Server protocols | `/admin/servers/:id/protocols` | `servers:view` (edit to change) | Per-protocol switch, account cap and creation quota (used / limit this period, next reset) |
-| Protocols | `/admin/protocols` | `protocols:view` | Enabled toggle, identifiers, servers published/detected, active accounts, durations |
-| Protocol editor | `/admin/protocols/:id`, `/new` | `protocols:edit` | Display name, slug (not a reserved public path such as `report` or `server-status`), description, icon, category, adapter, enabled, order, node identifiers, duration options, per-IP limit, **input fields**, **output fields**, live form preview |
+| Protocols | `/admin/protocols` | `protocols:view` | Enabled toggle, identifiers, servers published/detected, active accounts, durations (locked ones with a padlock). Enabling a protocol whose every duration is locked is refused |
+| Protocol editor | `/admin/protocols/:id`, `/new` | `protocols:edit` | Display name, slug (not a reserved public path such as `report` or `server-status`), description, icon, category, adapter, enabled, order, node identifiers, duration options (locked ones marked, see Site settings), per-IP limit, **input fields**, **output fields**, live form preview. Saving an enabled protocol whose every duration is locked is refused |
 | Accounts | `/admin/accounts` | `accounts:view` (`accounts:manage` to revoke) | DiceBear avatar per account, status counts, filters (username, server, protocol, status, country, created from/to, expires before), non-secret details dialog, **Revoke** with confirmation. Renew/delete are not exposed |
 | Reports | `/admin/reports` | `reports:view` (`reports:manage` to change) | "Report a problem" submissions: Open / Resolved / All tabs with counts, category, server, protocol, message, reply email; resolve with a note or reopen. The open count is a badge in the navigation |
 | Logs | `/admin/logs` | `logs:view` (`audit:view` for the audit tab) | Provisioning & server events; administrator audit trail; filters |
 | Administrators | `/admin/admins` | `admins:manage` | Avatars; create, change role, set password, reset 2FA, deactivate |
 | My account | `/admin/account` | signed in | Avatar, 2FA enrolment (QR + recovery codes), password change, active sessions |
-| Site settings | `/admin/settings` | `settings:manage` | Brand texts, announcement bar, public display, quota reset times and default quota, health monitor, avatar style, contact, account rules (see [Public site](09-public-site.md#admin-settings-and-reports)) |
+| Site settings | `/admin/settings` | `settings:manage` | Brand texts, announcement bar, public display, quota reset times and default quota, locked account durations, health monitor, avatar style, contact, account rules (see [Public site](09-public-site.md#admin-settings-and-reports)) |
 
 ## Server actions and confirmations
 

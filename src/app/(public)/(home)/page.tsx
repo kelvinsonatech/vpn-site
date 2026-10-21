@@ -111,7 +111,11 @@ export default async function HomePage() {
     },
     {
       q: "How long does an account last?",
-      a: `Between ${validity}, depending on the protocol: you choose the validity on the server page. The account expires automatically afterwards and is removed from the server.`,
+      a: `${
+        new Set(allDays).size === 1
+          ? `Accounts last ${validity}.`
+          : `Between ${validity}, depending on the protocol: you choose the validity on the server page.`
+      } The account expires automatically afterwards and is removed from the server.`,
     },
     {
       q: "Why are my details shown only once?",

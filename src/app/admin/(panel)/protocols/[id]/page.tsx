@@ -8,6 +8,7 @@ import { getProtocolWithFields } from "@/server/protocols/service";
 import { saveProtocolAction } from "../actions";
 import { adapterInfos } from "../adapters";
 import { ProtocolEditor } from "../protocol-editor";
+import { getSiteSettings } from "@/server/settings/service";
 
 export const metadata = { title: "Edit protocol" };
 
@@ -36,6 +37,7 @@ export default async function EditProtocolPage({ params }: { params: Promise<{ i
         icons={PROTOCOL_ICON_NAMES}
         adapters={adapterInfos()}
         action={saveProtocolAction.bind(null, p.id)}
+        lockedDurations={(await getSiteSettings()).lockedDurations}
         initial={{
           name: p.name,
           slug: p.slug,

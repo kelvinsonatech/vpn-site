@@ -124,7 +124,7 @@ describe("public API route handlers", () => {
       expect(locked.status).toBe(422);
       const err = (await locked.json()) as PublicApiError;
       expect(err.error.code).toBe("VALIDATION_FAILED");
-      expect(err.error.fieldErrors?.duration?.[0]).toMatch(/7 days is locked/);
+      expect(err.error.fieldErrors?.duration?.[0]).toBe("7 days is locked right now. You can choose 3 days.");
 
       const open = await createAccount(post("/api/public/accounts", accountBody({ username: "api_open", transport: "ws", duration: "3" })));
       expect(open.status).toBe(202);

@@ -25,7 +25,8 @@ import { isNodeError, NodeError } from "@/server/nodes/errors";
 import { getProtocolWithFields } from "@/server/protocols/service";
 import { refreshServerStatus } from "@/server/servers/status";
 import { getSiteSettings } from "@/server/settings/service";
-import { effectiveDefaultDuration } from "@/lib/public/durations";
+import { effectiveDefaultDuration, openDurations } from "@/lib/public/durations";
+import { formatDays } from "@/components/public/format";
 import { AdapterResponseError } from "./adapters/base";
 import { getAdapter } from "./adapters/registry";
 import { releaseCapacity, reserveCapacity } from "./capacity";
@@ -160,7 +161,9 @@ export async function requestAccount(p: AccountRequestParams): Promise<AccountRe
       else {
         const days = `${input.durationDays} ${input.durationDays === 1 ? "day" : "days"}`;
         const message =
-          open === undefined ? "No account duration is available right now. Please try again later." : `${days} is locked right now. Choose an open duration.`;
+          open === undefined
+            ? "No account duration is available right now. Please try again later."
+            : `${days} is locked right now. You can choose ${formatDays(openDurations(def.durationOptions, lockedDurations))}.`;
         throw new ProvisioningError("VALIDATION_FAILED", "Please correct the highlighted fields.", 422, { [durationKey ?? "_form"]: [message] });
       }
     }

@@ -86,6 +86,13 @@ export function CreateAccountPanel({
   const { state } = creation;
 
   const keys = useMemo(() => protocol.fields.map((f) => f.key), [protocol.fields]);
+  // The server refusing the duration means it was locked after this page loaded: reload the page data
+  // so the padlocks show (the typed values stay).
+  const durationKey = protocol.fields.find((f) => f.type === "duration")?.key;
+  const durationRefused = !!durationKey && !!creation.fieldErrors?.[durationKey]?.length;
+  useEffect(() => {
+    if (durationRefused) router.refresh();
+  }, [durationRefused, router]);
   const clientErrors = validateAll(protocol.fields, values, protocol);
   const server422 = normalizeFieldErrors(creation.fieldErrors, keys);
   const errors: Record<string, string | undefined> = {};

@@ -121,7 +121,7 @@ function Segmented({
   // Up to four choices share one row even on 360 px phones; longer lists wrap.
   const columns = options.length <= 4 ? `repeat(${options.length}, minmax(0, 1fr))` : undefined;
   return (
-    <div className="grid gap-2">
+    <div className="grid">
       <div
         className={cn(
           "grid grid-cols-[repeat(auto-fit,minmax(5rem,1fr))] gap-1 rounded-xl border bg-muted/60 p-1",
@@ -141,7 +141,8 @@ function Segmented({
               <span
                 key={nudge?.value === o.value ? nudge.n : 0}
                 className={cn(
-                  "flex min-h-10 cursor-not-allowed items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-center text-[13px] font-medium whitespace-nowrap text-muted-foreground/75 sm:gap-1.5 sm:px-2 sm:text-sm",
+                  // Phones stack the padlock above the label so four options still fit one row at 320 px.
+                  "flex h-full min-h-10 cursor-not-allowed flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1.5 text-center text-[13px] font-medium whitespace-nowrap text-muted-foreground/75 sm:flex-row sm:gap-1.5 sm:px-2 sm:text-sm",
                   "bg-[repeating-linear-gradient(135deg,transparent_0_7px,color-mix(in_oklch,var(--foreground)_5%,transparent)_7px_9px)] ring-1 ring-border/60 ring-inset",
                   nudge?.value === o.value && "motion-safe:animate-lock-shake",
                 )}
@@ -168,7 +169,7 @@ function Segmented({
                 disabled={disabled}
                 className="peer sr-only"
               />
-              <span className="flex min-h-10 cursor-pointer flex-col items-center justify-center rounded-lg px-1 py-1.5 text-center text-[13px] font-medium whitespace-nowrap sm:px-2 sm:text-sm text-muted-foreground transition-[background-color,color,box-shadow] peer-checked:bg-card peer-checked:text-foreground peer-checked:shadow-sm peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/50 hover:text-foreground motion-reduce:transition-none">
+              <span className="flex h-full min-h-10 cursor-pointer flex-col items-center justify-center rounded-lg px-1 py-1.5 text-center text-[13px] font-medium whitespace-nowrap sm:px-2 sm:text-sm text-muted-foreground transition-[background-color,color,box-shadow] peer-checked:bg-card peer-checked:text-foreground peer-checked:shadow-sm peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/50 hover:text-foreground motion-reduce:transition-none">
                 <span className="tabular-nums">{o.label}</span>
                 {o.hint ? <span className="text-[11px] font-normal text-muted-foreground">{o.hint}</span> : null}
               </span>
@@ -176,11 +177,12 @@ function Segmented({
           ),
         )}
       </div>
-      <p aria-live="polite" className="empty:hidden">
+      {/* Always rendered, so screen readers announce the first note too. */}
+      <p aria-live="polite">
         {nudge && lockedNote ? (
           <span
             key={nudge.n}
-            className="flex animate-in items-start gap-1.5 rounded-lg bg-warning-soft px-2.5 py-1.5 text-xs font-medium text-warning-strong duration-300 fade-in slide-in-from-top-1"
+            className="mt-2 flex animate-in items-start gap-1.5 rounded-lg bg-warning-soft px-2.5 py-1.5 text-xs font-medium text-warning-strong duration-300 fade-in slide-in-from-top-1"
           >
             <LockKeyholeIcon aria-hidden className="mt-px size-3.5 shrink-0" />
             {lockedNote(nudge.label)}

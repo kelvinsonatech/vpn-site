@@ -71,11 +71,11 @@ The query never selects the server's IP address, management API port or credenti
 
 | Endpoint | Purpose | Notes |
 | --- | --- | --- |
-| `GET /api/public/protocols` | Protocol summaries | cached 30 s |
+| `GET /api/public/protocols` | Protocol summaries (`durationOptions`, `lockedDurations`, and `defaultDurationDays` = the default, or the shortest open duration when the default is locked) | cached 30 s |
 | `GET /api/public/protocols/<slug>` | Form definition + countries | cached 30 s, 404 for unknown slugs |
 | `GET /api/public/status` | `StatusPageData` for the status page | cached 5 s |
 | `GET /api/public/servers` | Same data, for other consumers | cached 30 s |
-| `POST /api/public/accounts` | Create an account → `202 {requestId, claimToken, state}` | same-origin JSON ≤ 16 KB, strict zod schema, captcha, rate limits |
+| `POST /api/public/accounts` | Create an account → `202 {requestId, claimToken, state}` | same-origin JSON ≤ 16 KB, strict zod schema, captcha, rate limits; a locked duration → `422 VALIDATION_FAILED` with `fieldErrors.duration` naming the open ones |
 | `GET /api/public/accounts/<requestId>` | Poll with header `x-claim-token` → `pending` / `failed` / `active` | `no-store`, 120 polls/min per IP; unknown ids and wrong tokens get the same 404 |
 | `POST /api/public/reports` | Report a problem → `201 {id}` | same-origin JSON ≤ 8 KB, captcha, 3/hour and 10/day per IP |
 
@@ -176,6 +176,7 @@ With `turnstile`, the form renders the Cloudflare Turnstile widget and the serve
 | Announcement bar | On/off, text, tone (info/success/warning), optional link (site path or `https://` URL only) |
 | Public display | Show server hostnames; show account statistics in the footer |
 | Quotas & resets | Reset times (`HH:MM`, up to 24), time zone, default quota for new protocol rows (preview of the next reset) |
+| Account durations | Lock or unlock each duration the enabled protocols offer (one tile per duration). Locked ones stay on the create form with a padlock but cannot be chosen, the API refuses them, and "valid for" texts list only open ones. Saving is refused when an enabled protocol would have no open duration left. Migration `0005` locks 7, 14 and 30 days on an existing site |
 | Health monitor | Check interval, failures before offline |
 | Avatars | DiceBear style with previews and licence |
 | Contact | Support email, Telegram `https://t.me/…` link |

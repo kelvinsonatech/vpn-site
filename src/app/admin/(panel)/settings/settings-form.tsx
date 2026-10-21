@@ -264,16 +264,31 @@ export interface DurationUsage {
 }
 
 /** One tile per duration: select it to lock or unlock it. Locked tiles get amber stripes and a closed padlock. */
-function DurationLocks({ usage, locked, onToggle, error }: { usage: DurationUsage[]; locked: number[]; onToggle: (days: number) => void; error?: string[] }) {
+function DurationLocks({
+  usage,
+  locked,
+  savedLocked,
+  onToggle,
+  error,
+}: {
+  usage: DurationUsage[];
+  locked: number[];
+  /** Locks as last saved: their tiles stay until the next save, so unlocking one can be undone. */
+  savedLocked: number[];
+  onToggle: (days: number) => void;
+  error?: string[];
+}) {
   // Locked values no enabled protocol offers any more stay listed, so they can still be unlocked.
-  const all = [...usage, ...locked.filter((d) => !usage.some((u) => u.days === d)).map((days) => ({ days, protocols: [] }))].sort((a, b) => a.days - b.days);
-  const open = all.filter((u) => !locked.includes(u.days)).map((u) => u.days);
+  const orphans = [...new Set([...savedLocked, ...locked])].filter((d) => !usage.some((u) => u.days === d));
+  const all = [...usage, ...orphans.map((days) => ({ days, protocols: [] }))].sort((a, b) => a.days - b.days);
+  const open = usage.filter((u) => !locked.includes(u.days)).map((u) => u.days);
+  const lockedOffered = usage.filter((u) => locked.includes(u.days)).map((u) => u.days);
   if (!all.length) return <p className="text-sm text-muted-foreground">No enabled protocol offers a duration yet.</p>;
   return (
     <div className="grid gap-3">
       <div
         role="group"
-        aria-label="Account durations"
+        aria-label="Locked durations"
         aria-describedby={error ? "durations-error" : undefined}
         data-invalid={error ? true : undefined}
         className="grid grid-cols-2 gap-3 sm:grid-cols-4"
@@ -281,12 +296,13 @@ function DurationLocks({ usage, locked, onToggle, error }: { usage: DurationUsag
         {all.map((u) => {
           const isLocked = locked.includes(u.days);
           const unit = u.days === 1 ? "day" : "days";
+          // One fixed name per tile ("7 days"); aria-pressed says whether it is locked.
           return (
             <button
               key={u.days}
               type="button"
               aria-pressed={isLocked}
-              aria-label={`${u.days} ${unit}: ${isLocked ? "locked. Select to unlock" : "open. Select to lock"}`}
+              aria-describedby={`duration-${u.days}-protocols`}
               onClick={() => onToggle(u.days)}
               className={cn(
                 "group flex flex-col items-start gap-3 rounded-xl border p-4 text-left outline-none transition-[border-color,background-color,box-shadow] duration-300 focus-visible:ring-[3px] focus-visible:ring-ring/50 motion-reduce:transition-none",
@@ -307,6 +323,7 @@ function DurationLocks({ usage, locked, onToggle, error }: { usage: DurationUsag
                   {isLocked ? <LockKeyholeIcon aria-hidden className="size-4.5" /> : <LockKeyholeOpenIcon aria-hidden className="size-4.5" />}
                 </span>
                 <span
+                  aria-hidden
                   className={cn(
                     "rounded-full px-2 py-0.5 text-[11px] font-semibold tracking-wide uppercase",
                     isLocked ? "bg-warning/15 text-warning-strong" : "bg-success-soft text-success",
@@ -317,10 +334,9 @@ function DurationLocks({ usage, locked, onToggle, error }: { usage: DurationUsag
               </span>
               <span className="grid gap-1">
                 <span className="text-2xl leading-none font-bold tabular-nums">
-                  {u.days}
-                  <span className="ml-1 text-sm font-medium text-muted-foreground">{unit}</span>
+                  {u.days} <span className="text-sm font-medium text-muted-foreground">{unit}</span>
                 </span>
-                <span className="line-clamp-2 text-xs text-muted-foreground">
+                <span id={`duration-${u.days}-protocols`} aria-hidden className="line-clamp-2 text-xs text-muted-foreground">
                   {u.protocols.length ? u.protocols.join(", ") : "No enabled protocol offers it"}
                 </span>
               </span>
@@ -331,9 +347,9 @@ function DurationLocks({ usage, locked, onToggle, error }: { usage: DurationUsag
       <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground" aria-live="polite">
         <LockKeyholeOpenIcon aria-hidden className="size-3.5 text-success" />
         Visitors can choose <span className="font-medium text-foreground">{open.length ? formatDays(open) : "nothing"}</span>
-        {locked.length ? (
+        {lockedOffered.length ? (
           <>
-            · locked: <span className="font-medium text-foreground">{formatDays(locked)}</span>
+            · locked: <span className="font-medium text-foreground">{formatDays(lockedOffered)}</span>
           </>
         ) : null}
       </p>
@@ -843,6 +859,7 @@ export function SettingsForm({
           <DurationLocks
             usage={durations}
             locked={draft.lockedDurations}
+            savedLocked={saved.lockedDurations}
             error={err("lockedDurations")}
             onToggle={(days) =>
               patch(

@@ -61,7 +61,6 @@ export async function listProtocolsForAdmin() {
     .orderBy(asc(protocols.displayOrder), asc(protocols.name));
 }
 
-/** Checks that cut across fields: adapter requirements and identifier collisions. */
 /** An enabled protocol needs at least one duration that is not locked (Admin → Settings → Durations). */
 async function assertOpenDuration(name: string, durationOptions: number[]) {
   const { lockedDurations } = await getSiteSettings();
@@ -98,6 +97,7 @@ export async function durationUsage(): Promise<{ days: number; protocols: string
   return [...byDays].map(([days, names]) => ({ days, protocols: names })).sort((a, b) => a.days - b.days);
 }
 
+/** Checks that cut across fields: an open duration when enabled, adapter requirements and identifier collisions. */
 async function validateSemantics(input: ProtocolInput, exceptId?: string) {
   const adapter = getAdapter(input.adapterKey);
   if (input.enabled) await assertOpenDuration(input.name, input.durationOptions);

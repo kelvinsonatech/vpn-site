@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ExternalLinkIcon, PlusIcon } from "lucide-react";
+import { ExternalLinkIcon, LockKeyholeIcon, PlusIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { requirePermission } from "@/server/auth/guards";
 import { can } from "@/server/auth/rbac";
 import { listProtocolsForAdmin } from "@/server/protocols/service";
 import { ProtocolToggle } from "./protocol-toggle";
+import { getSiteSettings } from "@/server/settings/service";
 
 export const metadata = { title: "Protocols" };
 
@@ -17,7 +18,7 @@ const CATEGORY_LABEL: Record<string, string> = { ssh: "SSH", v2ray: "V2Ray / Xra
 
 export default async function ProtocolsPage() {
   const { admin } = await requirePermission("protocols:view");
-  const rows = await listProtocolsForAdmin();
+  const [rows, { lockedDurations }] = await Promise.all([listProtocolsForAdmin(), getSiteSettings()]);
   const edit = can(admin.role, "protocols:edit");
   return (
     <>
@@ -85,7 +86,16 @@ export default async function ProtocolsPage() {
                   <span className="text-muted-foreground"> / {serversDetected}</span>
                 </TableCell>
                 <TableCell className="text-right text-sm tabular-nums">{activeAccounts}</TableCell>
-                <TableCell className="hidden text-sm text-muted-foreground sm:table-cell">{p.durationOptions.join(", ")} days</TableCell>
+                <TableCell className="hidden text-sm text-muted-foreground sm:table-cell">
+                  {p.durationOptions.map((d, i) => (
+                    <span key={d} className={lockedDurations.includes(d) ? "text-muted-foreground/60" : "text-foreground"}>
+                      {i ? ", " : null}
+                      {lockedDurations.includes(d) ? <LockKeyholeIcon aria-label="locked" className="mr-0.5 inline size-3 align-[-1px]" /> : null}
+                      {d}
+                    </span>
+                  ))}{" "}
+                  days
+                </TableCell>
                 <TableCell className="text-right">
                   <ProtocolToggle id={p.id} name={p.name} enabled={p.enabled} disabled={!edit} />
                 </TableCell>

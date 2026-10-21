@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { ArrowDownIcon, ArrowUpIcon, LoaderCircleIcon, PlusIcon, RotateCcwIcon, SaveIcon, Trash2Icon } from "lucide-react";
+import Link from "next/link";
+import { ArrowDownIcon, ArrowUpIcon, LoaderCircleIcon, LockKeyholeIcon, PlusIcon, RotateCcwIcon, SaveIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { FormField } from "@/components/admin/form-field";
 import { ProtocolIcon } from "@/components/protocol-icon";
 import type { ActionState } from "@/lib/action-state";
+import { effectiveDefaultDuration } from "@/lib/public/durations";
+import { formatDays } from "@/components/public/format";
 import type { FieldOption, FieldValidation, OutputFieldDefinition, ProtocolFieldType } from "@/server/db/schema";
 
 export interface EditorField {
@@ -182,17 +185,20 @@ function FieldEditor({
   );
 }
 
-function FormPreview({ value }: { value: ProtocolEditorValue }) {
+function FormPreview({ value, lockedDurations }: { value: ProtocolEditorValue; lockedDurations: number[] }) {
   return (
     <div className="grid gap-3">
       {value.fields.map((f) => (
         <div key={f.key} className="grid gap-1.5">
           <Label>{f.label || f.key}</Label>
           {f.type === "duration" ? (
-            <NativeSelect disabled defaultValue={value.defaultDurationDays}>
+            <NativeSelect
+              disabled
+              value={effectiveDefaultDuration(value.durationOptions, value.defaultDurationDays, lockedDurations) ?? value.defaultDurationDays}
+            >
               {value.durationOptions.map((d) => (
                 <option key={d} value={d}>
-                  {d} days
+                  {d} days{lockedDurations.includes(d) ? " (locked)" : ""}
                 </option>
               ))}
             </NativeSelect>
@@ -223,6 +229,7 @@ export function ProtocolEditor({
   icons,
   canEdit,
   action,
+  lockedDurations,
 }: {
   mode: "edit" | "create";
   initial: ProtocolEditorValue;
@@ -231,6 +238,8 @@ export function ProtocolEditor({
   icons: readonly string[];
   canEdit: boolean;
   action: (json: string) => Promise<ActionState>;
+  /** Admin → Settings → Durations: shown with a padlock here, never chosen by visitors. */
+  lockedDurations: number[];
 }) {
   const [v, setV] = useState<ProtocolEditorValue>(initial);
   const [identifiers, setIdentifiers] = useState(initial.nodeIdentifiers.join(", "));
@@ -248,6 +257,8 @@ export function ProtocolEditor({
     .split(/[,\s]+/)
     .map((d) => Number(d))
     .filter((d) => Number.isInteger(d) && d > 0);
+  const lockedHere = parsedDurations.filter((d) => lockedDurations.includes(d));
+  const startsOn = effectiveDefaultDuration(parsedDurations, v.defaultDurationDays, lockedDurations);
 
   const submit = () => {
     const payload: ProtocolEditorValue = {
@@ -356,7 +367,7 @@ export function ProtocolEditor({
               <NativeSelect id="defaultDuration" value={v.defaultDurationDays} onChange={(e) => set("defaultDurationDays", Number(e.target.value))} disabled={disabled}>
                 {parsedDurations.map((d) => (
                   <option key={d} value={d}>
-                    {d} days
+                    {d} days{lockedDurations.includes(d) ? " (locked)" : ""}
                   </option>
                 ))}
               </NativeSelect>
@@ -364,6 +375,19 @@ export function ProtocolEditor({
             <FormField id="perIp" label="Accounts per IP per day" errors={err("maxAccountsPerIpPerDay")}>
               <Input id="perIp" type="number" min={1} value={v.maxAccountsPerIpPerDay} onChange={(e) => set("maxAccountsPerIpPerDay", Number(e.target.value))} disabled={disabled} />
             </FormField>
+            {lockedHere.length ? (
+              <p className="flex items-start gap-1.5 rounded-lg bg-warning-soft px-3 py-2 text-xs text-warning-strong sm:col-span-3">
+                <LockKeyholeIcon aria-hidden className="mt-px size-3.5 shrink-0" />
+                <span>
+                  {formatDays(lockedHere)} {lockedHere.length === 1 ? "is" : "are"} locked in{" "}
+                  <Link href="/admin/settings#durations" className="font-medium underline underline-offset-2">
+                    Settings → Durations
+                  </Link>
+                  : visitors see {lockedHere.length === 1 ? "it" : "them"} with a padlock but cannot choose {lockedHere.length === 1 ? "it" : "them"}.
+                  {startsOn !== undefined && startsOn !== v.defaultDurationDays ? ` The form starts on ${formatDays([startsOn])}.` : null}
+                </span>
+              </p>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -514,7 +538,7 @@ export function ProtocolEditor({
             <CardDescription>Rendered from the definition, as users will see it.</CardDescription>
           </CardHeader>
           <CardContent>
-            <FormPreview value={{ ...v, durationOptions: parsedDurations }} />
+            <FormPreview value={{ ...v, durationOptions: parsedDurations }} lockedDurations={lockedDurations} />
           </CardContent>
         </Card>
         {canEdit ? (

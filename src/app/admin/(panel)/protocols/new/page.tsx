@@ -4,6 +4,7 @@ import { requirePermission } from "@/server/auth/guards";
 import { createProtocolAction } from "../actions";
 import { adapterInfos } from "../adapters";
 import { ProtocolEditor } from "../protocol-editor";
+import { getSiteSettings } from "@/server/settings/service";
 
 export const metadata = { title: "New protocol" };
 
@@ -25,6 +26,7 @@ export default async function NewProtocolPage() {
         icons={PROTOCOL_ICON_NAMES}
         adapters={adapters}
         action={createProtocolAction}
+        lockedDurations={(await getSiteSettings()).lockedDurations}
         initial={{
           name: "",
           slug: "",
