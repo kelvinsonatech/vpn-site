@@ -65,6 +65,12 @@ const PER_SERVER_LIMIT = 40;
 const TIME_BUDGET_MS = 40_000;
 /** Servers checked in parallel; the accounts of one server are looked up one at a time. */
 const SERVER_CONCURRENCY = 6;
+/**
+ * Runs are a minute apart give or take a little, so an account counts as due this much before its
+ * interval is up: otherwise one checked by a run that started a moment late misses the run an
+ * interval later and waits a whole extra minute.
+ */
+const DUE_SLACK_MS = 15_000;
 /** Removals of a protocol are held back when at least this many of its accounts are missing… */
 const SUSPECT_MIN = 3;
 /** …and they are at least this share of the accounts answered. */
@@ -126,7 +132,7 @@ export async function checkAccounts(opts: { now?: Date; limit?: number; timeBudg
   }
   const now = opts.now ?? new Date();
   const nowIso = now.toISOString();
-  const dueBefore = new Date(now.getTime() - minutes * 60_000).toISOString();
+  const dueBefore = new Date(now.getTime() - minutes * 60_000 + DUE_SLACK_MS).toISOString();
   const paused = await pausedServers(now);
 
   // Oldest check first (an account never checked counts from its activation, so new accounts are not
