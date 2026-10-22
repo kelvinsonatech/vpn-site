@@ -14,6 +14,7 @@ const NUMBER_MESSAGES: Record<string, string> = {
   "quota.defaultLimit": "Use a whole number from 1 to 100 000, or leave blank for no quota",
   "health.intervalSeconds": "Use a whole number of seconds from 30 to 3600",
   "health.failureThreshold": "Use a whole number from 1 to 10",
+  "health.accountCheckMinutes": "Use a whole number of minutes from 0 to 60 (0 turns the check off)",
 };
 
 /** Cross-field rules the stored schema does not enforce but an editor should. */

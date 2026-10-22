@@ -220,11 +220,6 @@ export const servers = pgTable(
     /** Safe, user-presentable description of the last failure. */
     lastError: text("last_error"),
     consecutiveFailures: integer("consecutive_failures").notNull().default(0),
-    /**
-     * Last time the account check found an account on this server. Until the server has confirmed one
-     * account exists, its "not found" answers are not trusted (a broken lookup could say that of all).
-     */
-    accountLookupOkAt: timestamp("account_lookup_ok_at", { withTimezone: true }),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     createdBy: uuid("created_by").references(() => admins.id, { onDelete: "set null" }),
     ...timestamps,
@@ -367,6 +362,12 @@ export const serverProtocols = pgTable(
     metadata: jsonb("metadata").$type<JsonObject>().notNull().default({}),
     firstDetectedAt: timestamp("first_detected_at", { withTimezone: true }),
     lastDetectedAt: timestamp("last_detected_at", { withTimezone: true }),
+    /**
+     * Last time the account check found an account of this protocol on this server. Until then its
+     * "not found" answers are not trusted (a broken lookup could say that of every account). Cleared
+     * when the server's connection or credentials change.
+     */
+    accountLookupOkAt: timestamp("account_lookup_ok_at", { withTimezone: true }),
     ...timestamps,
   },
   (t) => [

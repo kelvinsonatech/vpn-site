@@ -48,6 +48,7 @@ function isSummary(x: unknown): x is SavedAccountSummary {
     o.avatar.startsWith("data:image/svg+xml") &&
     isDate(o.createdAt) &&
     isDate(o.expiresAt) &&
+    (o.removedAt === undefined || isDate(o.removedAt)) &&
     (o.details === undefined || isDetails(o.details))
   );
 }
@@ -62,6 +63,7 @@ function pick(s: SavedAccountSummary): SavedAccountSummary {
     avatar: s.avatar,
     createdAt: s.createdAt,
     expiresAt: s.expiresAt,
+    ...(s.removedAt ? { removedAt: s.removedAt } : {}),
     ...(s.details?.length ? { details: s.details.map((d) => ({ label: d.label, value: d.value })) } : {}),
   };
 }
@@ -127,6 +129,18 @@ export function restoreSavedAccounts(entries: { summary: SavedAccountSummary; in
 
 export function clearSavedAccounts() {
   write([]);
+}
+
+/** Records that the server removed these accounts (id → when). Writes only when something changes. */
+export function markSavedAccountsRemoved(removals: ReadonlyMap<string, string>) {
+  let changed = false;
+  const items = readSavedAccounts().map((s) => {
+    const at = removals.get(s.id);
+    if (!at || s.removedAt || !isDate(at)) return s;
+    changed = true;
+    return { ...s, removedAt: at };
+  });
+  if (changed) write(items);
 }
 
 // --- React binding -----------------------------------------------------------------------------

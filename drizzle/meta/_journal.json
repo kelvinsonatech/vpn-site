@@ -50,6 +50,13 @@
       "when": 1792625333165,
       "tag": "0006_account_check",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792628364085,
+      "tag": "0007_account_check_per_protocol",
+      "breakpoints": true
     }
   ]
 }

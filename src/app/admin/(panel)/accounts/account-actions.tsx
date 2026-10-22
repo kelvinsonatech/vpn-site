@@ -37,6 +37,8 @@ export interface AccountView {
   expiresAt: string | null;
   revokedAt: string | null;
   revokedByEmail: string | null;
+  /** Active, but its server answered "not found" (account check); not marked removed yet. */
+  missingSince: string | null;
   durationDays: number;
   remoteAccountId: string | null;
   failureCode: string | null;
@@ -109,6 +111,12 @@ export function AccountDetailsDialog({ account, open, onOpenChange }: { account:
           </div>
         </DialogHeader>
 
+        {account.status === "active" && account.missingSince ? (
+          <p className="rounded-lg border border-warning/30 bg-warning-soft px-3 py-2 text-sm text-warning-strong">
+            Missing on server since <When iso={account.missingSince} />. The account check has not marked it removed yet (or held it back: see Admin → Logs). If
+            the server really deleted it, revoke it.
+          </p>
+        ) : null}
         {account.failureMessage ? (
           <p className="rounded-md border border-destructive/30 bg-danger-soft p-3 text-sm text-destructive">
             {account.failureCode ? <span className="mr-1 font-mono text-xs">{account.failureCode}</span> : null}

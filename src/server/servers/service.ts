@@ -187,6 +187,10 @@ export async function updateServerDetails(id: string, details: ServerDetailsInpu
         })
         .where(eq(servers.id, id))
         .returning();
+      // Another address or driver may mean another node agent: the account check trusts its lookups
+      // again only after they have found an account (see provisioning/account-check.ts).
+      const endpoint = (x: typeof before) => [x.ipAddress, x.hostname, x.apiPort, x.apiBasePath, x.driver].join("|");
+      if (endpoint(before) !== endpoint(s!)) await tx.update(serverProtocols).set({ accountLookupOkAt: null }).where(eq(serverProtocols.serverId, id));
       await refreshServerStatus(tx, id);
       return s!;
     })
@@ -225,6 +229,9 @@ export async function updateServerConnection(id: string, conn: ConnectionInput, 
             : null,
       };
     }
+    // A new address or credentials may mean a new node agent: its account lookups must earn the
+    // account check's trust again (see provisioning/account-check.ts).
+    await tx.update(serverProtocols).set({ accountLookupOkAt: null }).where(eq(serverProtocols.serverId, id));
     if (current) await tx.update(serverCredentials).set({ revokedAt: new Date() }).where(eq(serverCredentials.id, current.id));
     await tx.insert(serverCredentials).values({
       ...values,

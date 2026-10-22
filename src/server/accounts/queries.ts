@@ -69,6 +69,7 @@ export async function listAccounts(f: AccountFilters) {
       activatedAt: vpnAccounts.activatedAt,
       revokedAt: vpnAccounts.revokedAt,
       revokedByEmail: admins.email,
+      missingSince: vpnAccounts.missingSince,
       remoteAccountId: vpnAccounts.remoteAccountId,
       failureCode: vpnAccounts.failureCode,
       failureMessage: vpnAccounts.failureMessage,

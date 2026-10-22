@@ -13,11 +13,11 @@ import { useSavedAccounts } from "./account/saved-accounts";
 
 const NONE: SavedAccountSummary[] = [];
 
-/** Accounts on this device that have not expired yet (all of them until the clock is known). */
+/** Accounts on this device that have not expired or been removed (all but removed ones until the clock is known). */
 export function useActiveAccounts(): { all: SavedAccountSummary[]; active: SavedAccountSummary[] } {
   const all = useSavedAccounts() ?? NONE;
   const now = useNow();
-  const active = now === null ? all : all.filter((a) => Date.parse(a.expiresAt) > now);
+  const active = all.filter((a) => !a.removedAt && (now === null || Date.parse(a.expiresAt) > now));
   return { all, active };
 }
 
@@ -96,11 +96,12 @@ export function MyAccountsMenu({ active: routeActive }: { active: boolean }) {
 function AccountRow({ account: a }: { account: SavedAccountSummary }) {
   const now = useNow();
   const expired = now !== null && Date.parse(a.expiresAt) <= now;
+  const removed = !expired && !!a.removedAt;
   return (
     <DropdownMenuItem asChild className="gap-3 rounded-xl p-2">
       <Link href="/my-accounts">
         {a.avatar ? (
-          <UserAvatar src={a.avatar} size={36} className={cn(expired && "opacity-50 grayscale")} />
+          <UserAvatar src={a.avatar} size={36} className={cn((expired || removed) && "opacity-50 grayscale")} />
         ) : (
           <span className="flex size-9 items-center justify-center rounded-full bg-muted">
             <UserRoundIcon />
@@ -115,8 +116,8 @@ function AccountRow({ account: a }: { account: SavedAccountSummary }) {
             </span>
           </span>
         </span>
-        <span className={cn("shrink-0 text-[11px] font-medium", expired ? "text-muted-foreground" : "text-success")}>
-          {expired ? "Expired" : <Countdown iso={a.expiresAt} doneText="Expired" />}
+        <span className={cn("shrink-0 text-[11px] font-medium", removed ? "text-destructive" : expired ? "text-muted-foreground" : "text-success")}>
+          {removed ? "Removed" : expired ? "Expired" : <Countdown iso={a.expiresAt} doneText="Expired" />}
         </span>
       </Link>
     </DropdownMenuItem>

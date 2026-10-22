@@ -947,7 +947,7 @@ export function SettingsForm({
               accountCheck === 0
                 ? "Off: accounts a server deletes itself stay Active here until they expire. 0 to 60 minutes."
                 : Number.isInteger(accountCheck) && accountCheck > 0 && accountCheck <= 60
-                  ? `Every active account is looked up on its server every ${accountCheck === 1 ? "minute" : `${accountCheck} minutes`}. An account the server deleted itself (for example its multi-login limiter) shows as Removed about a minute after that and its slot is freed. 0 turns it off · 0 to 60 minutes.`
+                  ? `Every active account is looked up on its server every ${accountCheck === 1 ? "minute" : `${accountCheck} minutes`}. An account the server deleted itself (for example its multi-login limiter) shows as Removed after two lookups in a row miss it (within about ${accountCheck * 2} minutes) and its slot is freed. 0 turns it off · 0 to 60 minutes.`
                   : "0 to 60 minutes; 0 turns it off."
             }
           >

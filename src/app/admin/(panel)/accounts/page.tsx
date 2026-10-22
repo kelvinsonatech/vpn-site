@@ -38,6 +38,7 @@ function toView(a: AdminAccountRow, avatarStyle: string): AccountView {
     expiresAt: a.expiresAt?.toISOString() ?? null,
     revokedAt: a.revokedAt?.toISOString() ?? null,
     revokedByEmail: a.revokedByEmail,
+    missingSince: a.missingSince?.toISOString() ?? null,
     durationDays: a.durationDays,
     remoteAccountId: a.remoteAccountId,
     failureCode: a.failureCode,
@@ -46,9 +47,15 @@ function toView(a: AdminAccountRow, avatarStyle: string): AccountView {
   };
 }
 
-function StatusBadge({ status }: { status: AccountView["status"] }) {
+function StatusBadge({ status, missing }: { status: AccountView["status"]; missing?: boolean }) {
   const s = ACCOUNT_STATUS[status];
-  return <Badge variant={s.variant}>{s.label}</Badge>;
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1">
+      <Badge variant={s.variant}>{s.label}</Badge>
+      {/* The account check found it missing on its server but has not marked it removed (yet). */}
+      {missing && status === "active" ? <Badge variant="warning">Missing on server</Badge> : null}
+    </span>
+  );
 }
 
 /** Request-time helper (server component, rendered once per request). */
@@ -244,7 +251,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <StatusBadge status={a.status} />
+                      <StatusBadge status={a.status} missing={!!a.missingSince} />
                     </TableCell>
                     <TableCell className="text-sm">
                       <RelativeTime date={a.createdAt} />
@@ -271,7 +278,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
                     <AccountActions account={a} canManage={manage} className="-mr-1.5 shrink-0" />
                   </div>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
-                    <StatusBadge status={a.status} />
+                    <StatusBadge status={a.status} missing={!!a.missingSince} />
                     <span className="flex items-center gap-1.5">
                       <ProtocolIcon name={a.protocol.icon} className="size-3.5 text-muted-foreground" />
                       {a.protocol.name}

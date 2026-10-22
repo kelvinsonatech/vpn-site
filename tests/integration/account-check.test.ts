@@ -1,244 +1,321 @@
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { db } from "@/server/db";
-import { provisioningLogs, servers, vpnAccounts } from "@/server/db/schema";
+import { provisioningLogs, provisioningRequests, serverProtocols, servers, vpnAccounts } from "@/server/db/schema";
 import { redis } from "@/server/redis";
 import { checkAccounts } from "@/server/provisioning/account-check";
-import { expireAccounts } from "@/server/provisioning/expiry";
+import { expireAccounts, processExpiredRevokes } from "@/server/provisioning/expiry";
 import { executeCreate, requestAccount } from "@/server/provisioning/service";
 import { getSavedAccountStatuses } from "@/server/public/saved-status";
-import { publishServer } from "@/server/servers/service";
+import { publishServer, updateServerConnection } from "@/server/servers/service";
 import { syncServer } from "@/server/servers/sync";
 import { POST as savedStatusRoute } from "@/app/api/public/accounts/status/route";
 import { DEFAULT_SITE_SETTINGS } from "@/lib/site-settings";
 import type { SavedAccountStatusResponse } from "@/lib/public/types";
-import { actor, createServer, resetDatabase, setSettings, startNode, teardown } from "../helpers";
+import { actor, createServer, resetDatabase, SECRET, setSettings, startNode, teardown } from "../helpers";
 
 vi.mock("next/server", async (importOriginal) => ({ ...(await importOriginal<typeof import("next/server")>()), connection: async () => {} }));
 
 let ipCounter = 0;
-const nextIp = () => `100.65.0.${++ipCounter}`;
+/** A fresh client IP per account (per-IP daily limits). */
+const nextIp = () => {
+  const i = ipCounter++;
+  return `100.65.${Math.floor(i / 250)}.${(i % 250) + 1}`;
+};
 const MINUTE = 60_000;
+type MockNode = Awaited<ReturnType<typeof startNode>>;
 
 describe("account check (accounts the server deleted itself)", () => {
-  let node: Awaited<ReturnType<typeof startNode>>;
-  let bulkNode: Awaited<ReturnType<typeof startNode>>;
-  let serverId: string;
-  let bulkId: string;
-  /** Each test runs at its own "now", far enough apart that earlier tests' accounts never interfere. */
+  const nodes: MockNode[] = [];
+  let n = 0;
+  /** Every test runs at its own "now", far from the others and well after its accounts were created. */
   let clock = Date.now();
-  const at = (offsetMs: number) => new Date(clock + offsetMs);
+  const at = (minutes: number) => new Date(clock + minutes * MINUTE);
+  const run = (minutes: number, opts: { limit?: number } = {}) => checkAccounts({ now: at(minutes), ...opts });
 
-  const create = async (sid: string, username: string) => {
-    const r = await requestAccount({
-      serverId: sid,
-      protocolSlug: "ssh",
-      input: { username, password: "S3cure-pass", duration: "3" },
-      idempotencyKey: randomUUID(),
-      clientIp: nextIp(),
-    });
+  /** A published server on its own mock node, so tests never share accounts. */
+  const fleet = async (protocols: string[] = ["ssh"]) => {
+    const node = await startNode({ protocols });
+    nodes.push(node);
+    n += 1;
+    const s = await createServer(node.port, { name: `Check ${n}`, countryCode: "NL", maxAccounts: 1000 });
+    await syncServer(s.id);
+    await publishServer(s.id, actor);
+    return { node, serverId: s.id };
+  };
+  const create = async (serverId: string, username: string, protocol = "ssh") => {
+    const input = protocol === "ssh" ? { username, password: "S3cure-pass", duration: "3" } : { username, duration: "3" };
+    const r = await requestAccount({ serverId, protocolSlug: protocol, input, idempotencyKey: randomUUID(), clientIp: nextIp() });
     await executeCreate(r.requestId);
-    const [acc] = await db().select().from(vpnAccounts).where(eq(vpnAccounts.username, username));
-    expect(acc!.status).toBe("active");
+    const [acc] = await db()
+      .select()
+      .from(vpnAccounts)
+      .where(and(eq(vpnAccounts.username, username), eq(vpnAccounts.status, "active")));
+    expect(acc).toBeDefined();
     return { ...acc!, requestId: r.requestId };
   };
+  const many = async (serverId: string, prefix: string, count: number, protocol = "ssh") => {
+    const out = [];
+    for (let i = 0; i < count; i++) out.push(await create(serverId, `${prefix}${i}`, protocol));
+    return out;
+  };
   const row = async (id: string) => (await db().select().from(vpnAccounts).where(eq(vpnAccounts.id, id)))[0]!;
+  const statuses = async (ids: string[]) => {
+    const rows = await db().select({ id: vpnAccounts.id, s: vpnAccounts.status }).from(vpnAccounts).where(inArray(vpnAccounts.id, ids));
+    return ids.map((id) => rows.find((r) => r.id === id)?.s);
+  };
   const current = async (sid: string) => (await db().select({ n: servers.currentAccounts }).from(servers).where(eq(servers.id, sid)))[0]!.n;
-  const lookups = (n: typeof node, remoteId: string) =>
-    n.state.requestLog.filter((l) => l.method === "GET" && l.path === `/api/v1/accounts/${remoteId}`).length;
+  const lookups = (node: MockNode, remoteId: string) =>
+    node.state.requestLog.filter((l) => l.method === "GET" && l.path === `/api/v1/accounts/${remoteId}`).length;
+  const warnings = async (serverId: string) =>
+    db()
+      .select()
+      .from(provisioningLogs)
+      .where(and(eq(provisioningLogs.serverId, serverId), eq(provisioningLogs.event, "account.removed"), eq(provisioningLogs.status, "failure")));
 
   beforeAll(async () => {
     await resetDatabase();
-    node = await startNode({ protocols: ["ssh"] });
-    bulkNode = await startNode({ protocols: ["ssh"] });
-    const a = await createServer(node.port, { name: "Check NL", countryCode: "NL" });
-    const b = await createServer(bulkNode.port, { name: "Check FI", countryCode: "FI" });
-    for (const s of [a, b]) {
-      await syncServer(s.id);
-      await publishServer(s.id, actor);
-    }
-    serverId = a.id;
-    bulkId = b.id;
   });
   beforeEach(async () => {
     await redis().flushdb();
     await setSettings({ health: { ...DEFAULT_SITE_SETTINGS.health, accountCheckMinutes: 5 } });
-    node.state.noAccountLookup = false;
-    // Move every test 10 minutes on, so accounts from earlier tests are due again but already settled.
-    clock += 10 * MINUTE;
+    clock += 2 * 60 * MINUTE; // two hours on (accounts last 3 days): earlier accounts are due, but each test has its own server
   });
   afterAll(async () => {
-    await node.close();
-    await bulkNode.close();
+    for (const node of nodes) await node.close();
     await teardown();
   });
 
   it("does not look up a new account straight away, nor anything when the check is off", async () => {
+    const { node, serverId } = await fleet();
     const acc = await create(serverId, "check_fresh");
+    await db().update(vpnAccounts).set({ checkedAt: new Date() }).where(eq(vpnAccounts.status, "active")); // only the new account matters here
+    await db().update(vpnAccounts).set({ checkedAt: null }).where(eq(vpnAccounts.id, acc.id));
     expect((await checkAccounts({ now: new Date() })).checked).toBe(0);
     expect(lookups(node, acc.remoteAccountId!)).toBe(0);
 
     await setSettings({ health: { ...DEFAULT_SITE_SETTINGS.health, accountCheckMinutes: 0 } });
-    expect(await checkAccounts({ now: at(0) })).toEqual({ checked: 0, missing: 0, removed: 0, held: 0, failed: 0 });
+    expect(await run(0)).toEqual({ checked: 0, missing: 0, removed: 0, held: 0, failed: 0 });
     expect(lookups(node, acc.remoteAccountId!)).toBe(0);
   });
 
-  it("marks an account the server deleted as removed on the second miss, frees its slot and logs it", async () => {
-    const acc = await create(serverId, "check_gone");
-    await checkAccounts({ now: at(0) }); // settle everything else that is due
-    node.state.accounts.delete(acc.remoteAccountId!); // the server's multi-login limiter deleted it
+  it("removes an account the server deleted on its next regular lookup, frees its slot and logs it", async () => {
+    const { node, serverId } = await fleet();
+    const [gone, ...rest] = await many(serverId, "check_gone", 4);
+    await run(0); // all found: the server's SSH lookups are trusted
+    node.state.accounts.delete(gone!.remoteAccountId!); // the server's multi-login limiter deleted it
     const before = await current(serverId);
 
-    clock += 10 * MINUTE;
-    const first = await checkAccounts({ now: at(0) });
-    expect(first.missing).toBe(1);
-    expect(first.removed).toBe(0);
-    expect(await row(acc.id)).toMatchObject({ status: "active", holdsCapacity: true, missingSince: at(0) });
+    expect((await run(5)).missing).toBe(1); // first miss only
+    expect(await row(gone!.id)).toMatchObject({ status: "active", holdsCapacity: true, missingSince: at(5) });
+    await run(6);
+    expect(lookups(node, gone!.remoteAccountId!)).toBe(2); // not due again a minute later
 
-    // Too soon for the second lookup: nothing happens.
-    expect((await checkAccounts({ now: at(20_000) })).checked).toBe(0);
-
-    const removedAt = at(MINUTE);
-    const second = await checkAccounts({ now: removedAt });
-    expect(second).toMatchObject({ missing: 1, removed: 1, held: 0 });
-    expect(await row(acc.id)).toMatchObject({ status: "removed", holdsCapacity: false, missingSince: null, revokedAt: removedAt, revokedBy: null });
+    await run(10);
+    expect(await row(gone!.id)).toMatchObject({ status: "removed", holdsCapacity: false, missingSince: null, revokedAt: at(10), revokedBy: null });
     expect(await current(serverId)).toBe(before - 1);
-    const logs = await db()
+    expect(await statuses(rest.map((a) => a.id))).toEqual(["active", "active", "active"]);
+    const [event] = await db()
       .select()
       .from(provisioningLogs)
-      .where(and(eq(provisioningLogs.accountId, acc.id), eq(provisioningLogs.event, "account.removed")));
-    expect(logs).toHaveLength(1);
-    expect(logs[0]!.message).toContain("check_gone");
+      .where(and(eq(provisioningLogs.accountId, gone!.id), eq(provisioningLogs.event, "account.removed")));
+    expect(event!.message).toContain("check_gone0");
 
-    // Later checks and the expiry job leave it alone: no DELETE is queued for a removed account.
-    expect(lookups(node, acc.remoteAccountId!)).toBe(3);
-    clock += 10 * MINUTE;
-    await checkAccounts({ now: at(0) });
-    expect(lookups(node, acc.remoteAccountId!)).toBe(3);
+    // My accounts sees it as removed; later checks leave it alone.
+    expect(await getSavedAccountStatuses([gone!.requestId])).toEqual({ [gone!.requestId]: { status: "removed", removedAt: at(10).toISOString() } });
+    await run(20);
+    expect(lookups(node, gone!.remoteAccountId!)).toBe(3);
+  });
+
+  it("still deletes a removed account on the server at its expiry date, unless its name is in use again", async () => {
+    const { node, serverId } = await fleet();
+    const [a, b, c] = await many(serverId, "check_exp", 3);
+    await run(0);
+    node.state.accounts.delete(a!.remoteAccountId!);
+    node.state.accounts.delete(b!.remoteAccountId!);
+    await run(5);
+    await run(10);
+    expect(await statuses([a!.id, b!.id])).toEqual(["removed", "removed"]);
+    const reused = await create(serverId, "check_exp1"); // b's username, free again on the server
     await db()
       .update(vpnAccounts)
       .set({ expiresAt: new Date(Date.now() - MINUTE) })
-      .where(eq(vpnAccounts.id, acc.id));
-    expect((await expireAccounts()).expired).toBe(0);
+      .where(inArray(vpnAccounts.id, [a!.id, b!.id]));
 
-    // My accounts sees it as removed.
-    expect(await getSavedAccountStatuses([acc.requestId])).toEqual({ [acc.requestId]: { status: "removed", removedAt: removedAt.toISOString() } });
-  });
-
-  it("counts an account the server reports as revoked as missing too", async () => {
-    const acc = await create(serverId, "check_revoked");
-    await checkAccounts({ now: at(0) });
-    node.state.accounts.get(acc.remoteAccountId!)!.status = "revoked";
-    clock += 10 * MINUTE;
-    await checkAccounts({ now: at(0) });
-    await checkAccounts({ now: at(MINUTE) });
-    expect((await row(acc.id)).status).toBe("removed");
-  });
-
-  it("forgets a miss when the account is found again", async () => {
-    const acc = await create(serverId, "check_back");
-    await checkAccounts({ now: at(0) });
-    const saved = node.state.accounts.get(acc.remoteAccountId!)!;
-    node.state.accounts.delete(acc.remoteAccountId!);
-    clock += 10 * MINUTE;
-    await checkAccounts({ now: at(0) });
-    expect((await row(acc.id)).missingSince).not.toBeNull();
-
-    node.state.accounts.set(acc.remoteAccountId!, saved); // a hiccup on the server, not a deletion
-    await checkAccounts({ now: at(MINUTE) });
-    expect(await row(acc.id)).toMatchObject({ status: "active", missingSince: null, holdsCapacity: true });
-  });
-
-  it("never removes anything on a bare 404 (agent without the lookup route) or on an offline server", async () => {
-    const acc = await create(serverId, "check_bare404");
-    await checkAccounts({ now: at(0) });
-    node.state.noAccountLookup = true;
-    clock += 10 * MINUTE;
-    const r = await checkAccounts({ now: at(0) });
-    expect(r.missing).toBe(0);
-    expect(r.failed).toBeGreaterThan(0);
-    await checkAccounts({ now: at(11 * MINUTE) });
-    expect(await row(acc.id)).toMatchObject({ status: "active", missingSince: null });
-
-    node.state.noAccountLookup = false;
-    const saved = node.state.accounts.get(acc.remoteAccountId!)!;
-    node.state.accounts.delete(acc.remoteAccountId!);
-    await db().update(servers).set({ healthStatus: "offline" }).where(eq(servers.id, serverId));
-    try {
-      clock += 30 * MINUTE;
-      expect((await checkAccounts({ now: at(0) })).checked).toBe(0);
-      expect((await row(acc.id)).missingSince).toBeNull();
-    } finally {
-      await db().update(servers).set({ healthStatus: "online" }).where(eq(servers.id, serverId));
-      node.state.accounts.set(acc.remoteAccountId!, saved);
-    }
-  });
-
-  it("holds removals and warns once when most of a server's accounts are missing at once", async () => {
-    const accs = [];
-    for (let i = 0; i < 6; i++) accs.push(await create(bulkId, `check_bulk${i}`));
-    await checkAccounts({ now: at(0) });
-    for (const a of accs) bulkNode.state.accounts.delete(a.remoteAccountId!); // e.g. a broken lookup that 404s everything
-    clock += 10 * MINUTE;
-    await checkAccounts({ now: at(0) });
-    const second = await checkAccounts({ now: at(MINUTE) });
-    expect(second.held).toBe(6);
-    expect(second.removed).toBe(0);
-    // Held misses are not looked up every minute: they wait for the normal interval like the rest.
-    const before = lookups(bulkNode, accs[0]!.remoteAccountId!);
-    await checkAccounts({ now: at(2 * MINUTE) });
-    await checkAccounts({ now: at(3 * MINUTE) });
-    expect(lookups(bulkNode, accs[0]!.remoteAccountId!)).toBe(before);
-    expect((await checkAccounts({ now: at(7 * MINUTE) })).held).toBeGreaterThanOrEqual(6);
-    expect(lookups(bulkNode, accs[0]!.remoteAccountId!)).toBe(before + 1);
-    for (const a of accs) expect((await row(a.id)).status).toBe("active");
-    const warnings = await db()
+    expect((await expireAccounts()).revokesQueued).toBe(1);
+    const queued = await db()
       .select()
-      .from(provisioningLogs)
-      .where(and(eq(provisioningLogs.serverId, bulkId), eq(provisioningLogs.event, "account.removed"), eq(provisioningLogs.level, "warning")));
-    expect(warnings).toHaveLength(1);
-    expect(warnings[0]!.message).toContain("6 of its 6 active accounts");
+      .from(provisioningRequests)
+      .where(and(eq(provisioningRequests.operation, "revoke"), inArray(provisioningRequests.accountId, [a!.id, b!.id])));
+    expect(queued.map((r) => r.accountId)).toEqual([a!.id]);
+    await processExpiredRevokes();
+    expect(node.state.requestLog.some((l) => l.method === "DELETE" && l.path === `/api/v1/accounts/${a!.remoteAccountId}`)).toBe(true);
+    expect((await db().select().from(provisioningRequests).where(eq(provisioningRequests.accountId, a!.id)))[0]!.state).toBe("succeeded");
+    expect((await expireAccounts()).revokesQueued).toBe(0); // queued once
+    expect(await statuses([reused.id, c!.id])).toEqual(["active", "active"]);
   });
 
-  it("does not trust misses from a server that has never confirmed an account exists", async () => {
-    const fresh = await startNode({ protocols: ["ssh"] });
-    try {
-      const srv = await createServer(fresh.port, { name: "Check EE", countryCode: "EE" });
-      await syncServer(srv.id);
-      await publishServer(srv.id, actor);
-      const acc = await create(srv.id, "check_untrusted");
-      fresh.state.accounts.delete(acc.remoteAccountId!); // gone before the first lookup: could be a broken lookup
-      clock += 10 * MINUTE;
-      await checkAccounts({ now: at(0) });
-      expect((await checkAccounts({ now: at(MINUTE) })).held).toBeGreaterThanOrEqual(1); // the bulk server's accounts are still held too
-      expect(await row(acc.id)).toMatchObject({ status: "active", holdsCapacity: true });
-      const [warning] = await db()
-        .select()
-        .from(provisioningLogs)
-        .where(and(eq(provisioningLogs.serverId, srv.id), eq(provisioningLogs.event, "account.removed")));
-      expect(warning?.message).toContain("has not yet confirmed that any account exists");
+  it("counts an account reported as revoked as missing, and forgets a miss when the account is found again", async () => {
+    const { node, serverId } = await fleet();
+    const [revoked, back, other] = await many(serverId, "check_rv", 3);
+    await run(0);
+    node.state.accounts.get(revoked!.remoteAccountId!)!.status = "revoked";
+    const saved = node.state.accounts.get(back!.remoteAccountId!)!;
+    node.state.accounts.delete(back!.remoteAccountId!);
+    await run(5);
+    node.state.accounts.set(back!.remoteAccountId!, saved); // a hiccup, not a deletion
+    await run(10);
+    expect((await row(revoked!.id)).status).toBe("removed");
+    expect(await row(back!.id)).toMatchObject({ status: "active", missingSince: null, holdsCapacity: true });
+    expect((await row(other!.id)).status).toBe("active");
+  });
 
-      // Once the server has found one account, its misses count.
-      const other = await create(srv.id, "check_untrusted2");
-      clock += 10 * MINUTE;
-      await checkAccounts({ now: at(0) });
-      expect((await db().select({ ok: servers.accountLookupOkAt }).from(servers).where(eq(servers.id, srv.id)))[0]!.ok).not.toBeNull();
-      await checkAccounts({ now: at(MINUTE) });
-      expect((await row(acc.id)).status).toBe("removed");
-      expect((await row(other.id)).status).toBe("active");
-    } finally {
-      await fresh.close();
+  it("never acts on a bare 404, and pauses a server that answers none of its lookups for an hour", async () => {
+    const { node, serverId } = await fleet();
+    const accs = await many(serverId, "check_404_", 2);
+    await run(0);
+    node.state.noAccountLookup = true; // like an agent without GET /accounts/{id}
+    await run(5);
+    expect(await statuses(accs.map((a) => a.id))).toEqual(["active", "active"]);
+    const [w] = await warnings(serverId);
+    expect(w!.message).toContain("answered none of its account lookups");
+    const asked = lookups(node, accs[0]!.remoteAccountId!);
+    await run(10);
+    await run(30);
+    expect(lookups(node, accs[0]!.remoteAccountId!)).toBe(asked); // paused
+    await run(66);
+    expect(lookups(node, accs[0]!.remoteAccountId!)).toBe(asked + 1); // asked again after the hour
+    for (const a of accs) expect(await row(a.id)).toMatchObject({ status: "active", missingSince: null });
+  });
+
+  it("skips offline servers", async () => {
+    const { node, serverId } = await fleet();
+    const acc = await create(serverId, "check_offline");
+    await db().update(servers).set({ healthStatus: "offline" }).where(eq(servers.id, serverId));
+    await run(0);
+    expect(lookups(node, acc.remoteAccountId!)).toBe(0);
+  });
+
+  it("trusts misses per protocol only after the server has found one of that protocol's accounts", async () => {
+    const { node, serverId } = await fleet(["ssh", "vless"]);
+    await many(serverId, "check_tr_ssh", 3);
+    const vless = await create(serverId, "check_tr_vless", "vless");
+    node.state.accounts.delete(vless.remoteAccountId!); // gone before the first lookup: could be a broken lookup
+    await run(0); // SSH found (trusted), VLESS missing
+    await run(5);
+    expect(await row(vless.id)).toMatchObject({ status: "active", holdsCapacity: true });
+    expect((await row(vless.id)).missingSince).not.toBeNull();
+    expect((await warnings(serverId)).some((w) => w.message.includes("never found a VLESS account"))).toBe(true);
+
+    // A changed connection may mean another agent: trust has to be earned again.
+    expect(
+      (await db().select({ ok: serverProtocols.accountLookupOkAt }).from(serverProtocols).where(eq(serverProtocols.serverId, serverId))).some((t) => t.ok),
+    ).toBe(true);
+    await updateServerConnection(
+      serverId,
+      {
+        authMethod: "hmac_sha256",
+        keyId: "mock-key",
+        apiSecret: SECRET,
+        tlsMode: "insecure_http",
+        tlsServerName: null,
+        caCertificatePem: null,
+        pinnedFingerprintSha256: null,
+        clientCertificatePem: null,
+        clientKeyPem: null,
+      },
+      actor,
+    );
+    const trust = await db().select({ ok: serverProtocols.accountLookupOkAt }).from(serverProtocols).where(eq(serverProtocols.serverId, serverId));
+    expect(trust.every((t) => t.ok === null)).toBe(true);
+  });
+
+  it("holds a protocol whose lookup breaks while the server's other protocol keeps working", async () => {
+    const { node, serverId } = await fleet(["ssh", "vless"]);
+    const ssh = await many(serverId, "check_pp_ssh", 6);
+    const vless = await many(serverId, "check_pp_vl", 4, "vless");
+    await run(0); // both protocols trusted
+    for (const a of vless) node.state.accounts.delete(a.remoteAccountId!); // e.g. the agent can no longer read Xray's clients
+    await run(5);
+    await run(10);
+    expect(await statuses([...ssh, ...vless].map((a) => a.id))).toEqual(Array(10).fill("active"));
+    expect((await warnings(serverId)).some((w) => w.message.includes("4 of the 4 VLESS accounts"))).toBe(true);
+  });
+
+  it("removes nothing when the lookup of a big server breaks, with lookups spread over the interval", async () => {
+    const { node, serverId } = await fleet();
+    const accs = await many(serverId, "check_big", 100);
+    const perRun = () => node.state.requestLog.filter((l) => l.method === "GET" && l.path.startsWith("/api/v1/accounts/")).length;
+    // Steady state: at most 40 lookups per server and run, so the 100 accounts spread over the minutes.
+    let seen = perRun();
+    for (let m = 0; m < 12; m++) {
+      await run(m);
+      expect(perRun() - seen).toBeLessThanOrEqual(40);
+      seen = perRun();
     }
+    node.state.accounts.clear(); // e.g. a reinstalled agent lost its records while the VPN users still work
+    for (let m = 12; m < 40; m++) {
+      await run(m);
+      expect(perRun() - seen).toBeLessThanOrEqual(40);
+      seen = perRun();
+    }
+    expect(new Set(await statuses(accs.map((a) => a.id)))).toEqual(new Set(["active"]));
+    expect((await warnings(serverId)).some((w) => w.message.includes("looks like a broken lookup"))).toBe(true);
   });
 
-  it("caps the lookups per run", async () => {
-    for (let i = 0; i < 3; i++) await create(serverId, `check_cap${i}`);
-    clock += 10 * MINUTE;
-    expect((await checkAccounts({ now: at(0), limit: 2 })).checked).toBe(2);
+  it("removes at most max(10, 20 %) accounts per server and hour, and the rest later", async () => {
+    const { node, serverId } = await fleet();
+    const accs = await many(serverId, "check_rate", 40);
+    await run(0);
+    const gone = accs.slice(0, 12); // 30 %: a busy limiter, not a broken lookup
+    for (const a of gone) node.state.accounts.delete(a.remoteAccountId!);
+    await run(5);
+    await run(10);
+    expect((await statuses(gone.map((a) => a.id))).filter((s) => s === "removed")).toHaveLength(10);
+    await run(15); // still within the hour
+    expect((await statuses(gone.map((a) => a.id))).filter((s) => s === "removed")).toHaveLength(10);
+    expect((await warnings(serverId)).some((w) => w.message.includes("at most 10 per hour"))).toBe(true);
+    await run(75);
+    expect(await statuses(gone.map((a) => a.id))).toEqual(Array(12).fill("removed"));
+    expect(await statuses(accs.slice(12).map((a) => a.id))).toEqual(Array(28).fill("active"));
+  });
+
+  it("caps lookups per server in the query, so a big server never crowds out a small one", async () => {
+    const big = await fleet();
+    const small = await fleet();
+    const bigAccs = await many(big.serverId, "check_crowd_big", 45);
+    const tiny = await many(small.serverId, "check_crowd_small", 2);
+    // Only these two servers' accounts are due; the big server's are the oldest.
+    await db()
+      .update(vpnAccounts)
+      .set({ checkedAt: at(0) })
+      .where(eq(vpnAccounts.status, "active"));
+    await db()
+      .update(vpnAccounts)
+      .set({ checkedAt: at(-20) })
+      .where(
+        inArray(
+          vpnAccounts.id,
+          bigAccs.map((a) => a.id),
+        ),
+      );
+    await db()
+      .update(vpnAccounts)
+      .set({ checkedAt: at(-10) })
+      .where(
+        inArray(
+          vpnAccounts.id,
+          tiny.map((a) => a.id),
+        ),
+      );
+    const r = await run(0, { limit: 42 });
+    expect(r.checked).toBe(42);
+    for (const a of tiny) expect(lookups(small.node, a.remoteAccountId!)).toBe(1);
   });
 
   it("POST /api/public/accounts/status answers only the status of known accounts, for this site only", async () => {
+    const { serverId } = await fleet();
     const ORIGIN = "http://localhost:3000";
     const post = (body: unknown, origin: string | null = ORIGIN) =>
       new Request(`${ORIGIN}/api/public/accounts/status`, {

@@ -26,12 +26,12 @@ import { Flag } from "@/components/public/flag";
 import { RelativeTime, useNow } from "@/components/public/live-time";
 import { EmptyState } from "@/components/public/section";
 import { cn } from "@/lib/utils";
-import type { SavedAccountServerStatus, SavedAccountSummary } from "@/lib/public/types";
+import type { SavedAccountSummary } from "@/lib/public/types";
 import { CopyAction } from "./copy-action";
 import { DetailRow } from "./detail-row";
 import { readSavedAccounts, removeSavedAccounts, restoreSavedAccounts, useSavedAccounts, clearSavedAccounts } from "./saved-accounts";
 import { ExpiryCountdown, LocalDateTime } from "./time";
-import { useSavedStatuses } from "./use-saved-statuses";
+import { useRefreshSavedStatuses } from "./use-saved-statuses";
 
 /**
  * /my-accounts: the accounts created in this browser as DiceBear profile cards (non-secret
@@ -63,11 +63,11 @@ function displayName(a: SavedAccountSummary) {
   return a.username ?? `${a.protocol.name} account`;
 }
 
-/** The server removed this account before it expired: when, if known. */
-type Removal = { removedAt: string | null } | null;
+/** The server removed this account before it expired, and when (from the saved summary). */
+type Removal = { removedAt: string } | null;
 
-function removalOf(status: SavedAccountServerStatus | undefined): Removal {
-  return status?.status === "removed" ? { removedAt: status.removedAt } : null;
+function removalOf(a: SavedAccountSummary): Removal {
+  return a.removedAt ? { removedAt: a.removedAt } : null;
 }
 
 /** Share of the account's lifetime that is left (1 = just created, 0 = expired). */
@@ -132,7 +132,9 @@ function DetailsDialog({ account: a, expired, removal }: { account: SavedAccount
           </DetailRow>
           {removal ? (
             <DetailRow label="Removed">
-              <span className="font-sans">{removal.removedAt ? <LocalDateTime iso={removal.removedAt} /> : "By the server, before its expiry date"}</span>
+              <span className="font-sans">
+                <LocalDateTime iso={removal.removedAt} />
+              </span>
             </DetailRow>
           ) : null}
         </ul>
@@ -237,7 +239,7 @@ function ProfileCard({ account: a, now, removal, onRemove }: { account: SavedAcc
             {removed ? "Removed" : expired ? "Expired" : "Expires"}
           </dt>
           <dd className="mt-0.5 truncate font-medium">
-            {removed ? removal?.removedAt ? <LocalDateTime iso={removal.removedAt} /> : "Before its expiry" : <LocalDateTime iso={a.expiresAt} />}
+            <LocalDateTime iso={removed && removal ? removal.removedAt : a.expiresAt} />
           </dd>
         </div>
       </dl>
@@ -245,10 +247,8 @@ function ProfileCard({ account: a, now, removal, onRemove }: { account: SavedAcc
       <div className="px-5 py-4">
         <div className="flex items-baseline justify-between gap-2 text-xs">
           <span className="text-muted-foreground">{removed ? "Removed by the server" : expired ? "This account has ended" : "Time left"}</span>
-          {removed ? (
-            removal?.removedAt ? (
-              <RelativeTime iso={removal.removedAt} className="text-muted-foreground" />
-            ) : null
+          {removed && removal ? (
+            <RelativeTime iso={removal.removedAt} className="text-muted-foreground" />
           ) : expired ? (
             <RelativeTime iso={a.expiresAt} className="text-muted-foreground" />
           ) : (
@@ -353,7 +353,7 @@ export function MyAccountsList() {
   const accounts = useSavedAccounts();
   const now = useNow();
   const [announcement, setAnnouncement] = useState("");
-  const statuses = useSavedStatuses(accounts?.map((a) => a.id) ?? null);
+  useRefreshSavedStatuses(accounts, now);
 
   const live = (
     <p className="sr-only" aria-live="polite" role="status">
@@ -398,9 +398,8 @@ export function MyAccountsList() {
     );
   }
 
-  const removalFor = (a: SavedAccountSummary) => removalOf(statuses.get(a.id));
-  const active = accounts.filter((a) => Date.parse(a.expiresAt) > now && !removalFor(a));
-  const ended = accounts.filter((a) => Date.parse(a.expiresAt) <= now || removalFor(a));
+  const active = accounts.filter((a) => Date.parse(a.expiresAt) > now && !removalOf(a));
+  const ended = accounts.filter((a) => Date.parse(a.expiresAt) <= now || removalOf(a));
   const removedCount = ended.filter((a) => Date.parse(a.expiresAt) > now).length;
   const expiredCount = ended.length - removedCount;
   const endedWord = removedCount ? "ended" : "expired";
@@ -463,7 +462,7 @@ export function MyAccountsList() {
           <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {active.map((a) => (
               <li key={a.id} className="grid">
-                <ProfileCard account={a} now={now} removal={removalFor(a)} onRemove={() => remove(a)} />
+                <ProfileCard account={a} now={now} removal={removalOf(a)} onRemove={() => remove(a)} />
               </li>
             ))}
           </ul>
@@ -508,7 +507,7 @@ export function MyAccountsList() {
           <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {ended.map((a) => (
               <li key={a.id} className="grid">
-                <ProfileCard account={a} now={now} removal={removalFor(a)} onRemove={() => remove(a)} />
+                <ProfileCard account={a} now={now} removal={removalOf(a)} onRemove={() => remove(a)} />
               </li>
             ))}
           </ul>

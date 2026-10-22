@@ -280,6 +280,11 @@ export interface SavedAccountSummary {
   avatar: string;
   createdAt: string;
   expiresAt: string;
+  /**
+   * Set once the website reports that the server removed the account before it expired (e.g. its
+   * multi-login limiter). A removal is final, so it is kept here and every "My accounts" view agrees.
+   */
+  removedAt?: string;
   /** Non-secret connection details (host, IP, ports, SNI, payload...) in display order. Never secrets. */
   details?: { label: string; value: string }[];
 }

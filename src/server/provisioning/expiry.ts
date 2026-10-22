@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { db } from "@/server/db";
 import { protocols, provisioningRequests, servers, vpnAccounts } from "@/server/db/schema";
 import { sha256Hex } from "@/server/crypto/hashing";
@@ -23,6 +23,10 @@ import { releaseCapacity } from "./capacity";
  *    with backoff (capped at an hour) for as long as it takes: an expired account must never stay
  *    usable on the server. A 404 means the account is already gone. Nothing secret is involved or
  *    logged.
+ * 3. Accounts the account check marked `removed` (deleted by the server itself, see account-check.ts)
+ *    get the same removal request when they reach their expiry date, so that even a wrong removal
+ *    never outlives the expiry on the server. For a really deleted account it costs one request (404).
+ *    Skipped while a live account on that server uses the same node account id or username.
  */
 
 class ServerDeleted extends Error {}
@@ -115,7 +119,48 @@ export async function expireAccounts(opts: { now?: Date; batchSize?: number } = 
     }
     if (rows.length < batchSize) break;
   }
+  revokesQueued += await queueRemovedAccountRevokes(now, batchSize);
   return { expired, revokesQueued };
+}
+
+async function queueRemovedAccountRevokes(now: Date, limit: number): Promise<number> {
+  const due = await db()
+    .select({ id: vpnAccounts.id, serverId: vpnAccounts.serverId, protocolId: vpnAccounts.protocolId, capabilities: servers.capabilities })
+    .from(vpnAccounts)
+    .innerJoin(servers, eq(servers.id, vpnAccounts.serverId))
+    .where(
+      and(
+        eq(vpnAccounts.status, "removed"),
+        lte(vpnAccounts.expiresAt, now),
+        isNotNull(vpnAccounts.remoteAccountId),
+        isNull(servers.deletedAt),
+        sql`not exists (select 1 from ${provisioningRequests} r where r.idempotency_key = 'expire:' || ${vpnAccounts.id})`,
+        // The alias hides the table name inside the subquery, so "vpn_accounts".* is the outer row.
+        sql`not exists (
+          select 1 from ${vpnAccounts} o
+          where o.server_id = ${vpnAccounts.serverId} and o.id <> ${vpnAccounts.id} and o.status in ('pending', 'active')
+            and (o.remote_account_id = ${vpnAccounts.remoteAccountId} or (o.username is not null and o.username = ${vpnAccounts.username})))`,
+      ),
+    )
+    .limit(limit);
+  const revokes = due.filter((r) => r.capabilities?.expiryManagedByNode !== true);
+  if (!revokes.length) return 0;
+  const inserted = await db()
+    .insert(provisioningRequests)
+    .values(
+      revokes.map((r) => ({
+        idempotencyKey: `expire:${r.id}`,
+        operation: "revoke" as const,
+        state: "queued" as const,
+        accountId: r.id,
+        serverId: r.serverId,
+        protocolId: r.protocolId,
+        inputDigest: sha256Hex(`expire:${r.id}`),
+      })),
+    )
+    .onConflictDoNothing()
+    .returning({ id: provisioningRequests.id });
+  return inserted.length;
 }
 
 /**

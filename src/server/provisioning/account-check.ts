@@ -1,6 +1,6 @@
-import { and, asc, eq, gt, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/server/db";
-import { protocols, servers, vpnAccounts } from "@/server/db/schema";
+import { protocols, serverProtocols, servers, vpnAccounts } from "@/server/db/schema";
 import { logEvent } from "@/server/logging/events";
 import { errorSummary, logger } from "@/server/logging/logger";
 import { getNodeDriver } from "@/server/nodes/connection";
@@ -17,43 +17,52 @@ import { releaseCapacity } from "./capacity";
  * every active account is looked up with the predefined `GET /accounts/{id}` once per
  * **Settings → Health monitor → Account check** interval (0 turns the check off).
  *
- * - The account is missing when the server answers `ACCOUNT_NOT_FOUND` or reports it `revoked`.
- *   A bare 404, a timeout or any other error changes nothing.
- * - The first miss only records `missing_since`; the account is checked again about a minute later
- *   and becomes `removed` (slot released, event logged) only if it is still missing. Found again →
- *   the miss is forgotten.
- * - Safety valves against a broken lookup that says "not found" for accounts that do exist: a
- *   server's misses are trusted only once it has found at least one account
- *   (`servers.account_lookup_ok_at`), and when at least 5 accounts and at least half of a server's
- *   active accounts are missing at once, that looks like a broken lookup rather than a limiter. In
- *   both cases nothing on that server is removed and Admin → Logs gets a warning (at most once an
- *   hour per server).
+ * - Missing = the server answers `ACCOUNT_NOT_FOUND` or reports the account `revoked`. A bare 404,
+ *   a timeout or any other error changes nothing.
+ * - The first miss only records `missing_since`. The account is removed (status `removed`, slot
+ *   released, event logged) when its next regular lookup, one interval later, misses again and the
+ *   safety checks below pass. Found again → the miss is forgotten.
+ * - Accounts are looked up oldest check first, so before an account's second lookup every older
+ *   account of its server has been looked up since its first miss. The share of misses among those
+ *   lookups tells a limiter (a few accounts) from a broken lookup (most of them).
  *
- * Load stays small: one short request per account per interval, at most one request in flight per
- * server, at most 40 lookups per server and 200 in total per minute (a bigger fleet just takes more
- * than one interval to go round). Accounts are claimed by moving `checked_at` forward (FOR UPDATE
- * SKIP LOCKED), so several workers never check the same account twice. Servers marked offline are
- * skipped; the first connection failure stops the checks on that server for this run. Nothing
- * secret is sent or logged.
+ * Safety checks, per server and protocol (a lookup can break for one protocol only):
+ * - Trust: misses count only once the server has found at least one account of that protocol
+ *   (`server_protocols.account_lookup_ok_at`, cleared when the server's connection changes).
+ * - Share: when at least 3 accounts and at least half of those looked up since the first miss are
+ *   missing, nothing is removed.
+ * - Rate: at most max(10, 20 % of its active accounts) removals per server per hour.
+ * Held accounts stay active with `missing_since` set (Admin → Accounts shows "Missing on server") and
+ * Admin → Logs gets a warning naming them, at most once an hour per server and reason.
+ *
+ * Load: one short request per account per interval, at most one request in flight per server, at
+ * most 40 lookups per server and 200 in total per run (a bigger server takes longer to go round),
+ * servers marked offline are skipped, the first connection failure stops a server's lookups for the
+ * run, and a server that answers none of its lookups (no such route, wrong answers) is paused for an
+ * hour with a warning. Accounts are claimed by moving `checked_at` forward (FOR UPDATE SKIP LOCKED),
+ * so several workers never check the same account twice. Nothing secret is sent or logged.
  */
 
 /** Lookups per run (one run a minute) across all servers… */
 const CLAIM_LIMIT = 200;
 /** …and per server, so a big server is spread over several runs instead of getting a burst. */
 const PER_SERVER_LIMIT = 40;
-/** Due accounts read per run before the per-server cap is applied. */
-const SCAN_LIMIT = 1000;
 /** One run stops starting new lookups after this long so it never holds a maintenance slot for minutes. */
 const TIME_BUDGET_MS = 40_000;
 /** Servers checked in parallel; the accounts of one server are looked up one at a time. */
 const SERVER_CONCURRENCY = 6;
-/** A missing account is looked up again after this long and removed if it is still missing. */
-const CONFIRM_AFTER_MS = 50_000;
-/** Removals on a server are held back when at least this many of its accounts are missing… */
-const SUSPECT_MIN = 5;
-/** …and they are at least this share of its active accounts. */
+/** Removals of a protocol are held back when at least this many of its recent lookups missed… */
+const SUSPECT_MIN = 3;
+/** …and they are at least this share of them. */
 const SUSPECT_SHARE = 0.5;
+/** Removals per server per hour: at least this many… */
+const RATE_MIN = 10;
+/** …or this share of its active accounts. */
+const RATE_SHARE = 0.2;
 const WARN_EVERY_SECONDS = 3600;
+const PAUSE_SECONDS = 3600;
+/** Sorted set: server id → until when (ms) the check skips it. */
+const PAUSED_KEY = "account-check:paused";
 
 export interface AccountCheckResult {
   checked: number;
@@ -66,76 +75,92 @@ export interface AccountCheckResult {
 type Claimed = {
   id: string;
   serverId: string;
+  protocolId: string;
   remoteAccountId: string | null;
+  username: string | null;
   missingSince: Date | null;
 };
+
+type Ctx = { now: Date; started: number; budget: number; result: AccountCheckResult };
+
+const lastCheck = sql`coalesce(${vpnAccounts.checkedAt}, ${vpnAccounts.activatedAt}, ${vpnAccounts.createdAt})`;
 
 export async function checkAccounts(opts: { now?: Date; limit?: number; timeBudgetMs?: number } = {}): Promise<AccountCheckResult> {
   const result: AccountCheckResult = { checked: 0, missing: 0, removed: 0, held: 0, failed: 0 };
   const minutes = (await getSiteSettings()).health.accountCheckMinutes;
   if (!minutes) return result;
   const now = opts.now ?? new Date();
+  const nowIso = now.toISOString();
   const dueBefore = new Date(now.getTime() - minutes * 60_000).toISOString();
-  const confirmBefore = new Date(now.getTime() - CONFIRM_AFTER_MS).toISOString();
+  const paused = await pausedServers(now);
 
-  // Accounts that were never checked count from their activation, so a new account is not looked up
-  // straight away. Accounts waiting for their second lookup go first.
-  const lastCheck = sql`coalesce(${vpnAccounts.checkedAt}, ${vpnAccounts.activatedAt}, ${vpnAccounts.createdAt})`;
-  // Only the lookup right after a first miss is brought forward (checked_at still equals
-  // missing_since). Misses that were held back wait for the normal interval like everything else, so
-  // they can neither hog a server's lookups nor hammer it every minute.
-  const awaitingSecond = sql`(${vpnAccounts.missingSince} is not null and ${vpnAccounts.checkedAt} = ${vpnAccounts.missingSince})`;
+  // Oldest check first (an account never checked counts from its activation, so new accounts are not
+  // looked up straight away), at most PER_SERVER_LIMIT per server. FOR UPDATE cannot be combined with
+  // a window function, so the chosen ids are locked in a second step that re-checks they are due.
   const claimed: Claimed[] = await db().transaction(async (tx) => {
+    const candidates = await tx.execute<{ id: string }>(sql`
+      select id from (
+        select a.id, coalesce(a.checked_at, a.activated_at, a.created_at) as last_check,
+               row_number() over (partition by a.server_id order by coalesce(a.checked_at, a.activated_at, a.created_at), a.id) as rn
+        from ${vpnAccounts} a
+        join ${servers} s on s.id = a.server_id
+        where a.status = 'active'
+          and a.remote_account_id is not null
+          and a.expires_at > ${nowIso}::timestamptz
+          and s.deleted_at is null
+          and s.health_status <> 'offline'
+          and coalesce(a.checked_at, a.activated_at, a.created_at) <= ${dueBefore}::timestamptz
+          ${
+            paused.length
+              ? sql`and a.server_id not in (${sql.join(
+                  paused.map((id) => sql`${id}::uuid`),
+                  sql`, `,
+                )})`
+              : sql``
+          }
+      ) due
+      where rn <= ${PER_SERVER_LIMIT}
+      order by last_check, id
+      limit ${opts.limit ?? CLAIM_LIMIT}`);
+    const ids = [...candidates].map((r) => r.id);
+    if (!ids.length) return [];
     const rows = await tx
-      .select({ id: vpnAccounts.id, serverId: vpnAccounts.serverId, remoteAccountId: vpnAccounts.remoteAccountId, missingSince: vpnAccounts.missingSince })
-      .from(vpnAccounts)
-      .innerJoin(servers, eq(servers.id, vpnAccounts.serverId))
-      .where(
-        and(
-          eq(vpnAccounts.status, "active"),
-          isNotNull(vpnAccounts.remoteAccountId),
-          gt(vpnAccounts.expiresAt, now),
-          isNull(servers.deletedAt),
-          ne(servers.healthStatus, "offline"),
-          sql`(${lastCheck} <= ${dueBefore}::timestamptz or (${awaitingSecond} and ${lastCheck} <= ${confirmBefore}::timestamptz))`,
-        ),
-      )
-      .orderBy(sql`${awaitingSecond} desc`, asc(lastCheck))
-      .limit(SCAN_LIMIT)
-      .for("update", { of: vpnAccounts, skipLocked: true });
-    const perServer = new Map<string, number>();
-    const picked = rows
-      .filter((r) => {
-        const n = (perServer.get(r.serverId) ?? 0) + 1;
-        perServer.set(r.serverId, n);
-        return n <= PER_SERVER_LIMIT;
+      .select({
+        id: vpnAccounts.id,
+        serverId: vpnAccounts.serverId,
+        protocolId: vpnAccounts.protocolId,
+        remoteAccountId: vpnAccounts.remoteAccountId,
+        username: vpnAccounts.username,
+        missingSince: vpnAccounts.missingSince,
       })
-      .slice(0, opts.limit ?? CLAIM_LIMIT);
-    if (picked.length)
+      .from(vpnAccounts)
+      .where(and(inArray(vpnAccounts.id, ids), eq(vpnAccounts.status, "active"), sql`${lastCheck} <= ${dueBefore}::timestamptz`))
+      .orderBy(lastCheck, vpnAccounts.id)
+      .for("update", { skipLocked: true });
+    if (rows.length)
       await tx
         .update(vpnAccounts)
         .set({ checkedAt: now })
         .where(
           inArray(
             vpnAccounts.id,
-            picked.map((r) => r.id),
+            rows.map((r) => r.id),
           ),
         );
-    return picked;
+    return rows;
   });
   if (!claimed.length) return result;
 
   const byServer = new Map<string, Claimed[]>();
   for (const a of claimed) byServer.set(a.serverId, [...(byServer.get(a.serverId) ?? []), a]);
 
-  const started = Date.now();
-  const budget = opts.timeBudgetMs ?? TIME_BUDGET_MS;
+  const ctx: Ctx = { now, started: Date.now(), budget: opts.timeBudgetMs ?? TIME_BUDGET_MS, result };
   const queue = [...byServer.entries()];
   const work = async () => {
     for (let next = queue.shift(); next; next = queue.shift()) {
       const [serverId, accounts] = next;
       try {
-        await checkServer(serverId, accounts, { now, started, budget, result });
+        await checkServer(serverId, accounts, ctx);
       } catch (e) {
         result.failed += accounts.length;
         logger.warn("account check failed", { serverId, ...errorSummary(e) });
@@ -146,14 +171,11 @@ export async function checkAccounts(opts: { now?: Date; limit?: number; timeBudg
   return result;
 }
 
-async function checkServer(
-  serverId: string,
-  accounts: Claimed[],
-  ctx: { now: Date; started: number; budget: number; result: AccountCheckResult },
-): Promise<void> {
-  const { driver } = await getNodeDriver(serverId);
+async function checkServer(serverId: string, accounts: Claimed[], ctx: Ctx): Promise<void> {
+  const { driver, server } = await getNodeDriver(serverId);
   const present: Claimed[] = [];
   const missing: Claimed[] = [];
+  let firstError: { code: string; message: string } | null = null;
   for (const a of accounts) {
     if (Date.now() - ctx.started > ctx.budget) break; // the rest is looked up again after the interval
     try {
@@ -162,13 +184,33 @@ async function checkServer(
       ctx.result.checked++;
     } catch (e) {
       ctx.result.failed++;
-      if (isNodeError(e) && (e.kind === "connect" || e.kind === "timeout")) break;
+      if (isNodeError(e) && (e.kind === "connect" || e.kind === "timeout")) break; // the health monitor deals with that
+      firstError ??= isNodeError(e) ? { code: e.code, message: e.safeMessage } : { code: "UNEXPECTED", message: "Unexpected error." };
     }
   }
 
-  if (present.length) await db().update(servers).set({ accountLookupOkAt: ctx.now }).where(eq(servers.id, serverId));
-  const found = present.filter((a) => a.missingSince).map((a) => a.id);
-  if (found.length) await db().update(vpnAccounts).set({ missingSince: null }).where(inArray(vpnAccounts.id, found));
+  // A server that answers none of its lookups (an agent without the route, answers outside the
+  // contract) is skipped for an hour instead of being asked about every account again.
+  if (firstError && !present.length && !missing.length) {
+    await pauseServer(serverId, ctx.now);
+    await warn(
+      serverId,
+      "lookup_failing",
+      `${server.name} answered none of its account lookups (${firstError.message}). The account check skips this server for an hour, so accounts it deletes itself are not noticed. Update its node agent so GET /accounts/{id} answers as described in docs/10 and run node-selftest.py or npm run node:check.`,
+      { code: firstError.code },
+    );
+    return;
+  }
+
+  if (present.length) {
+    const ok = [...new Set(present.map((a) => a.protocolId))];
+    await db()
+      .update(serverProtocols)
+      .set({ accountLookupOkAt: ctx.now })
+      .where(and(eq(serverProtocols.serverId, serverId), inArray(serverProtocols.protocolId, ok)));
+    const found = present.filter((a) => a.missingSince).map((a) => a.id);
+    if (found.length) await db().update(vpnAccounts).set({ missingSince: null }).where(inArray(vpnAccounts.id, found));
+  }
   if (!missing.length) return;
   ctx.result.missing += missing.length;
 
@@ -179,77 +221,144 @@ async function checkServer(
       .set({ missingSince: ctx.now })
       .where(and(inArray(vpnAccounts.id, firstMiss), eq(vpnAccounts.status, "active")));
   }
-  const confirmed = missing.filter((a) => a.missingSince && ctx.now.getTime() - a.missingSince.getTime() >= CONFIRM_AFTER_MS);
+  // Missed on an earlier lookup too (at least one interval ago, since accounts are only due then).
+  const confirmed = missing.filter((a) => a.missingSince);
   if (!confirmed.length) return;
 
-  const [server] = await db().select({ name: servers.name, lookupOkAt: servers.accountLookupOkAt }).from(servers).where(eq(servers.id, serverId)).limit(1);
-  const [counts] = await db()
+  const byProtocol = new Map<string, Claimed[]>();
+  for (const a of confirmed) byProtocol.set(a.protocolId, [...(byProtocol.get(a.protocolId) ?? []), a]);
+  const removable: Claimed[] = [];
+  for (const [protocolId, group] of byProtocol) {
+    const [sp] = await db()
+      .select({ okAt: serverProtocols.accountLookupOkAt, name: protocols.name })
+      .from(serverProtocols)
+      .innerJoin(protocols, eq(protocols.id, serverProtocols.protocolId))
+      .where(and(eq(serverProtocols.serverId, serverId), eq(serverProtocols.protocolId, protocolId)))
+      .limit(1);
+    const protocolName = sp?.name ?? "VPN";
+    if (!sp?.okAt) {
+      hold(ctx, group);
+      await warn(
+        serverId,
+        `unconfirmed:${protocolId}`,
+        `${server.name} says ${names(group)} ${group.length === 1 ? "does" : "do"} not exist, but it has never found a ${protocolName} account there, so its answer is not trusted yet and nothing was removed. Check GET /accounts/{id} on the server (node-selftest.py or npm run node:check). If the server really deleted ${group.length === 1 ? "it" : "them"}, revoke ${group.length === 1 ? "it" : "them"} in Admin → Accounts.`,
+        { reason: "lookup_unconfirmed", protocolId, accounts: group.map((a) => a.id) },
+      );
+      continue;
+    }
+    // Every account of this protocol checked longer ago than the newest first miss has been looked up
+    // since then (oldest first), so this is the share of misses in a full round of lookups.
+    const since = new Date(Math.max(...group.map((a) => a.missingSince!.getTime())));
+    const [c] = await db()
+      .select({
+        looked: sql<number>`count(*)::int`,
+        missing: sql<number>`(count(*) filter (where ${vpnAccounts.missingSince} is not null))::int`,
+      })
+      .from(vpnAccounts)
+      .where(
+        and(
+          eq(vpnAccounts.serverId, serverId),
+          eq(vpnAccounts.protocolId, protocolId),
+          eq(vpnAccounts.status, "active"),
+          isNotNull(vpnAccounts.remoteAccountId),
+          gte(vpnAccounts.checkedAt, since),
+        ),
+      );
+    if (c && c.missing >= SUSPECT_MIN && c.missing >= c.looked * SUSPECT_SHARE) {
+      hold(ctx, group);
+      await warn(
+        serverId,
+        `too_many:${protocolId}`,
+        `${server.name} says ${c.missing} of the ${c.looked} ${protocolName} accounts it was asked about recently do not exist (${names(group)}…). That looks like a broken lookup rather than a login limiter, so nothing was removed. Check GET /accounts/{id} on the server; accounts it really deleted show as "Missing on server" in Admin → Accounts and can be revoked there.`,
+        { reason: "too_many_missing", protocolId, missing: c.missing, looked: c.looked },
+      );
+      continue;
+    }
+    removable.push(...group);
+  }
+  if (!removable.length) return;
+
+  const hourAgo = new Date(ctx.now.getTime() - 3_600_000).toISOString();
+  const [r] = await db()
     .select({
-      active: sql<number>`count(*)::int`,
-      missing: sql<number>`(count(*) filter (where ${vpnAccounts.missingSince} is not null))::int`,
+      active: sql<number>`(count(*) filter (where ${vpnAccounts.status} = 'active'))::int`,
+      recent: sql<number>`(count(*) filter (where ${vpnAccounts.status} = 'removed' and ${vpnAccounts.revokedAt} >= ${hourAgo}::timestamptz))::int`,
     })
     .from(vpnAccounts)
-    .where(and(eq(vpnAccounts.serverId, serverId), eq(vpnAccounts.status, "active"), isNotNull(vpnAccounts.remoteAccountId)));
-  const name = server?.name ?? "A server";
-  if (!server?.lookupOkAt) {
-    ctx.result.held += confirmed.length;
-    await warnHeld(
+    .where(eq(vpnAccounts.serverId, serverId));
+  const cap = Math.max(RATE_MIN, Math.ceil((r?.active ?? 0) * RATE_SHARE));
+  const allowed = Math.max(0, cap - (r?.recent ?? 0));
+  for (const a of removable.slice(0, allowed)) if (await markRemoved(a, server.name, ctx.now)) ctx.result.removed++;
+  const later = removable.slice(allowed);
+  if (later.length) {
+    hold(ctx, later);
+    await warn(
       serverId,
-      `${name} says ${confirmed.length === 1 ? "an account does" : `${confirmed.length} accounts do`} not exist, but it has not yet confirmed that any account exists, so its GET /accounts/{id} answer is not trusted and no account was marked removed. Check that lookup on the server (npm run node:check or node-selftest.py); accounts it really deleted can be revoked in Admin → Accounts.`,
-      { missing: confirmed.length, reason: "lookup_unconfirmed" },
+      "rate",
+      `${server.name} already had ${r?.recent ?? 0} accounts removed in the last hour (at most ${cap} per hour, in case its lookup is wrong). ${names(later)} will be removed at a later check if the server still says ${later.length === 1 ? "it does" : "they do"} not exist.`,
+      { reason: "rate", cap, accounts: later.map((a) => a.id) },
     );
-    return;
   }
-  if (counts && counts.missing >= SUSPECT_MIN && counts.missing >= counts.active * SUSPECT_SHARE) {
-    ctx.result.held += confirmed.length;
-    await warnHeld(
-      serverId,
-      `${name} says ${counts.missing} of its ${counts.active} active accounts do not exist. That looks like a problem with its GET /accounts/{id} answer rather than a login limiter, so no account was marked removed. Check the server; accounts it really deleted can be revoked in Admin → Accounts.`,
-      { missing: counts.missing, active: counts.active, reason: "too_many_missing" },
-    );
-    return;
-  }
+}
 
-  for (const a of confirmed) if (await markRemoved(a.id, ctx.now)) ctx.result.removed++;
+function hold(ctx: Ctx, accounts: Claimed[]) {
+  ctx.result.held += accounts.length;
+}
+
+function names(accounts: Claimed[]): string {
+  const shown = accounts.slice(0, 5).map((a) => a.username ?? a.remoteAccountId ?? a.id);
+  return accounts.length > 5 ? `${shown.join(", ")} and ${accounts.length - 5} more` : shown.join(", ");
 }
 
 /** Mark one account removed by its server and release its slot. False when it is no longer active. */
-async function markRemoved(accountId: string, now: Date): Promise<boolean> {
+async function markRemoved(account: Claimed, serverName: string, now: Date): Promise<boolean> {
   const row = await db().transaction(async (tx) => {
     const [acc] = await tx
       .update(vpnAccounts)
       .set({ status: "removed", revokedAt: now, missingSince: null })
-      .where(and(eq(vpnAccounts.id, accountId), eq(vpnAccounts.status, "active"), isNotNull(vpnAccounts.missingSince)))
-      .returning({ id: vpnAccounts.id, serverId: vpnAccounts.serverId, protocolId: vpnAccounts.protocolId, username: vpnAccounts.username });
+      .where(and(eq(vpnAccounts.id, account.id), eq(vpnAccounts.status, "active"), isNotNull(vpnAccounts.missingSince)))
+      .returning({ id: vpnAccounts.id });
     if (acc) await releaseCapacity(tx, acc.id);
     return acc;
   });
   if (!row) return false;
-  const [names] = await db()
-    .select({ server: servers.name, protocol: protocols.name })
-    .from(servers)
-    .innerJoin(protocols, eq(protocols.id, row.protocolId))
-    .where(eq(servers.id, row.serverId))
-    .limit(1);
+  const [p] = await db().select({ name: protocols.name }).from(protocols).where(eq(protocols.id, account.protocolId)).limit(1);
   await logEvent({
     event: "account.removed",
     status: "info",
     level: "warning",
-    serverId: row.serverId,
-    protocolId: row.protocolId,
-    accountId: row.id,
-    message: `${names?.protocol ?? "VPN"} account${row.username ? ` ${row.username}` : ""} was removed by ${names?.server ?? "its server"} before it expired (for example by its multi-login limiter). Its slot is free again.`,
+    serverId: account.serverId,
+    protocolId: account.protocolId,
+    accountId: account.id,
+    message: `${p?.name ?? "VPN"} account${account.username ? ` ${account.username}` : ""} was removed by ${serverName} before it expired (for example by its multi-login limiter). Its slot is free again.`,
   });
   return true;
 }
 
-/** Log why removals on a server were held back, at most once an hour per server. */
-async function warnHeld(serverId: string, message: string, details: Record<string, unknown>): Promise<void> {
+/** Log a warning about a server at most once an hour per reason. */
+async function warn(serverId: string, reason: string, message: string, details: Record<string, unknown>): Promise<void> {
   try {
-    const first = await redis().set(`account-check:held:${serverId}`, "1", "EX", WARN_EVERY_SECONDS, "NX");
+    const first = await redis().set(`account-check:warn:${serverId}:${reason}`, "1", "EX", WARN_EVERY_SECONDS, "NX");
     if (first !== "OK") return;
   } catch {
     // Without Redis the warning may repeat; better than staying silent.
   }
   await logEvent({ event: "account.removed", status: "failure", level: "warning", serverId, message, details });
+}
+
+async function pauseServer(serverId: string, now: Date): Promise<void> {
+  try {
+    await redis().zadd(PAUSED_KEY, now.getTime() + PAUSE_SECONDS * 1000, serverId);
+  } catch {
+    // Without Redis the server is simply asked again next interval.
+  }
+}
+
+async function pausedServers(now: Date): Promise<string[]> {
+  try {
+    await redis().zremrangebyscore(PAUSED_KEY, "-inf", now.getTime());
+    return (await redis().zrange(PAUSED_KEY, 0, -1)).filter((id) => /^[0-9a-f-]{36}$/.test(id));
+  } catch {
+    return [];
+  }
 }
