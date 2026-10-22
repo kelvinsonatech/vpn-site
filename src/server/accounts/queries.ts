@@ -75,6 +75,7 @@ export async function listAccounts(f: AccountFilters) {
       revokedAt: vpnAccounts.revokedAt,
       revokedByEmail: admins.email,
       missingSince: vpnAccounts.missingSince,
+      answeredAt: vpnAccounts.answeredAt,
       serverState: vpnAccounts.serverState,
       serverStateReason: vpnAccounts.serverStateReason,
       serverStateSince: vpnAccounts.serverStateSince,

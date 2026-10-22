@@ -8,9 +8,25 @@ import { getAccountState } from "@/server/accounts/queries";
 import { authorize } from "@/server/auth/guards";
 import { UserFacingError } from "@/server/errors";
 import { NodeError } from "@/server/nodes/errors";
+import { checkAccountNow } from "@/server/provisioning/account-check";
 import { revokeAccount } from "@/server/provisioning/service";
 
 const idSchema = z.uuid();
+
+/**
+ * Ask the account's server about it right away (the predefined GET /accounts/{id}, nothing else) and
+ * show what it answered; the answer is recorded like the regular account check's.
+ */
+export async function checkAccountNowAction(id: string): Promise<ActionState> {
+  return safeAction("checkAccountNow", async () => {
+    await authorize("accounts:manage");
+    const parsed = idSchema.safeParse(id);
+    if (!parsed.success) throw new UserFacingError("Invalid account id.");
+    const answer = await checkAccountNow(parsed.data);
+    revalidatePath("/admin/accounts");
+    return { ok: answer.outcome !== "error", data: { answer } };
+  });
+}
 
 /**
  * Revoke a VPN account: the node deletes it (predefined operation, no free-form input) and its

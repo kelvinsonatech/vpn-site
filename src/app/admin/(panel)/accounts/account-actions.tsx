@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
-import { BanIcon, EllipsisIcon, ExternalLinkIcon, IdCardIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { BanIcon, EllipsisIcon, ExternalLinkIcon, IdCardIcon, RefreshCwIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -20,7 +21,8 @@ import { ProtocolIcon } from "@/components/protocol-icon";
 import { Flag } from "@/components/public/flag";
 import { UserAvatar } from "@/components/user-avatar";
 import { cn } from "@/lib/utils";
-import { revokeAccountAction } from "./actions";
+import type { AccountCheckAnswer } from "@/server/provisioning/account-check";
+import { checkAccountNowAction, revokeAccountAction } from "./actions";
 import { ACCOUNT_STATUS, serverStateLabel, type AccountStatusName } from "./status";
 
 /** Serializable, non-secret view of one account (built by the accounts page on the server). */
@@ -39,6 +41,8 @@ export interface AccountView {
   revokedByEmail: string | null;
   /** Active, but its server answered "not found" (account check); not marked removed yet. */
   missingSince: string | null;
+  /** Last time its server answered the account check (found or not found). */
+  answeredAt: string | null;
   /** What its server reports about a block (banned for multi-login, expired early); null when none. */
   serverState: { state: "disabled" | "expired"; reason: string | null; since: string | null; until: string | null } | null;
   durationDays: number;
@@ -86,7 +90,95 @@ function Item({ label, children, mono }: { label: string; children: React.ReactN
   );
 }
 
-export function AccountDetailsDialog({ account, open, onOpenChange }: { account: AccountView; open: boolean; onOpenChange: (o: boolean) => void }) {
+/** What the server answered to "Check on server now", in words. */
+function AnswerText({ answer }: { answer: AccountCheckAnswer }) {
+  if (answer.outcome === "error") return <>No answer from the server: {answer.message}</>;
+  if (answer.outcome === "missing") {
+    return answer.revoked ? <>The server reports this account as revoked.</> : <>The server answered 404 ACCOUNT_NOT_FOUND: it does not have this account.</>;
+  }
+  return (
+    <>
+      The server answered <span className="font-mono">&quot;status&quot;: &quot;{answer.status}&quot;</span>
+      {answer.disabledReason ? (
+        <>
+          , reason <span className="font-mono">{answer.disabledReason}</span>
+        </>
+      ) : null}
+      {answer.disabledUntil ? (
+        <>
+          , until <When iso={answer.disabledUntil} />
+        </>
+      ) : null}
+      .
+      {answer.status === "active"
+        ? ' It does not report a ban. If its multi-login limiter banned this account, its API must answer "status": "disabled" with "disabled_reason": "multi_login" (docs/10).'
+        : null}
+    </>
+  );
+}
+
+/** The account check's last answer and (with accounts:manage) an immediate re-check. */
+function AccountCheck({ account, canManage }: { account: AccountView; canManage: boolean }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [answer, setAnswer] = useState<AccountCheckAnswer | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  if (account.status !== "active" || !account.remoteAccountId) return null;
+  const last = account.serverState
+    ? serverStateLabel(account.serverState.state, account.serverState.reason).label
+    : account.missingSince
+      ? "Not found"
+      : "Active";
+  const check = () =>
+    startTransition(async () => {
+      setError(null);
+      const res = await checkAccountNowAction(account.id);
+      if (res.error) setError(res.error);
+      setAnswer((res.data?.answer as AccountCheckAnswer | undefined) ?? null);
+      router.refresh();
+    });
+  return (
+    <section aria-label="Account check" className="grid gap-2 rounded-lg border bg-muted/30 p-3 text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-muted-foreground">
+          {account.answeredAt ? (
+            <>
+              Server&apos;s last answer: <span className="font-medium text-foreground">{last}</span> · <When iso={account.answeredAt} />
+            </>
+          ) : (
+            "Not looked up on its server yet: the automatic check first asks one interval after creation."
+          )}
+        </p>
+        {canManage ? (
+          <Button type="button" size="sm" variant="outline" disabled={pending} onClick={check}>
+            <RefreshCwIcon className={cn(pending && "animate-spin motion-reduce:animate-none")} aria-hidden />
+            Check on server now
+          </Button>
+        ) : null}
+      </div>
+      <p role="status" className={cn("empty:hidden", answer?.outcome === "error" && "text-destructive")}>
+        {answer ? <AnswerText answer={answer} /> : null}
+      </p>
+      {error ? (
+        <p role="alert" className="text-destructive">
+          {error}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+export function AccountDetailsDialog({
+  account,
+  open,
+  onOpenChange,
+  canManage = false,
+}: {
+  account: AccountView;
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  canManage?: boolean;
+}) {
   const status = ACCOUNT_STATUS[account.status];
   const meta = Object.entries(account.metadata);
   return (
@@ -144,6 +236,7 @@ export function AccountDetailsDialog({ account, open, onOpenChange }: { account:
             the server really deleted it, revoke it.
           </p>
         ) : null}
+        <AccountCheck account={account} canManage={canManage} />
         {account.failureMessage ? (
           <p className="rounded-md border border-destructive/30 bg-danger-soft p-3 text-sm text-destructive">
             {account.failureCode ? <span className="mr-1 font-mono text-xs">{account.failureCode}</span> : null}
@@ -248,7 +341,7 @@ export function AccountActions({ account, canManage, className }: { account: Acc
           ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
-      <AccountDetailsDialog account={account} open={details} onOpenChange={setDetails} />
+      <AccountDetailsDialog account={account} open={details} onOpenChange={setDetails} canManage={canManage} />
       {revocable ? (
         <ConfirmAction
           open={confirm}
@@ -273,7 +366,7 @@ export function AccountActions({ account, canManage, className }: { account: Acc
 }
 
 /** The account name in a list: opens the details dialog. */
-export function AccountName({ account }: { account: AccountView }) {
+export function AccountName({ account, canManage = false }: { account: AccountView; canManage?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -288,7 +381,7 @@ export function AccountName({ account }: { account: AccountView }) {
           <span className="truncate font-mono text-[11px] text-muted-foreground">{account.remoteAccountId ?? account.id.slice(0, 8)}</span>
         </span>
       </button>
-      <AccountDetailsDialog account={account} open={open} onOpenChange={setOpen} />
+      <AccountDetailsDialog account={account} open={open} onOpenChange={setOpen} canManage={canManage} />
     </>
   );
 }

@@ -4,7 +4,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { db } from "@/server/db";
 import { provisioningLogs, provisioningRequests, serverProtocols, servers, vpnAccounts } from "@/server/db/schema";
 import { redis } from "@/server/redis";
-import { checkAccounts } from "@/server/provisioning/account-check";
+import { checkAccountNow, checkAccounts } from "@/server/provisioning/account-check";
 import { expireAccounts, processExpiredRevokes } from "@/server/provisioning/expiry";
 import { executeCreate, requestAccount } from "@/server/provisioning/service";
 import { getSavedAccountStatuses } from "@/server/public/saved-status";
@@ -610,6 +610,44 @@ describe("account check (accounts the server deleted itself)", () => {
     expect(await getSavedAccountStatuses([early!.requestId])).toEqual({
       [early!.requestId]: { status: "suspended", reason: "expired", since: at(5).toISOString(), until: null },
     });
+  });
+
+  it("checks one account right away on request and records the answer like the regular check", async () => {
+    const { node, serverId } = await fleet();
+    const [acc, other] = await many(serverId, "check_now", 2);
+    expect(await checkAccountNow(acc!.id)).toMatchObject({ outcome: "found", status: "active", disabledReason: null });
+    expect((await row(acc!.id)).answeredAt).not.toBeNull();
+
+    const na = node.state.accounts.get(acc!.remoteAccountId!)!;
+    na.status = "disabled";
+    na.disabledReason = "multi_login";
+    na.disabledUntil = new Date(Date.now() + 3_600_000);
+    expect(await checkAccountNow(acc!.id)).toMatchObject({
+      outcome: "found",
+      status: "disabled",
+      disabledReason: "multi_login",
+      disabledUntil: na.disabledUntil.toISOString(),
+    });
+    expect(await row(acc!.id)).toMatchObject({ status: "active", serverState: "disabled", serverStateReason: "multi_login" });
+    const events = await db()
+      .select()
+      .from(provisioningLogs)
+      .where(and(eq(provisioningLogs.accountId, acc!.id), eq(provisioningLogs.event, "account.server_state")));
+    expect(events).toHaveLength(1);
+
+    node.state.accounts.delete(other!.remoteAccountId!);
+    expect(await checkAccountNow(other!.id)).toEqual({ outcome: "missing", revoked: false });
+    const r = await row(other!.id);
+    expect(r).toMatchObject({ status: "active" }); // removal stays with the regular check and its safety rules
+    expect(r.missingSince).not.toBeNull();
+    expect(r.checkedAt).not.toBeNull();
+
+    node.state.noAccountLookup = true;
+    expect(await checkAccountNow(acc!.id)).toMatchObject({ outcome: "error", code: "NOT_FOUND" });
+    node.state.noAccountLookup = false;
+
+    await db().update(vpnAccounts).set({ status: "expired" }).where(eq(vpnAccounts.id, other!.id));
+    await expect(checkAccountNow(other!.id)).rejects.toThrow("Only active accounts");
   });
 
   it("POST /api/public/accounts/status answers only the status of known accounts, for this site only", async () => {

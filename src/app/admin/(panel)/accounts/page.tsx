@@ -39,6 +39,7 @@ function toView(a: AdminAccountRow, avatarStyle: string): AccountView {
     revokedAt: a.revokedAt?.toISOString() ?? null,
     revokedByEmail: a.revokedByEmail,
     missingSince: a.missingSince?.toISOString() ?? null,
+    answeredAt: a.answeredAt?.toISOString() ?? null,
     serverState:
       a.serverState === "disabled" || a.serverState === "expired"
         ? {
@@ -267,7 +268,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
                 {views.map((a) => (
                   <TableRow key={a.id}>
                     <TableCell className="max-w-64">
-                      <AccountName account={a} />
+                      <AccountName account={a} canManage={manage} />
                       {a.failureMessage ? <span className="mt-1 block max-w-xs truncate pl-[52px] text-xs text-destructive">{a.failureMessage}</span> : null}
                     </TableCell>
                     <TableCell className="text-sm">
@@ -308,7 +309,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
               <li key={a.id}>
                 <Card className="gap-3 px-4 py-4">
                   <div className="flex items-start justify-between gap-2">
-                    <AccountName account={a} />
+                    <AccountName account={a} canManage={manage} />
                     <AccountActions account={a} canManage={manage} className="-mr-1.5 shrink-0" />
                   </div>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">

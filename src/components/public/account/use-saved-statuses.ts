@@ -31,8 +31,9 @@ function markLookup(at: number) {
  * Asks the website what became of the saved accounts that are still running by their expiry date:
  * removed by the server before they expired, or blocked by it for now (e.g. banned by its
  * multi-login limiter), and records that in the saved list, so every "My accounts" view (page,
- * header, mobile menu) shows it. Asked when a page opens and when the tab comes back into view, at
- * most once a minute per tab. Without an answer the list simply falls back to what it knew.
+ * header, mobile menu) shows it. Asked when a page opens, when the tab comes back into view and every
+ * minute while it stays in view (no reload needed), at most once a minute per tab. Without an answer
+ * the list simply falls back to what it knew.
  */
 export function useRefreshSavedStatuses(accounts: readonly SavedAccountSummary[] | null, now: number | null): void {
   const key =
@@ -69,8 +70,12 @@ export function useRefreshSavedStatuses(accounts: readonly SavedAccountSummary[]
     };
     load();
     document.addEventListener("visibilitychange", onVisible);
+    // A tab left open picks up a ban or removal by itself (load() keeps it to once a minute); hidden
+    // tabs ask again when shown.
+    const timer = window.setInterval(onVisible, MIN_GAP_MS / 4);
     return () => {
       document.removeEventListener("visibilitychange", onVisible);
+      window.clearInterval(timer);
       controller?.abort();
     };
   }, [key]);
