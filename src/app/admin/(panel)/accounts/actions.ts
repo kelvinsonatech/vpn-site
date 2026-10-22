@@ -19,11 +19,12 @@ const idSchema = z.uuid();
  */
 export async function checkAccountNowAction(id: string): Promise<ActionState> {
   return safeAction("checkAccountNow", async () => {
-    await authorize("accounts:manage");
+    const { actor } = await authorize("accounts:manage");
     const parsed = idSchema.safeParse(id);
     if (!parsed.success) throw new UserFacingError("Invalid account id.");
-    const answer = await checkAccountNow(parsed.data);
-    revalidatePath("/admin/accounts");
+    // No revalidatePath: the dialog refreshes the list when it closes, so a filtered list (e.g.
+    // "Blocked on server") does not drop the row, and with it the answer, while it is being read.
+    const answer = await checkAccountNow(parsed.data, actor);
     return { ok: answer.outcome !== "error", data: { answer } };
   });
 }

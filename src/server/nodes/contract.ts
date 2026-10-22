@@ -307,7 +307,19 @@ export type NodeAccount = {
   expiresAt?: Date;
   config: Record<string, unknown>;
   replayed?: boolean;
+  /**
+   * The server's own "status" and "disabled_reason" words as sent (strings only, clipped), before the
+   * contract read them (an unknown status reads as "active", an unknown reason is dropped). Only set by
+   * a lookup, and only for an administrator to see what the server really said.
+   */
+  wire?: { status: string | null; disabledReason: string | null };
 };
+
+/** One wire word for display: a string, without control characters, at most 40 characters; else null. */
+export function wireWord(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  return v.replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 40);
+}
 
 export function toNodeAccount(w: z.infer<typeof nodeAccountWire>, replayed?: boolean): NodeAccount {
   return {

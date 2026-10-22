@@ -1,4 +1,5 @@
 import { and, eq, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
+import { audit, type AuditActor } from "@/server/audit";
 import { db } from "@/server/db";
 import { protocols, serverProtocols, servers, vpnAccounts } from "@/server/db/schema";
 import { logEvent } from "@/server/logging/events";
@@ -6,8 +7,8 @@ import { errorSummary, logger } from "@/server/logging/logger";
 import { getNodeDriver } from "@/server/nodes/connection";
 import type { NodeAccount } from "@/server/nodes/contract";
 import { isNodeError, type NodeError } from "@/server/nodes/errors";
-import { redis } from "@/server/redis";
 import { UserFacingError } from "@/server/errors";
+import { redis } from "@/server/redis";
 import { getSiteSettings } from "@/server/settings/service";
 import { releaseCapacity } from "./capacity";
 
@@ -277,17 +278,8 @@ async function checkServer(serverId: string, accounts: Claimed[], ctx: Ctx, outc
   // Found again after a miss: this protocol's lookup is unreliable on this server for now.
   const foundAgain = found.filter((a) => a.missingSince);
   for (const protocolId of new Set(foundAgain.map((a) => a.protocolId))) {
-    await db()
-      .update(serverProtocols)
-      .set({ accountLookupFalseMissAt: ctx.now })
-      .where(and(eq(serverProtocols.serverId, serverId), eq(serverProtocols.protocolId, protocolId)));
     const again = foundAgain.filter((a) => a.protocolId === protocolId);
-    await warn(
-      serverId,
-      `false_miss:${protocolId}`,
-      `${server.name} said ${names(again)} did not exist, then found ${again.length === 1 ? "it" : "them"} again. Its lookup for this protocol looks unreliable, so its accounts are not removed for the next 2 hours.`,
-      { reason: "false_miss", protocolId, accounts: again.map((a) => a.id) },
-    );
+    await noteFalseMiss(serverId, server.name, protocolId, again, ctx.now);
   }
 
   if (!missing.length) return;
@@ -439,18 +431,30 @@ async function recordAnswer(a: Claimed, remote: NodeAccount | null, now: Date): 
 }
 
 /** What the server answered when an administrator asked about one account (Admin → Accounts → "Check on server now"). */
-export type AccountCheckAnswer =
-  | { outcome: "found"; status: NodeAccount["status"]; disabledReason: string | null; disabledUntil: string | null; expiresAt: string | null }
+export type AccountCheckAnswer = (
+  | {
+      outcome: "found";
+      status: NodeAccount["status"];
+      disabledReason: string | null;
+      disabledUntil: string | null;
+      expiresAt: string | null;
+      /** The server's own words, when they are not what the contract reads them as (e.g. "banned" read as "active"). */
+      wire: { status: string | null; disabledReason: string | null };
+    }
   | { outcome: "missing"; revoked: boolean }
-  | { outcome: "error"; code: string; message: string };
+  | { outcome: "error"; code: string; message: string }
+) & {
+  /** False while the account check is turned off: the answer is only shown, not stored. */
+  recorded: boolean;
+};
 
 /**
  * Look one active account up on its server right away, for an administrator who wants to see what the
- * server says now. The answer is recorded exactly like the regular check's (ban, early expiry, a miss),
- * and the regular check then waits a full interval for this account; removing it stays with the
- * regular check and its safety rules.
+ * server says now. While the account check is on, the answer is recorded exactly like the regular
+ * check's (ban, early expiry, a miss) and the regular check then waits a full interval for this
+ * account; removing it stays with the regular check and its safety rules.
  */
-export async function checkAccountNow(accountId: string): Promise<AccountCheckAnswer> {
+export async function checkAccountNow(accountId: string, actor: AuditActor): Promise<AccountCheckAnswer> {
   const [a] = await db()
     .select({
       id: vpnAccounts.id,
@@ -464,37 +468,62 @@ export async function checkAccountNow(accountId: string): Promise<AccountCheckAn
       serverStateReason: vpnAccounts.serverStateReason,
       prevCheckedAt: vpnAccounts.checkedAt,
       status: vpnAccounts.status,
+      serverDeletedAt: servers.deletedAt,
     })
     .from(vpnAccounts)
+    .innerJoin(servers, eq(servers.id, vpnAccounts.serverId))
     .where(eq(vpnAccounts.id, accountId))
     .limit(1);
   if (!a || a.status !== "active" || !a.remoteAccountId) throw new UserFacingError("Only active accounts that their server has confirmed can be checked.");
+  if (a.serverDeletedAt) throw new UserFacingError("Its server was deleted, so there is nothing to ask. Revoke the account if it should go.");
+  // Turned off, the worker clears every mark within a minute, so storing one would only flicker.
+  const recorded = (await getSiteSettings()).health.accountCheckMinutes > 0;
   const now = new Date();
   const { driver, server } = await getNodeDriver(a.serverId);
   let remote: NodeAccount | null;
   try {
     remote = await driver.getAccount(a.remoteAccountId);
   } catch (e) {
-    return isNodeError(e) ? { outcome: "error", code: e.code, message: e.safeMessage } : { outcome: "error", code: "UNEXPECTED", message: "Unexpected error." };
+    const err = isNodeError(e) ? { code: e.code, message: e.safeMessage } : { code: "UNEXPECTED", message: "Unexpected error." };
+    await audit(actor, "account.check_now", { targetType: "account", targetId: a.id, success: false, details: { code: err.code } });
+    return { outcome: "error", ...err, recorded: false };
   }
-  const { found, stateChange } = await recordAnswer(a, remote, now);
-  await db().update(vpnAccounts).set({ checkedAt: now }).where(eq(vpnAccounts.id, a.id));
-  if (stateChange !== undefined) await logServerState(a, stateChange, server.name);
-  if (found && a.missingSince) {
+  const found = !!remote && remote.status !== "revoked";
+  if (recorded) {
+    const { stateChange } = await recordAnswer(a, remote, now);
+    await db().update(vpnAccounts).set({ checkedAt: now }).where(eq(vpnAccounts.id, a.id));
+    if (stateChange !== undefined) await logServerState(a, stateChange, server.name, actor.adminId);
     // Found again after a miss, as in the regular check: that protocol's lookup looks unreliable.
-    await db()
-      .update(serverProtocols)
-      .set({ accountLookupFalseMissAt: now })
-      .where(and(eq(serverProtocols.serverId, a.serverId), eq(serverProtocols.protocolId, a.protocolId)));
+    if (found && a.missingSince) await noteFalseMiss(a.serverId, server.name, a.protocolId, [a], now);
   }
-  if (!found || !remote) return { outcome: "missing", revoked: remote?.status === "revoked" };
-  return {
-    outcome: "found",
-    status: remote.status,
-    disabledReason: remote.disabledReason ?? null,
-    disabledUntil: remote.disabledUntil?.toISOString() ?? null,
-    expiresAt: remote.expiresAt?.toISOString() ?? null,
-  };
+  const answer: AccountCheckAnswer =
+    !found || !remote
+      ? { outcome: "missing", revoked: remote?.status === "revoked", recorded }
+      : {
+          outcome: "found",
+          status: remote.status,
+          disabledReason: remote.disabledReason ?? null,
+          disabledUntil: remote.disabledUntil?.toISOString() ?? null,
+          expiresAt: remote.expiresAt?.toISOString() ?? null,
+          wire: { status: remote.wire?.status ?? null, disabledReason: remote.wire?.disabledReason ?? null },
+          recorded,
+        };
+  await audit(actor, "account.check_now", { targetType: "account", targetId: a.id, details: { outcome: answer.outcome, recorded } });
+  return answer;
+}
+
+/** Remember that a protocol's lookup on a server reported accounts missing that it then found again. */
+async function noteFalseMiss(serverId: string, serverName: string, protocolId: string, again: Claimed[], now: Date): Promise<void> {
+  await db()
+    .update(serverProtocols)
+    .set({ accountLookupFalseMissAt: now })
+    .where(and(eq(serverProtocols.serverId, serverId), eq(serverProtocols.protocolId, protocolId)));
+  await warn(
+    serverId,
+    `false_miss:${protocolId}`,
+    `${serverName} said ${names(again)} did not exist, then found ${again.length === 1 ? "it" : "them"} again. Its lookup for this protocol looks unreliable, so its accounts are not removed for the next 2 hours.`,
+    { reason: "false_miss", protocolId, accounts: again.map((x) => x.id) },
+  );
 }
 
 /** "Expired" on the server counts as early only this long before the expiry here (clocks differ a little). */
@@ -510,7 +539,7 @@ function serverStateOf(remote: NodeAccount, account: Claimed, now: Date): Server
   return null;
 }
 
-async function logServerState(account: Claimed, state: ServerState | null, serverName: string): Promise<void> {
+async function logServerState(account: Claimed, state: ServerState | null, serverName: string, adminId?: string | null): Promise<void> {
   const [p] = await db().select({ name: protocols.name }).from(protocols).where(eq(protocols.id, account.protocolId)).limit(1);
   const what = `${p?.name ?? "VPN"} account${account.username ? ` ${account.username}` : ""} on ${serverName}`;
   const message = !state
@@ -527,6 +556,7 @@ async function logServerState(account: Claimed, state: ServerState | null, serve
     serverId: account.serverId,
     protocolId: account.protocolId,
     accountId: account.id,
+    adminId,
     message,
     details: { state: state?.state ?? "active", reason: state?.reason ?? null },
   });

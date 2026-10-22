@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { db } from "@/server/db";
-import { provisioningLogs, provisioningRequests, serverProtocols, servers, vpnAccounts } from "@/server/db/schema";
+import { auditLogs, provisioningLogs, provisioningRequests, serverProtocols, servers, vpnAccounts } from "@/server/db/schema";
 import { redis } from "@/server/redis";
 import { checkAccountNow, checkAccounts } from "@/server/provisioning/account-check";
 import { expireAccounts, processExpiredRevokes } from "@/server/provisioning/expiry";
@@ -615,18 +615,25 @@ describe("account check (accounts the server deleted itself)", () => {
   it("checks one account right away on request and records the answer like the regular check", async () => {
     const { node, serverId } = await fleet();
     const [acc, other] = await many(serverId, "check_now", 2);
-    expect(await checkAccountNow(acc!.id)).toMatchObject({ outcome: "found", status: "active", disabledReason: null });
+    expect(await checkAccountNow(acc!.id, actor)).toMatchObject({
+      outcome: "found",
+      status: "active",
+      disabledReason: null,
+      wire: { status: "active", disabledReason: null },
+      recorded: true,
+    });
     expect((await row(acc!.id)).answeredAt).not.toBeNull();
 
     const na = node.state.accounts.get(acc!.remoteAccountId!)!;
     na.status = "disabled";
     na.disabledReason = "multi_login";
     na.disabledUntil = new Date(Date.now() + 3_600_000);
-    expect(await checkAccountNow(acc!.id)).toMatchObject({
+    expect(await checkAccountNow(acc!.id, actor)).toMatchObject({
       outcome: "found",
       status: "disabled",
       disabledReason: "multi_login",
       disabledUntil: na.disabledUntil.toISOString(),
+      wire: { status: "disabled", disabledReason: "multi_login" },
     });
     expect(await row(acc!.id)).toMatchObject({ status: "active", serverState: "disabled", serverStateReason: "multi_login" });
     const events = await db()
@@ -634,20 +641,80 @@ describe("account check (accounts the server deleted itself)", () => {
       .from(provisioningLogs)
       .where(and(eq(provisioningLogs.accountId, acc!.id), eq(provisioningLogs.event, "account.server_state")));
     expect(events).toHaveLength(1);
+    const audits = await db()
+      .select()
+      .from(auditLogs)
+      .where(and(eq(auditLogs.action, "account.check_now"), eq(auditLogs.targetId, acc!.id)));
+    expect(audits).toHaveLength(2);
+    expect(audits).toEqual(
+      expect.arrayContaining([expect.objectContaining({ success: true, adminEmail: actor.email, details: { outcome: "found", recorded: true } })]),
+    );
 
     node.state.accounts.delete(other!.remoteAccountId!);
-    expect(await checkAccountNow(other!.id)).toEqual({ outcome: "missing", revoked: false });
+    expect(await checkAccountNow(other!.id, actor)).toEqual({ outcome: "missing", revoked: false, recorded: true });
     const r = await row(other!.id);
     expect(r).toMatchObject({ status: "active" }); // removal stays with the regular check and its safety rules
     expect(r.missingSince).not.toBeNull();
     expect(r.checkedAt).not.toBeNull();
 
     node.state.noAccountLookup = true;
-    expect(await checkAccountNow(acc!.id)).toMatchObject({ outcome: "error", code: "NOT_FOUND" });
+    expect(await checkAccountNow(acc!.id, actor)).toMatchObject({ outcome: "error", code: "NOT_FOUND", recorded: false });
     node.state.noAccountLookup = false;
 
     await db().update(vpnAccounts).set({ status: "expired" }).where(eq(vpnAccounts.id, other!.id));
-    await expect(checkAccountNow(other!.id)).rejects.toThrow("Only active accounts");
+    await expect(checkAccountNow(other!.id, actor)).rejects.toThrow("Only active accounts");
+  });
+
+  it("shows the server's own words when it reports a ban in a form the contract does not read", async () => {
+    const { node, serverId } = await fleet();
+    const acc = await create(serverId, "check_words");
+    const na = node.state.accounts.get(acc.remoteAccountId!)!;
+    (na as { status: string }).status = "banned";
+    expect(await checkAccountNow(acc.id, actor)).toMatchObject({ outcome: "found", status: "active", wire: { status: "banned", disabledReason: null } });
+    expect(await row(acc.id)).toMatchObject({ serverState: null });
+
+    na.status = "disabled";
+    na.disabledReason = "Multi-Login";
+    expect(await checkAccountNow(acc.id, actor)).toMatchObject({
+      outcome: "found",
+      status: "disabled",
+      disabledReason: null,
+      wire: { status: "disabled", disabledReason: "Multi-Login" },
+    });
+    expect(await row(acc.id)).toMatchObject({ serverState: "disabled", serverStateReason: null });
+  });
+
+  it("warns, like the regular check, when an account it had missed is found again on request", async () => {
+    const { serverId } = await fleet();
+    const acc = await create(serverId, "check_again");
+    await db().update(vpnAccounts).set({ missingSince: new Date() }).where(eq(vpnAccounts.id, acc.id));
+    expect(await checkAccountNow(acc.id, actor)).toMatchObject({ outcome: "found", recorded: true });
+    expect((await row(acc.id)).missingSince).toBeNull();
+    const [sp] = await db()
+      .select()
+      .from(serverProtocols)
+      .where(and(eq(serverProtocols.serverId, serverId), eq(serverProtocols.protocolId, (await row(acc.id)).protocolId)));
+    expect(sp!.accountLookupFalseMissAt).not.toBeNull();
+    expect((await warnings(serverId)).map((w) => (w.details as { reason?: string }).reason)).toContain("false_miss");
+  });
+
+  it("only shows the answer while the account check is off, and refuses accounts on a deleted server", async () => {
+    const { node, serverId } = await fleet();
+    const acc = await create(serverId, "check_off");
+    const na = node.state.accounts.get(acc.remoteAccountId!)!;
+    na.status = "disabled";
+    na.disabledReason = "multi_login";
+    await setSettings({ health: { ...DEFAULT_SITE_SETTINGS.health, accountCheckMinutes: 0 } });
+    expect(await checkAccountNow(acc.id, actor)).toMatchObject({ outcome: "found", status: "disabled", disabledReason: "multi_login", recorded: false });
+    expect(await row(acc.id)).toMatchObject({ serverState: null, answeredAt: null, checkedAt: null });
+    const events = await db()
+      .select()
+      .from(provisioningLogs)
+      .where(and(eq(provisioningLogs.accountId, acc.id), eq(provisioningLogs.event, "account.server_state")));
+    expect(events).toHaveLength(0);
+
+    await db().update(servers).set({ deletedAt: new Date() }).where(eq(servers.id, serverId));
+    await expect(checkAccountNow(acc.id, actor)).rejects.toThrow("Its server was deleted");
   });
 
   it("POST /api/public/accounts/status answers only the status of known accounts, for this site only", async () => {

@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BanIcon, EllipsisIcon, ExternalLinkIcon, IdCardIcon, RefreshCwIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,6 +43,8 @@ export interface AccountView {
   missingSince: string | null;
   /** Last time its server answered the account check (found or not found). */
   answeredAt: string | null;
+  /** Settings → Health monitor → Account check is on (interval above 0). */
+  accountCheckOn: boolean;
   /** What its server reports about a block (banned for multi-login, expired early); null when none. */
   serverState: { state: "disabled" | "expired"; reason: string | null; since: string | null; until: string | null } | null;
   durationDays: number;
@@ -90,18 +92,44 @@ function Item({ label, children, mono }: { label: string; children: React.ReactN
   );
 }
 
-/** What the server answered to "Check on server now", in words. */
+const BAN_FORMAT = '"status": "disabled" with "disabled_reason": "multi_login" (docs/10)';
+
+/** What the server answered to "Check on server now", in words: its own words where the site reads them differently. */
 function AnswerText({ answer }: { answer: AccountCheckAnswer }) {
   if (answer.outcome === "error") return <>No answer from the server: {answer.message}</>;
+  const notRecorded = answer.recorded ? null : " Not recorded: the account check is off (Settings → Health monitor).";
   if (answer.outcome === "missing") {
-    return answer.revoked ? <>The server reports this account as revoked.</> : <>The server answered 404 ACCOUNT_NOT_FOUND: it does not have this account.</>;
+    return (
+      <>
+        {answer.revoked ? "The server reports this account as revoked." : "The server answered 404 ACCOUNT_NOT_FOUND: it does not have this account."}
+        {notRecorded}
+      </>
+    );
   }
+  const said = answer.wire.status;
+  const unread = said !== answer.status;
   return (
     <>
-      The server answered <span className="font-mono">&quot;status&quot;: &quot;{answer.status}&quot;</span>
+      The server answered{" "}
+      {said === null ? (
+        <>
+          no <span className="font-mono">&quot;status&quot;</span>
+        </>
+      ) : (
+        <span className="font-mono">&quot;status&quot;: &quot;{said}&quot;</span>
+      )}
+      {unread ? (
+        <>
+          , which is not a contract value, so it reads as <span className="font-mono">&quot;{answer.status}&quot;</span>
+        </>
+      ) : null}
       {answer.disabledReason ? (
         <>
           , reason <span className="font-mono">{answer.disabledReason}</span>
+        </>
+      ) : answer.wire.disabledReason !== null ? (
+        <>
+          , reason <span className="font-mono">&quot;{answer.wire.disabledReason}&quot;</span> (ignored: not a lowercase word such as multi_login)
         </>
       ) : null}
       {answer.disabledUntil ? (
@@ -111,18 +139,39 @@ function AnswerText({ answer }: { answer: AccountCheckAnswer }) {
       ) : null}
       .
       {answer.status === "active"
-        ? ' It does not report a ban. If its multi-login limiter banned this account, its API must answer "status": "disabled" with "disabled_reason": "multi_login" (docs/10).'
+        ? unread
+          ? ` A ban must be reported as ${BAN_FORMAT}.`
+          : ` It does not report a ban. If its multi-login limiter banned this account, its API must answer ${BAN_FORMAT}.`
         : null}
+      {notRecorded}
     </>
   );
 }
 
 /** The account check's last answer and (with accounts:manage) an immediate re-check. */
-function AccountCheck({ account, canManage }: { account: AccountView; canManage: boolean }) {
+function AccountCheck({
+  account,
+  canManage,
+  answer,
+  onAnswer,
+}: {
+  account: AccountView;
+  canManage: boolean;
+  answer: AccountCheckAnswer | null;
+  onAnswer: (a: AccountCheckAnswer | null) => void;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [answer, setAnswer] = useState<AccountCheckAnswer | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const checked = useRef(false);
+  // The list is refreshed when the dialog closes, not right away: in a filtered list ("Blocked on
+  // server") the row could otherwise vanish, closing the dialog before the answer is read.
+  useEffect(
+    () => () => {
+      if (checked.current) router.refresh();
+    },
+    [router],
+  );
   if (account.status !== "active" || !account.remoteAccountId) return null;
   const last = account.serverState
     ? serverStateLabel(account.serverState.state, account.serverState.reason).label
@@ -133,20 +182,25 @@ function AccountCheck({ account, canManage }: { account: AccountView; canManage:
     startTransition(async () => {
       setError(null);
       const res = await checkAccountNowAction(account.id);
+      checked.current = true;
       if (res.error) setError(res.error);
-      setAnswer((res.data?.answer as AccountCheckAnswer | undefined) ?? null);
-      router.refresh();
+      onAnswer((res.data?.answer as AccountCheckAnswer | undefined) ?? null);
     });
+  const answered = answer !== null && answer.outcome !== "error";
   return (
-    <section aria-label="Account check" className="grid gap-2 rounded-lg border bg-muted/30 p-3 text-sm">
+    <section aria-label="Account check" className="relative grid gap-2 rounded-lg border bg-muted/30 p-3 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-muted-foreground">
-          {account.answeredAt ? (
+          {!account.accountCheckOn ? (
+            "The automatic account check is off (Settings → Health monitor)."
+          ) : answered ? (
+            "The server's answer just now:"
+          ) : account.answeredAt ? (
             <>
               Server&apos;s last answer: <span className="font-medium text-foreground">{last}</span> · <When iso={account.answeredAt} />
             </>
           ) : (
-            "Not looked up on its server yet: the automatic check first asks one interval after creation."
+            "Its server has not answered a lookup yet. The automatic check first asks one interval after activation."
           )}
         </p>
         {canManage ? (
@@ -156,8 +210,9 @@ function AccountCheck({ account, canManage }: { account: AccountView; canManage:
           </Button>
         ) : null}
       </div>
-      <p role="status" className={cn("empty:hidden", answer?.outcome === "error" && "text-destructive")}>
-        {answer ? <AnswerText answer={answer} /> : null}
+      {/* Always in the accessibility tree, so screen readers announce each answer. */}
+      <p role="status" className={cn(!pending && !answer && "sr-only", answer?.outcome === "error" && !pending && "text-destructive")}>
+        {pending ? "Checking on its server…" : answer ? <AnswerText answer={answer} /> : null}
       </p>
       {error ? (
         <p role="alert" className="text-destructive">
@@ -179,131 +234,143 @@ export function AccountDetailsDialog({
   onOpenChange: (o: boolean) => void;
   canManage?: boolean;
 }) {
-  const status = ACCOUNT_STATUS[account.status];
-  const meta = Object.entries(account.metadata);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="gap-5 sm:max-w-xl">
-        <DialogHeader className="flex-row items-center gap-4 text-left">
-          <UserAvatar src={account.avatarUrl} size={64} className="ring-2 ring-border" />
-          <div className="grid min-w-0 gap-1">
-            <DialogTitle className="flex flex-wrap items-center gap-2 text-xl">
-              <span className="truncate">{account.username ?? "Unnamed account"}</span>
-              <Badge variant={status.variant}>{status.label}</Badge>
-              {account.status === "active" && account.serverState ? (
-                <Badge variant={serverStateLabel(account.serverState.state, account.serverState.reason).variant}>
-                  {serverStateLabel(account.serverState.state, account.serverState.reason).label}
-                </Badge>
-              ) : null}
-            </DialogTitle>
-            <DialogDescription className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="inline-flex items-center gap-1.5">
-                <ProtocolIcon name={account.protocol.icon} className="size-3.5" />
-                {account.protocol.name}
-              </span>
-              <span aria-hidden>·</span>
-              <span className="inline-flex items-center gap-1.5">
-                <Flag code={account.server.countryCode} className="h-3 w-4" title={account.server.country} />
-                {account.server.name}
-              </span>
-            </DialogDescription>
-          </div>
-        </DialogHeader>
-
-        {account.status === "active" && account.serverState ? (
-          <p className="rounded-lg border border-destructive/30 bg-danger-soft px-3 py-2 text-sm text-destructive">
-            {account.serverState.state === "expired"
-              ? "The server reports this account as expired, before its expiry date here."
-              : account.serverState.reason === "multi_login"
-                ? "The server banned this account for multi-login."
-                : `The server blocks this account${account.serverState.reason ? ` (${account.serverState.reason.replace(/_/g, " ")})` : ""}.`}{" "}
-            {account.serverState.since ? (
-              <>
-                Since <When iso={account.serverState.since} />.
-              </>
-            ) : null}{" "}
-            {account.serverState.until ? (
-              <>
-                Until <When iso={account.serverState.until} />.
-              </>
-            ) : null}{" "}
-            It still exists on the server and keeps its slot; this clears when the server reports it active again.
-          </p>
-        ) : null}
-        {account.status === "active" && account.missingSince ? (
-          <p className="rounded-lg border border-warning/30 bg-warning-soft px-3 py-2 text-sm text-warning-strong">
-            Missing on server since <When iso={account.missingSince} />. The account check has not marked it removed yet (or held it back: see Admin → Logs). If
-            the server really deleted it, revoke it.
-          </p>
-        ) : null}
-        <AccountCheck account={account} canManage={canManage} />
-        {account.failureMessage ? (
-          <p className="rounded-md border border-destructive/30 bg-danger-soft p-3 text-sm text-destructive">
-            {account.failureCode ? <span className="mr-1 font-mono text-xs">{account.failureCode}</span> : null}
-            {account.failureMessage}
-          </p>
-        ) : null}
-
-        <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-5 gap-y-2 text-sm">
-          <Item label="Created">
-            <When iso={account.createdAt} />
-          </Item>
-          <Item label="Activated">
-            <When iso={account.activatedAt} empty="Not yet" />
-          </Item>
-          <Item label="Expires">
-            <When iso={account.expiresAt} />
-          </Item>
-          <Item label="Validity">{account.durationDays} days</Item>
-          {account.revokedAt ? (
-            <Item label={account.status === "removed" ? "Removed" : "Revoked"}>
-              <When iso={account.revokedAt} />
-              {account.status === "removed" ? (
-                <span className="block text-xs text-muted-foreground">by the server itself, before it expired (for example its multi-login limiter)</span>
-              ) : account.revokedByEmail ? (
-                <span className="block text-xs text-muted-foreground">by {account.revokedByEmail}</span>
-              ) : null}
-            </Item>
-          ) : null}
-          <Item label="Server">
-            <Link href={`/admin/servers/${account.server.id}`} className="text-primary hover:underline">
-              {account.server.name}
-            </Link>{" "}
-            <span className="font-mono text-xs text-muted-foreground">/{account.server.slug}</span>
-          </Item>
-          <Item label="Node account" mono>
-            {account.remoteAccountId ?? "—"}
-          </Item>
-          <Item label="Account ID" mono>
-            {account.id}
-          </Item>
-        </dl>
-
-        <div className="grid gap-2">
-          <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Connection details</h3>
-          {meta.length ? (
-            <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-5 gap-y-1.5 rounded-lg border bg-muted/30 p-3 text-sm">
-              {meta.map(([k, v]) => (
-                <Item key={k} label={humanKey(k)} mono>
-                  {displayValue(v)}
-                </Item>
-              ))}
-            </dl>
-          ) : (
-            <p className="text-sm text-muted-foreground">No connection details recorded.</p>
-          )}
-          <p className="text-xs text-muted-foreground">
-            Passwords, keys and configuration files were shown to the user once and are not stored, so they cannot be displayed here.
-          </p>
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Close
-          </Button>
-        </DialogFooter>
+        <AccountDetails account={account} canManage={canManage} />
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** The dialog's content; mounted only while it is open, so a "Check on server now" answer lasts until it closes. */
+function AccountDetails({ account, canManage }: { account: AccountView; canManage: boolean }) {
+  const [answer, setAnswer] = useState<AccountCheckAnswer | null>(null);
+  // A fresh answer replaces what the page knew when it loaded (until it is refreshed on close).
+  const stale = answer !== null && answer.outcome !== "error";
+  const status = ACCOUNT_STATUS[account.status];
+  const meta = Object.entries(account.metadata);
+  return (
+    <>
+      <DialogHeader className="flex-row items-center gap-4 text-left">
+        <UserAvatar src={account.avatarUrl} size={64} className="ring-2 ring-border" />
+        <div className="grid min-w-0 gap-1">
+          <DialogTitle className="flex flex-wrap items-center gap-2 text-xl">
+            <span className="truncate">{account.username ?? "Unnamed account"}</span>
+            <Badge variant={status.variant}>{status.label}</Badge>
+            {account.status === "active" && account.serverState && !stale ? (
+              <Badge variant={serverStateLabel(account.serverState.state, account.serverState.reason).variant}>
+                {serverStateLabel(account.serverState.state, account.serverState.reason).label}
+              </Badge>
+            ) : null}
+          </DialogTitle>
+          <DialogDescription className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="inline-flex items-center gap-1.5">
+              <ProtocolIcon name={account.protocol.icon} className="size-3.5" />
+              {account.protocol.name}
+            </span>
+            <span aria-hidden>·</span>
+            <span className="inline-flex items-center gap-1.5">
+              <Flag code={account.server.countryCode} className="h-3 w-4" title={account.server.country} />
+              {account.server.name}
+            </span>
+          </DialogDescription>
+        </div>
+      </DialogHeader>
+
+      {account.status === "active" && account.serverState && !stale ? (
+        <p className="rounded-lg border border-destructive/30 bg-danger-soft px-3 py-2 text-sm text-destructive">
+          {account.serverState.state === "expired"
+            ? "The server reports this account as expired, before its expiry date here."
+            : account.serverState.reason === "multi_login"
+              ? "The server banned this account for multi-login."
+              : `The server blocks this account${account.serverState.reason ? ` (${account.serverState.reason.replace(/_/g, " ")})` : ""}.`}{" "}
+          {account.serverState.since ? (
+            <>
+              Since <When iso={account.serverState.since} />.
+            </>
+          ) : null}{" "}
+          {account.serverState.until ? (
+            <>
+              Until <When iso={account.serverState.until} />.
+            </>
+          ) : null}{" "}
+          It still exists on the server and keeps its slot; this clears when the server reports it active again.
+        </p>
+      ) : null}
+      {account.status === "active" && account.missingSince && !stale ? (
+        <p className="rounded-lg border border-warning/30 bg-warning-soft px-3 py-2 text-sm text-warning-strong">
+          Missing on server since <When iso={account.missingSince} />. The account check has not marked it removed yet (or held it back: see Admin → Logs). If
+          the server really deleted it, revoke it.
+        </p>
+      ) : null}
+      <AccountCheck account={account} canManage={canManage} answer={answer} onAnswer={setAnswer} />
+      {account.failureMessage ? (
+        <p className="rounded-md border border-destructive/30 bg-danger-soft p-3 text-sm text-destructive">
+          {account.failureCode ? <span className="mr-1 font-mono text-xs">{account.failureCode}</span> : null}
+          {account.failureMessage}
+        </p>
+      ) : null}
+
+      <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-5 gap-y-2 text-sm">
+        <Item label="Created">
+          <When iso={account.createdAt} />
+        </Item>
+        <Item label="Activated">
+          <When iso={account.activatedAt} empty="Not yet" />
+        </Item>
+        <Item label="Expires">
+          <When iso={account.expiresAt} />
+        </Item>
+        <Item label="Validity">{account.durationDays} days</Item>
+        {account.revokedAt ? (
+          <Item label={account.status === "removed" ? "Removed" : "Revoked"}>
+            <When iso={account.revokedAt} />
+            {account.status === "removed" ? (
+              <span className="block text-xs text-muted-foreground">by the server itself, before it expired (for example its multi-login limiter)</span>
+            ) : account.revokedByEmail ? (
+              <span className="block text-xs text-muted-foreground">by {account.revokedByEmail}</span>
+            ) : null}
+          </Item>
+        ) : null}
+        <Item label="Server">
+          <Link href={`/admin/servers/${account.server.id}`} className="text-primary hover:underline">
+            {account.server.name}
+          </Link>{" "}
+          <span className="font-mono text-xs text-muted-foreground">/{account.server.slug}</span>
+        </Item>
+        <Item label="Node account" mono>
+          {account.remoteAccountId ?? "—"}
+        </Item>
+        <Item label="Account ID" mono>
+          {account.id}
+        </Item>
+      </dl>
+
+      <div className="grid gap-2">
+        <h3 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Connection details</h3>
+        {meta.length ? (
+          <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-5 gap-y-1.5 rounded-lg border bg-muted/30 p-3 text-sm">
+            {meta.map(([k, v]) => (
+              <Item key={k} label={humanKey(k)} mono>
+                {displayValue(v)}
+              </Item>
+            ))}
+          </dl>
+        ) : (
+          <p className="text-sm text-muted-foreground">No connection details recorded.</p>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Passwords, keys and configuration files were shown to the user once and are not stored, so they cannot be displayed here.
+        </p>
+      </div>
+
+      <DialogFooter>
+        <DialogClose asChild>
+          <Button variant="outline">Close</Button>
+        </DialogClose>
+      </DialogFooter>
+    </>
   );
 }
 

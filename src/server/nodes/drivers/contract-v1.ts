@@ -13,6 +13,7 @@ import {
   toNodeInfo,
   toNodeProtocol,
   toNodeStats,
+  wireWord,
   type CreateAccountWire,
 } from "../contract";
 import type { NodeDriver } from "../driver";
@@ -110,7 +111,11 @@ export function contractV1Driver(conn: NodeConnection): NodeDriver {
     async getAccount(accountId) {
       try {
         const res = await call({ method: "GET", path: `/accounts/${idSegment(accountId)}` });
-        return toNodeAccount(parse(nodeAccountEnvelopeWire, res.data, "account").account);
+        const raw = (res.data as { account?: { status?: unknown; disabled_reason?: unknown } } | null)?.account;
+        return {
+          ...toNodeAccount(parse(nodeAccountEnvelopeWire, res.data, "account").account),
+          wire: { status: wireWord(raw?.status), disabledReason: wireWord(raw?.disabled_reason) },
+        };
       } catch (e) {
         // Only the contract's own answer means "gone": a bare 404 (wrong base path, a proxy page)
         // must never make the account check mark live accounts as removed.

@@ -25,7 +25,7 @@ import { ACCOUNT_STATUS, serverStateLabel } from "./status";
 
 export const metadata = { title: "Accounts" };
 
-function toView(a: AdminAccountRow, avatarStyle: string): AccountView {
+function toView(a: AdminAccountRow, avatarStyle: string, accountCheckOn: boolean): AccountView {
   return {
     id: a.id,
     username: a.username,
@@ -40,6 +40,7 @@ function toView(a: AdminAccountRow, avatarStyle: string): AccountView {
     revokedByEmail: a.revokedByEmail,
     missingSince: a.missingSince?.toISOString() ?? null,
     answeredAt: a.answeredAt?.toISOString() ?? null,
+    accountCheckOn,
     serverState:
       a.serverState === "disabled" || a.serverState === "expired"
         ? {
@@ -102,7 +103,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
     getSiteSettings(),
   ]);
   const manage = can(admin.role, "accounts:manage");
-  const views = rows.map((r) => toView(r, settings.avatarStyle));
+  const views = rows.map((r) => toView(r, settings.avatarStyle, settings.health.accountCheckMinutes > 0));
   const iso = (d?: Date) => d?.toISOString().slice(0, 10);
   const params = {
     q: f.q,
