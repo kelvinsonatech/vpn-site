@@ -278,8 +278,11 @@ export const nodeAccountWire = z.object({
     .regex(/^[a-z0-9_]{1,32}$/)
     .optional()
     .catch(undefined),
-  /** When a temporary block ends, if the server knows. */
-  disabled_until: isoDate.optional().catch(undefined),
+  /** When a temporary block ends, if the server knows (a date the database cannot store is ignored). */
+  disabled_until: isoDate
+    .refine((d) => d.getUTCFullYear() >= 1970 && d.getUTCFullYear() <= 9999)
+    .optional()
+    .catch(undefined),
   created_at: isoDate.optional(),
   expires_at: isoDate.optional(),
   /** Protocol-specific values; validated by the protocol adapter. */

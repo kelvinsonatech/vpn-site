@@ -20,3 +20,13 @@ describe("node account answer: blocks", () => {
     expect(toNodeAccount(nodeAccountWire.parse({ ...base, status: "active" }))).toMatchObject({ status: "active", disabledReason: undefined });
   });
 });
+
+describe("node account answer: dates the database cannot store", () => {
+  it("ignores a ban end before 1970 or after 9999 instead of failing the lookup", () => {
+    for (const disabled_until of ["0000-01-01T00:00:00Z", "9999-12-31T23:59:59-23:59"]) {
+      const a = toNodeAccount(nodeAccountWire.parse({ ...base, disabled_reason: "multi_login", disabled_until }));
+      expect(a.disabledReason).toBe("multi_login");
+      expect(a.disabledUntil).toBeUndefined();
+    }
+  });
+});

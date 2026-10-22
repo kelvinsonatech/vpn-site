@@ -1,4 +1,5 @@
 import { and, desc, eq, ilike, sql, type SQL } from "drizzle-orm";
+import { escapeLike } from "@/server/db/like";
 import { db } from "@/server/db";
 import { auditLogs, protocols, provisioningLogs, servers, type LogLevel } from "@/server/db/schema";
 
@@ -7,9 +8,9 @@ export const LOG_PAGE_SIZE = 50;
 export async function listProvisioningLogs(f: { level?: LogLevel; event?: string; serverId?: string; q?: string; page: number }) {
   const conds: SQL[] = [];
   if (f.level) conds.push(eq(provisioningLogs.level, f.level));
-  if (f.event) conds.push(ilike(provisioningLogs.event, `${f.event.replace(/[%_]/g, "")}%`));
+  if (f.event) conds.push(ilike(provisioningLogs.event, `${escapeLike(f.event)}%`));
   if (f.serverId) conds.push(eq(provisioningLogs.serverId, f.serverId));
-  if (f.q) conds.push(ilike(provisioningLogs.message, `%${f.q.replace(/[%_]/g, "")}%`));
+  if (f.q) conds.push(ilike(provisioningLogs.message, `%${escapeLike(f.q)}%`));
   const rows = await db()
     .select({
       id: provisioningLogs.id,
@@ -37,8 +38,8 @@ export async function listProvisioningLogs(f: { level?: LogLevel; event?: string
 
 export async function listAuditLogs(f: { action?: string; q?: string; page: number }) {
   const conds: SQL[] = [];
-  if (f.action) conds.push(ilike(auditLogs.action, `${f.action.replace(/[%_]/g, "")}%`));
-  if (f.q) conds.push(sql`(${auditLogs.adminEmail} ilike ${`%${f.q.replace(/[%_]/g, "")}%`} or ${auditLogs.targetId} = ${f.q})`);
+  if (f.action) conds.push(ilike(auditLogs.action, `${escapeLike(f.action)}%`));
+  if (f.q) conds.push(sql`(${auditLogs.adminEmail} ilike ${`%${escapeLike(f.q)}%`} or ${auditLogs.targetId} = ${f.q})`);
   const rows = await db()
     .select()
     .from(auditLogs)

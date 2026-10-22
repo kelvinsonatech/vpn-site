@@ -1,6 +1,7 @@
 import { and, desc, eq, gte, ilike, isNotNull, lte, sql, type SQL } from "drizzle-orm";
 import { db } from "@/server/db";
 import { accountStatus, admins, protocols, servers, vpnAccounts, type AccountStatus } from "@/server/db/schema";
+import { escapeLike } from "@/server/db/like";
 import { redactObject } from "@/server/logging/redact";
 
 export const ACCOUNT_PAGE_SIZE = 50;
@@ -47,7 +48,7 @@ export function parseAccountFilters(sp: Record<string, string | string[] | undef
 
 function filterConditions(f: AccountFilters, opts: { status: boolean }): SQL[] {
   const conds: SQL[] = [];
-  if (f.q) conds.push(ilike(vpnAccounts.username, `%${f.q.replace(/[%_]/g, "")}%`));
+  if (f.q) conds.push(ilike(vpnAccounts.username, `%${escapeLike(f.q)}%`));
   if (f.serverId) conds.push(eq(vpnAccounts.serverId, f.serverId));
   if (f.protocol) conds.push(eq(protocols.slug, f.protocol));
   if (opts.status && f.status) conds.push(eq(vpnAccounts.status, f.status));

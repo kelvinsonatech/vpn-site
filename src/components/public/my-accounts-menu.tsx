@@ -10,7 +10,7 @@ import { Flag } from "./flag";
 import { Countdown, useNow } from "./live-time";
 import { navItemClass } from "./nav";
 import { useSavedAccounts } from "./account/saved-accounts";
-import { SUSPENSION } from "./account/suspension";
+import { currentSuspension, SUSPENSION } from "./account/suspension";
 
 const NONE: SavedAccountSummary[] = [];
 
@@ -18,7 +18,7 @@ const NONE: SavedAccountSummary[] = [];
 export function useActiveAccounts(): { all: SavedAccountSummary[]; active: SavedAccountSummary[] } {
   const all = useSavedAccounts() ?? NONE;
   const now = useNow();
-  const active = all.filter((a) => !a.removedAt && !a.suspended && (now === null || Date.parse(a.expiresAt) > now));
+  const active = all.filter((a) => !a.removedAt && !currentSuspension(a, now) && (now === null || Date.parse(a.expiresAt) > now));
   return { all, active };
 }
 
@@ -98,7 +98,8 @@ function AccountRow({ account: a }: { account: SavedAccountSummary }) {
   const now = useNow();
   const expired = now !== null && Date.parse(a.expiresAt) <= now;
   const removed = !expired && !!a.removedAt;
-  const block = !expired && !removed && a.suspended ? SUSPENSION[a.suspended.reason] : null;
+  const suspension = !expired && !removed ? currentSuspension(a, now) : null;
+  const block = suspension ? SUSPENSION[suspension.reason] : null;
   return (
     <DropdownMenuItem asChild className="gap-3 rounded-xl p-2">
       <Link href="/my-accounts">

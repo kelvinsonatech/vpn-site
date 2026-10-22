@@ -31,8 +31,7 @@ import { CopyAction } from "./copy-action";
 import { DetailRow } from "./detail-row";
 import { readSavedAccounts, removeSavedAccounts, restoreSavedAccounts, useSavedAccounts, clearSavedAccounts } from "./saved-accounts";
 import { ExpiryCountdown, LocalDateTime } from "./time";
-import { SUSPENSION } from "./suspension";
-import { useRefreshSavedStatuses } from "./use-saved-statuses";
+import { currentSuspension, SUSPENSION } from "./suspension";
 
 /**
  * /my-accounts: the accounts created in this browser as DiceBear profile cards (non-secret
@@ -152,7 +151,7 @@ function ProfileCard({ account: a, now, removal, onRemove }: { account: SavedAcc
   const removed = !expired && !!removal;
   const ended = expired || removed;
   /** Still running here, but the server blocks it (e.g. banned for multi-login). */
-  const blocked = !ended && a.suspended ? a.suspended : null;
+  const blocked = !ended ? currentSuspension(a, now) : null;
   const block = blocked ? SUSPENSION[blocked.reason] : null;
   const left = removed ? 0 : lifeLeft(a, now);
   const name = displayName(a);
@@ -372,7 +371,6 @@ export function MyAccountsList() {
   const accounts = useSavedAccounts();
   const now = useNow();
   const [announcement, setAnnouncement] = useState("");
-  useRefreshSavedStatuses(accounts, now);
 
   const live = (
     <p className="sr-only" aria-live="polite" role="status">
@@ -418,7 +416,12 @@ export function MyAccountsList() {
   }
 
   const active = accounts.filter((a) => Date.parse(a.expiresAt) > now && !removalOf(a));
-  const blockedCount = active.filter((a) => a.suspended).length;
+  const bannedCount = active.filter((a) => {
+    const s = currentSuspension(a, now);
+    return s && s.reason !== "expired";
+  }).length;
+  const serverExpiredCount = active.filter((a) => currentSuspension(a, now)?.reason === "expired").length;
+  const workingCount = active.length - bannedCount - serverExpiredCount;
   const ended = accounts.filter((a) => Date.parse(a.expiresAt) <= now || removalOf(a));
   const removedCount = ended.filter((a) => Date.parse(a.expiresAt) > now).length;
   const expiredCount = ended.length - removedCount;
@@ -433,16 +436,22 @@ export function MyAccountsList() {
         <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
           <span className="inline-flex items-center gap-1.5 font-medium">
             <span className="size-2 rounded-full bg-success" aria-hidden />
-            <span className="tabular-nums">{active.length - blockedCount}</span> active
+            <span className="tabular-nums">{workingCount}</span> active
           </span>
           <span className="inline-flex items-center gap-1.5 text-muted-foreground">
             <span className="size-2 rounded-full bg-muted-foreground/50" aria-hidden />
             <span className="tabular-nums">{expiredCount}</span> expired
           </span>
-          {blockedCount ? (
+          {bannedCount ? (
             <span className="inline-flex items-center gap-1.5 text-destructive">
               <span className="size-2 rounded-full bg-destructive" aria-hidden />
-              <span className="tabular-nums">{blockedCount}</span> blocked by the server
+              <span className="tabular-nums">{bannedCount}</span> banned or blocked by the server
+            </span>
+          ) : null}
+          {serverExpiredCount ? (
+            <span className="inline-flex items-center gap-1.5 text-destructive">
+              <span className="size-2 rounded-full bg-destructive" aria-hidden />
+              <span className="tabular-nums">{serverExpiredCount}</span> expired on the server
             </span>
           ) : null}
           {removedCount ? (
@@ -482,7 +491,8 @@ export function MyAccountsList() {
       {active.length ? (
         <section aria-labelledby="my-active" className="grid gap-4">
           <h2 id="my-active" className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-            Active
+            {/* "Active" would contradict the summary once some of them are blocked by the server. */}
+            {workingCount === active.length ? "Active" : "Current"}
             <span className="rounded-full bg-success-soft px-2 py-0.5 text-xs font-semibold text-success tabular-nums">{active.length}</span>
           </h2>
           <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

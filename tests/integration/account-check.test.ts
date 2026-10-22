@@ -556,6 +556,47 @@ describe("account check (accounts the server deleted itself)", () => {
     });
     expect(await getSavedAccountStatuses([banned!.requestId])).toEqual({ [banned!.requestId]: { status: "active" } });
     expect((await logged()).some((m) => m.includes("no longer blocked"))).toBe(true);
+
+    // Usernames with "_" are found by the admin search (LIKE wildcards are escaped, not dropped).
+    expect((await listAccounts(parseAccountFilters({ q: "check_ban0" }))).rows.map((r) => r.id)).toEqual([banned!.id]);
+
+    // Banned again, then the server deletes it: no longer "blocked", just missing.
+    na.status = "disabled";
+    na.disabledReason = "multi_login";
+    await run(20);
+    expect((await row(banned!.id)).serverState).toBe("disabled");
+    node.state.accounts.delete(banned!.remoteAccountId!);
+    await run(25);
+    expect(await row(banned!.id)).toMatchObject({ serverState: null, serverStateReason: null });
+    expect((await row(banned!.id)).missingSince).not.toBeNull();
+  });
+
+  it("forgets every server block when the check is turned off", async () => {
+    const { node, serverId } = await fleet();
+    const [banned] = await many(serverId, "check_banoff", 2);
+    await run(0);
+    const na = node.state.accounts.get(banned!.remoteAccountId!)!;
+    na.status = "disabled";
+    na.disabledReason = "multi_login";
+    await run(5);
+    expect((await row(banned!.id)).serverState).toBe("disabled");
+    await setSettings({ health: { ...DEFAULT_SITE_SETTINGS.health, accountCheckMinutes: 0 } });
+    await run(6);
+    expect(await row(banned!.id)).toMatchObject({ status: "active", serverState: null, serverStateReason: null, serverStateSince: null });
+    expect(await getSavedAccountStatuses([banned!.requestId])).toEqual({ [banned!.requestId]: { status: "active" } });
+  });
+
+  it("does not call an account expired early when the server says so in its last minutes (clock skew)", async () => {
+    const { node, serverId } = await fleet();
+    const [late] = await many(serverId, "check_skew", 2);
+    await run(0);
+    await db()
+      .update(vpnAccounts)
+      .set({ expiresAt: at(9) })
+      .where(eq(vpnAccounts.id, late!.id)); // 4 minutes left at the next check
+    node.state.accounts.get(late!.remoteAccountId!)!.status = "expired";
+    await run(5);
+    expect(await row(late!.id)).toMatchObject({ status: "active", serverState: null });
   });
 
   it("shows an account the server already expired before the expiry date here, without removing it", async () => {

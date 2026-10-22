@@ -226,7 +226,8 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
             </Button>
             {filtered ? (
               <Button asChild variant="ghost">
-                <Link href={statusHref(f.status)}>
+                {/* Clears the filters, keeps the status or "Blocked on server" selection. */}
+                <Link href={f.blocked ? "/admin/accounts?blocked=1" : f.status ? `/admin/accounts?status=${f.status}` : "/admin/accounts"}>
                   <XIcon /> Clear
                 </Link>
               </Button>

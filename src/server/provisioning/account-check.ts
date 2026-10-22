@@ -97,6 +97,7 @@ type Claimed = {
   remoteAccountId: string | null;
   username: string | null;
   missingSince: Date | null;
+  expiresAt: Date | null;
   /** What the server said last time about a blocked account (see vpn_accounts.server_state). */
   serverState: string | null;
   serverStateReason: string | null;
@@ -113,11 +114,12 @@ export async function checkAccounts(opts: { now?: Date; limit?: number; timeBudg
   const result: AccountCheckResult = { checked: 0, missing: 0, removed: 0, held: 0, failed: 0 };
   const minutes = (await getSiteSettings()).health.accountCheckMinutes;
   if (!minutes) {
-    // Turned off: nothing is "missing on server" any more (a cheap no-op once cleared).
+    // Turned off: nothing is "missing on server" or "blocked on server" any more, since nobody would
+    // notice when that ends (a cheap no-op once cleared).
     await db()
       .update(vpnAccounts)
-      .set({ missingSince: null })
-      .where(and(eq(vpnAccounts.status, "active"), isNotNull(vpnAccounts.missingSince)));
+      .set({ missingSince: null, serverState: null, serverStateReason: null, serverStateSince: null, serverStateUntil: null })
+      .where(and(eq(vpnAccounts.status, "active"), sql`(${vpnAccounts.missingSince} is not null or ${vpnAccounts.serverState} is not null)`));
     return result;
   }
   const now = opts.now ?? new Date();
@@ -163,6 +165,7 @@ export async function checkAccounts(opts: { now?: Date; limit?: number; timeBudg
         remoteAccountId: vpnAccounts.remoteAccountId,
         username: vpnAccounts.username,
         missingSince: vpnAccounts.missingSince,
+        expiresAt: vpnAccounts.expiresAt,
         serverState: vpnAccounts.serverState,
         serverStateReason: vpnAccounts.serverStateReason,
         prevCheckedAt: vpnAccounts.checkedAt,
@@ -228,7 +231,7 @@ async function checkServer(serverId: string, accounts: Claimed[], ctx: Ctx, outc
       ctx.result.checked++;
       // A found account may still be blocked on the server (banned by its multi-login limiter, expired
       // early): mirror that for display, and clear it once the server reports it active again.
-      const state = remote && found ? serverStateOf(remote) : null;
+      const state = remote && found ? serverStateOf(remote, a, ctx.now) : null;
       const sameState = !!state && state.state === a.serverState && state.reason === a.serverStateReason;
       await db()
         .update(vpnAccounts)
@@ -242,7 +245,15 @@ async function checkServer(serverId: string, accounts: Claimed[], ctx: Ctx, outc
                 serverStateUntil: state?.until ?? null,
                 ...(sameState ? {} : { serverStateSince: state ? ctx.now : null }),
               }
-            : { answeredAt: ctx.now, missingSince: a.missingSince ?? ctx.now },
+            : // Not there at all any more: no longer "blocked on server" either.
+              {
+                answeredAt: ctx.now,
+                missingSince: a.missingSince ?? ctx.now,
+                serverState: null,
+                serverStateReason: null,
+                serverStateSince: null,
+                serverStateUntil: null,
+              },
         )
         .where(and(eq(vpnAccounts.id, a.id), eq(vpnAccounts.status, "active")));
       if (found && !sameState && (state || a.serverState)) changed.push({ account: a, state });
@@ -418,11 +429,16 @@ async function checkServer(serverId: string, accounts: Claimed[], ctx: Ctx, outc
 
 type ServerState = { state: "disabled" | "expired"; reason: string | null; until: Date | null };
 
+/** "Expired" on the server counts as early only this long before the expiry here (clocks differ a little). */
+const EARLY_EXPIRY_TOLERANCE_MS = 10 * 60_000;
+
 /** A found account the server does not let connect, or null when it says the account is active. */
-function serverStateOf(remote: NodeAccount): ServerState | null {
+function serverStateOf(remote: NodeAccount, account: Claimed, now: Date): ServerState | null {
   if (remote.status === "disabled") return { state: "disabled", reason: remote.disabledReason ?? null, until: remote.disabledUntil ?? null };
-  // Only accounts that are still running here are looked up, so "expired" there means expired early.
-  if (remote.status === "expired") return { state: "expired", reason: null, until: null };
+  // Only accounts still running here are looked up; "expired" there in their last minutes is just clock skew.
+  if (remote.status === "expired" && account.expiresAt && account.expiresAt.getTime() - now.getTime() > EARLY_EXPIRY_TOLERANCE_MS) {
+    return { state: "expired", reason: null, until: null };
+  }
   return null;
 }
 
