@@ -363,11 +363,13 @@ export const serverProtocols = pgTable(
     firstDetectedAt: timestamp("first_detected_at", { withTimezone: true }),
     lastDetectedAt: timestamp("last_detected_at", { withTimezone: true }),
     /**
-     * Last time the account check found an account of this protocol on this server. Until then its
-     * "not found" answers are not trusted (a broken lookup could say that of every account). Cleared
-     * when the server's connection or credentials change.
+     * Account check: when too many of this protocol's accounts were reported missing at once (a broken
+     * lookup rather than a login limiter). Accounts that went missing before then are never removed
+     * automatically; only finding them again or an administrator clears them.
      */
-    accountLookupOkAt: timestamp("account_lookup_ok_at", { withTimezone: true }),
+    accountLookupSuspectAt: timestamp("account_lookup_suspect_at", { withTimezone: true }),
+    /** Account check: last time an account reported missing was found again (an unreliable lookup). */
+    accountLookupFalseMissAt: timestamp("account_lookup_false_miss_at", { withTimezone: true }),
     ...timestamps,
   },
   (t) => [
@@ -408,6 +410,8 @@ export const vpnAccounts = pgTable(
     checkedAt: timestamp("checked_at", { withTimezone: true }),
     /** First check that found the account missing on the server; cleared when it is found again. */
     missingSince: timestamp("missing_since", { withTimezone: true }),
+    /** Last time its server answered the account check with "found" or "not found" (errors do not count). */
+    answeredAt: timestamp("answered_at", { withTimezone: true }),
     /** Safe (non-secret) connection metadata: host, ports, transport, SNI, path... */
     metadata: jsonb("metadata").$type<JsonObject>().notNull().default({}),
     failureCode: text("failure_code"),

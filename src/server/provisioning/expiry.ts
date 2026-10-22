@@ -125,7 +125,7 @@ export async function expireAccounts(opts: { now?: Date; batchSize?: number } = 
 
 async function queueRemovedAccountRevokes(now: Date, limit: number): Promise<number> {
   const due = await db()
-    .select({ id: vpnAccounts.id, serverId: vpnAccounts.serverId, protocolId: vpnAccounts.protocolId, capabilities: servers.capabilities })
+    .select({ id: vpnAccounts.id, serverId: vpnAccounts.serverId, protocolId: vpnAccounts.protocolId })
     .from(vpnAccounts)
     .innerJoin(servers, eq(servers.id, vpnAccounts.serverId))
     .where(
@@ -134,6 +134,8 @@ async function queueRemovedAccountRevokes(now: Date, limit: number): Promise<num
         lte(vpnAccounts.expiresAt, now),
         isNotNull(vpnAccounts.remoteAccountId),
         isNull(servers.deletedAt),
+        // Filtered here, not after the LIMIT, so servers that expire accounts themselves never crowd out the rest.
+        sql`coalesce((${servers.capabilities}->>'expiryManagedByNode')::boolean, false) = false`,
         sql`not exists (select 1 from ${provisioningRequests} r where r.idempotency_key = 'expire:' || ${vpnAccounts.id})`,
         // The alias hides the table name inside the subquery, so "vpn_accounts".* is the outer row.
         sql`not exists (
@@ -142,13 +144,13 @@ async function queueRemovedAccountRevokes(now: Date, limit: number): Promise<num
             and (o.remote_account_id = ${vpnAccounts.remoteAccountId} or (o.username is not null and o.username = ${vpnAccounts.username})))`,
       ),
     )
+    .orderBy(asc(vpnAccounts.expiresAt))
     .limit(limit);
-  const revokes = due.filter((r) => r.capabilities?.expiryManagedByNode !== true);
-  if (!revokes.length) return 0;
+  if (!due.length) return 0;
   const inserted = await db()
     .insert(provisioningRequests)
     .values(
-      revokes.map((r) => ({
+      due.map((r) => ({
         idempotencyKey: `expire:${r.id}`,
         operation: "revoke" as const,
         state: "queued" as const,

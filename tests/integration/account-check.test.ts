@@ -154,37 +154,78 @@ describe("account check (accounts the server deleted itself)", () => {
     expect((await db().select().from(provisioningRequests).where(eq(provisioningRequests.accountId, a!.id)))[0]!.state).toBe("succeeded");
     expect((await expireAccounts()).revokesQueued).toBe(0); // queued once
     expect(await statuses([reused.id, c!.id])).toEqual(["active", "active"]);
+
+    // A server that expires accounts itself gets no such request.
+    const managed = await fleet();
+    const [m1, ...mRest] = await many(managed.serverId, "check_exp_m", 3);
+    await run(20);
+    managed.node.state.accounts.delete(m1!.remoteAccountId!);
+    await run(25);
+    await run(30);
+    expect((await row(m1!.id)).status).toBe("removed");
+    await db()
+      .update(servers)
+      .set({ capabilities: { expiryManagedByNode: true } })
+      .where(eq(servers.id, managed.serverId));
+    await db()
+      .update(vpnAccounts)
+      .set({ expiresAt: new Date(Date.now() - MINUTE) })
+      .where(eq(vpnAccounts.id, m1!.id));
+    expect((await expireAccounts()).revokesQueued).toBe(0);
+    expect(mRest).toHaveLength(2);
   });
 
-  it("counts an account reported as revoked as missing, and forgets a miss when the account is found again", async () => {
+  it("counts an account the server reports as revoked as missing", async () => {
     const { node, serverId } = await fleet();
-    const [revoked, back, other] = await many(serverId, "check_rv", 3);
+    const [revoked, ...others] = await many(serverId, "check_rv", 3);
     await run(0);
     node.state.accounts.get(revoked!.remoteAccountId!)!.status = "revoked";
-    const saved = node.state.accounts.get(back!.remoteAccountId!)!;
-    node.state.accounts.delete(back!.remoteAccountId!);
     await run(5);
-    node.state.accounts.set(back!.remoteAccountId!, saved); // a hiccup, not a deletion
     await run(10);
     expect((await row(revoked!.id)).status).toBe("removed");
-    expect(await row(back!.id)).toMatchObject({ status: "active", missingSince: null, holdsCapacity: true });
-    expect((await row(other!.id)).status).toBe("active");
+    expect(await statuses(others.map((a) => a.id))).toEqual(["active", "active"]);
   });
 
-  it("never acts on a bare 404, and pauses a server that answers none of its lookups for an hour", async () => {
+  it("forgets a miss when the account is found again, and then waits 2 hours before removing that protocol's accounts", async () => {
+    const { node, serverId } = await fleet();
+    const [gone, back, ...others] = await many(serverId, "check_fa", 4);
+    await run(0);
+    const saved = node.state.accounts.get(back!.remoteAccountId!)!;
+    node.state.accounts.delete(gone!.remoteAccountId!);
+    node.state.accounts.delete(back!.remoteAccountId!);
+    await run(5);
+    node.state.accounts.set(back!.remoteAccountId!, saved); // the lookup said "not found" for an account that exists
+    await run(10);
+    expect(await row(back!.id)).toMatchObject({ status: "active", missingSince: null, holdsCapacity: true });
+    expect(await row(gone!.id)).toMatchObject({ status: "active", holdsCapacity: true }); // held: the lookup looks unreliable
+    expect((await warnings(serverId)).some((w) => w.message.includes("found it again"))).toBe(true);
+    await run(60);
+    expect((await row(gone!.id)).status).toBe("active");
+    await run(135);
+    expect((await row(gone!.id)).status).toBe("removed");
+    expect(await statuses(others.map((a) => a.id))).toEqual(["active", "active"]);
+  });
+
+  it("never acts on a bare 404 or a passing 500, and pauses a server that cannot answer the lookup twice in a row", async () => {
     const { node, serverId } = await fleet();
     const accs = await many(serverId, "check_404_", 2);
     await run(0);
-    node.state.noAccountLookup = true; // like an agent without GET /accounts/{id}
+    node.state.failLookups = 2; // one passing server error: no pause, asked again next interval
     await run(5);
-    expect(await statuses(accs.map((a) => a.id))).toEqual(["active", "active"]);
-    const [w] = await warnings(serverId);
-    expect(w!.message).toContain("answered none of its account lookups");
-    const asked = lookups(node, accs[0]!.remoteAccountId!);
     await run(10);
-    await run(30);
+    expect(lookups(node, accs[0]!.remoteAccountId!)).toBe(3);
+    expect(await warnings(serverId)).toHaveLength(0);
+
+    node.state.noAccountLookup = true; // like an agent without GET /accounts/{id}
+    await run(15);
+    expect(await warnings(serverId)).toHaveLength(0); // once could be a hiccup
+    await run(20);
+    expect((await warnings(serverId))[0]!.message).toContain("could not answer the account lookups in 2 checks in a row");
+    const asked = lookups(node, accs[0]!.remoteAccountId!);
+    await run(25);
+    await run(45);
     expect(lookups(node, accs[0]!.remoteAccountId!)).toBe(asked); // paused
-    await run(66);
+    await run(81);
     expect(lookups(node, accs[0]!.remoteAccountId!)).toBe(asked + 1); // asked again after the hour
     for (const a of accs) expect(await row(a.id)).toMatchObject({ status: "active", missingSince: null });
   });
@@ -197,50 +238,70 @@ describe("account check (accounts the server deleted itself)", () => {
     expect(lookups(node, acc.remoteAccountId!)).toBe(0);
   });
 
-  it("trusts misses per protocol only after the server has found one of that protocol's accounts", async () => {
+  it("removes nothing unless another account of the same protocol that existed before has been found since", async () => {
     const { node, serverId } = await fleet(["ssh", "vless"]);
-    await many(serverId, "check_tr_ssh", 3);
-    const vless = await create(serverId, "check_tr_vless", "vless");
-    node.state.accounts.delete(vless.remoteAccountId!); // gone before the first lookup: could be a broken lookup
-    await run(0); // SSH found (trusted), VLESS missing
-    await run(5);
-    expect(await row(vless.id)).toMatchObject({ status: "active", holdsCapacity: true });
-    expect((await row(vless.id)).missingSince).not.toBeNull();
-    expect((await warnings(serverId)).some((w) => w.message.includes("never found a VLESS account"))).toBe(true);
-
-    // A changed connection may mean another agent: trust has to be earned again.
-    expect(
-      (await db().select({ ok: serverProtocols.accountLookupOkAt }).from(serverProtocols).where(eq(serverProtocols.serverId, serverId))).some((t) => t.ok),
-    ).toBe(true);
-    await updateServerConnection(
-      serverId,
-      {
-        authMethod: "hmac_sha256",
-        keyId: "mock-key",
-        apiSecret: SECRET,
-        tlsMode: "insecure_http",
-        tlsServerName: null,
-        caCertificatePem: null,
-        pinnedFingerprintSha256: null,
-        clientCertificatePem: null,
-        clientKeyPem: null,
-      },
-      actor,
-    );
-    const trust = await db().select({ ok: serverProtocols.accountLookupOkAt }).from(serverProtocols).where(eq(serverProtocols.serverId, serverId));
-    expect(trust.every((t) => t.ok === null)).toBe(true);
-  });
-
-  it("holds a protocol whose lookup breaks while the server's other protocol keeps working", async () => {
-    const { node, serverId } = await fleet(["ssh", "vless"]);
-    const ssh = await many(serverId, "check_pp_ssh", 6);
-    const vless = await many(serverId, "check_pp_vl", 4, "vless");
-    await run(0); // both protocols trusted
+    await many(serverId, "check_pc_ssh", 8);
+    const vless = await many(serverId, "check_pc_vl", 2, "vless");
+    await run(0); // everything found
     for (const a of vless) node.state.accounts.delete(a.remoteAccountId!); // e.g. the agent can no longer read Xray's clients
     await run(5);
     await run(10);
-    expect(await statuses([...ssh, ...vless].map((a) => a.id))).toEqual(Array(10).fill("active"));
-    expect((await warnings(serverId)).some((w) => w.message.includes("4 of the 4 VLESS accounts"))).toBe(true);
+    await run(15);
+    expect(await statuses(vless.map((a) => a.id))).toEqual(["active", "active"]);
+    expect((await row(vless[0]!.id)).missingSince).not.toBeNull(); // shown as "Missing on server"
+    expect((await warnings(serverId)).some((w) => w.message.includes("has not found any other VLESS account"))).toBe(true);
+
+    // Accounts created after the misses started do not count as evidence that the lookup works.
+    const fresh = await create(serverId, "check_pc_vl_new", "vless");
+    await db()
+      .update(vpnAccounts)
+      .set({ activatedAt: at(16) })
+      .where(eq(vpnAccounts.id, fresh.id)); // signed up after the break
+    await run(20);
+    await run(25);
+    expect(await statuses([...vless.map((a) => a.id), fresh.id])).toEqual(["active", "active", "active"]);
+  });
+
+  it("holds for good when too many of a protocol's accounts go missing at once, even after new accounts or revokes", async () => {
+    const { node, serverId } = await fleet();
+    const accs = await many(serverId, "check_tm", 10);
+    await run(0);
+    const gone = accs.slice(0, 6); // 6 of 10: a partly broken lookup rather than a limiter
+    for (const a of gone) node.state.accounts.delete(a.remoteAccountId!);
+    await run(5);
+    await run(10);
+    expect(await statuses(gone.map((a) => a.id))).toEqual(Array(6).fill("active"));
+    expect((await warnings(serverId)).some((w) => w.message.includes("6 of the 10 SSH accounts"))).toBe(true);
+    const [sp] = await db().select({ at: serverProtocols.accountLookupSuspectAt }).from(serverProtocols).where(eq(serverProtocols.serverId, serverId));
+    expect(sp!.at).toEqual(at(10));
+
+    // New, found accounts and an administrator revoking two of them do not release the others.
+    const newer = await many(serverId, "check_tm_new", 12);
+    await db()
+      .update(vpnAccounts)
+      .set({ activatedAt: at(11) })
+      .where(
+        inArray(
+          vpnAccounts.id,
+          newer.map((a) => a.id),
+        ),
+      );
+    await db()
+      .update(vpnAccounts)
+      .set({ status: "revoked", revokedAt: at(11), holdsCapacity: false })
+      .where(inArray(vpnAccounts.id, [gone[0]!.id, gone[1]!.id]));
+    for (let m = 15; m <= 60; m += 5) await run(m);
+    expect(await statuses(gone.slice(2).map((a) => a.id))).toEqual(Array(4).fill("active"));
+
+    // Found again: no longer missing.
+    const back = gone[2]!;
+    node.state.accounts.set(back.remoteAccountId!, {
+      ...node.state.accounts.values().next().value!,
+      accountId: back.remoteAccountId!,
+      username: back.username!,
+    });
+    await run(65);
+    expect((await row(back.id)).missingSince).toBeNull();
   });
 
   it("removes nothing when the lookup of a big server breaks, with lookups spread over the interval", async () => {
@@ -256,12 +317,74 @@ describe("account check (accounts the server deleted itself)", () => {
     }
     node.state.accounts.clear(); // e.g. a reinstalled agent lost its records while the VPN users still work
     for (let m = 12; m < 40; m++) {
+      if (m === 20) {
+        // Sign-ups after the break, found by the new agent.
+        const newer = await many(serverId, "check_big_new", 15);
+        await db()
+          .update(vpnAccounts)
+          .set({ activatedAt: at(20) })
+          .where(
+            inArray(
+              vpnAccounts.id,
+              newer.map((a) => a.id),
+            ),
+          );
+      }
       await run(m);
       expect(perRun() - seen).toBeLessThanOrEqual(40);
       seen = perRun();
     }
     expect(new Set(await statuses(accs.map((a) => a.id)))).toEqual(new Set(["active"]));
-    expect((await warnings(serverId)).some((w) => w.message.includes("looks like a broken lookup"))).toBe(true);
+    expect((await warnings(serverId)).length).toBeGreaterThan(0);
+  });
+
+  it("removes nothing when a broken lookup is cut short by the time budget, and gets to every account in the end", async () => {
+    const { node, serverId } = await fleet();
+    const accs = await many(serverId, "check_budget", 20);
+    await run(0);
+    node.state.accounts.clear();
+    const before = new Map(accs.map((a) => [a.id, lookups(node, a.remoteAccountId!)]));
+    node.state.latencyMs = 15;
+    for (let m = 5; m < 65; m++) await checkAccounts({ now: at(m), timeBudgetMs: 20 }); // one or two lookups per run
+    expect(new Set(await statuses(accs.map((a) => a.id)))).toEqual(new Set(["active"]));
+    for (const a of accs) expect(lookups(node, a.remoteAccountId!)).toBeGreaterThan(before.get(a.id)!);
+  });
+
+  it("clears its per-protocol verdicts when the server's connection changes, and Missing marks when turned off", async () => {
+    const { node, serverId } = await fleet();
+    const [gone] = await many(serverId, "check_reset", 2);
+    await run(0);
+    node.state.accounts.delete(gone!.remoteAccountId!);
+    await run(5);
+    expect((await row(gone!.id)).missingSince).not.toBeNull();
+    await db()
+      .update(serverProtocols)
+      .set({ accountLookupSuspectAt: at(5), accountLookupFalseMissAt: at(5) })
+      .where(eq(serverProtocols.serverId, serverId));
+    await updateServerConnection(
+      serverId,
+      {
+        authMethod: "hmac_sha256",
+        keyId: "mock-key",
+        apiSecret: SECRET,
+        tlsMode: "insecure_http",
+        tlsServerName: null,
+        caCertificatePem: null,
+        pinnedFingerprintSha256: null,
+        clientCertificatePem: null,
+        clientKeyPem: null,
+      },
+      actor,
+    );
+    const flags = await db()
+      .select({ s: serverProtocols.accountLookupSuspectAt, f: serverProtocols.accountLookupFalseMissAt })
+      .from(serverProtocols)
+      .where(eq(serverProtocols.serverId, serverId));
+    expect(flags.every((x) => x.s === null && x.f === null)).toBe(true);
+
+    await setSettings({ health: { ...DEFAULT_SITE_SETTINGS.health, accountCheckMinutes: 0 } });
+    await run(6);
+    expect(await row(gone!.id)).toMatchObject({ status: "active", missingSince: null });
   });
 
   it("removes at most max(10, 20 %) accounts per server and hour, and the rest later", async () => {
