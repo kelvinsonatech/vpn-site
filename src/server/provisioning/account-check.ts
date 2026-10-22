@@ -1,6 +1,8 @@
+import { randomUUID } from "node:crypto";
 import { and, eq, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { audit, type AuditActor } from "@/server/audit";
 import { db } from "@/server/db";
+import { env } from "@/server/env";
 import { protocols, serverProtocols, servers, vpnAccounts } from "@/server/db/schema";
 import { logEvent } from "@/server/logging/events";
 import { errorSummary, logger } from "@/server/logging/logger";
@@ -71,6 +73,8 @@ const SERVER_CONCURRENCY = 6;
  * interval later and waits a whole extra minute.
  */
 const DUE_SLACK_MS = 15_000;
+/** Held while a run is going, so runs never overlap (see takeRunLock). */
+const RUN_LOCK_KEY = "account-check:run";
 /** Removals of a protocol are held back when at least this many of its accounts are missing… */
 const SUSPECT_MIN = 3;
 /** …and they are at least this share of the accounts answered. */
@@ -130,6 +134,44 @@ export async function checkAccounts(opts: { now?: Date; limit?: number; timeBudg
       .where(and(eq(vpnAccounts.status, "active"), sql`(${vpnAccounts.missingSince} is not null or ${vpnAccounts.serverState} is not null)`));
     return result;
   }
+  // One run at a time: a run that started late can still be waiting for its last answers when the
+  // next one starts, and two runs asking about the same account must not act on each other's answers.
+  const budget = opts.timeBudgetMs ?? TIME_BUDGET_MS;
+  const lock = await takeRunLock(budget);
+  if (lock === null) return result; // the previous run is still going: its accounts wait for the next one
+  try {
+    return await checkDue(minutes, budget, opts, result);
+  } finally {
+    await releaseRunLock(lock);
+  }
+}
+
+/**
+ * Takes the run lock, for as long as a run can last (its time budget, then its last lookup and its own
+ * database work). Returns its token, null when another run holds it, or "" when Redis cannot be
+ * reached (the run then goes ahead unlocked, as it did before there was a lock).
+ */
+async function takeRunLock(budget: number): Promise<string | null> {
+  const token = randomUUID();
+  try {
+    const ok = await redis().set(RUN_LOCK_KEY, token, "PX", budget + env().NODE_REQUEST_TIMEOUT_MS + 15_000, "NX");
+    return ok === "OK" ? token : null;
+  } catch {
+    return "";
+  }
+}
+
+async function releaseRunLock(token: string): Promise<void> {
+  if (!token) return;
+  try {
+    // Only our own lock: if it expired and another run took it, that one keeps it.
+    await redis().eval('if redis.call("get", KEYS[1]) == ARGV[1] then return redis.call("del", KEYS[1]) end return 0', 1, RUN_LOCK_KEY, token);
+  } catch {
+    // It expires by itself.
+  }
+}
+
+async function checkDue(minutes: number, budget: number, opts: { now?: Date; limit?: number }, result: AccountCheckResult): Promise<AccountCheckResult> {
   const now = opts.now ?? new Date();
   const nowIso = now.toISOString();
   const dueBefore = new Date(now.getTime() - minutes * 60_000 + DUE_SLACK_MS).toISOString();
@@ -199,7 +241,7 @@ export async function checkAccounts(opts: { now?: Date; limit?: number; timeBudg
   const byServer = new Map<string, Claimed[]>();
   for (const a of claimed) byServer.set(a.serverId, [...(byServer.get(a.serverId) ?? []), a]);
 
-  const ctx: Ctx = { now, started: Date.now(), budget: opts.timeBudgetMs ?? TIME_BUDGET_MS, result };
+  const ctx: Ctx = { now, started: Date.now(), budget, result };
   const queue = [...byServer.entries()];
   const work = async () => {
     for (let next = queue.shift(); next; next = queue.shift()) {
@@ -290,7 +332,7 @@ async function checkServer(serverId: string, accounts: Claimed[], ctx: Ctx, outc
 
   if (!missing.length) return;
   ctx.result.missing += missing.length;
-  // Missed on an earlier lookup too (at least one interval ago, since accounts are only due then).
+  // Missed on an earlier lookup too (about one interval ago, since accounts are only due then).
   const confirmed = missing.filter((a) => a.missingSince);
   if (!confirmed.length) return;
 
@@ -457,7 +499,7 @@ export type AccountCheckAnswer = (
 /**
  * Look one active account up on its server right away, for an administrator who wants to see what the
  * server says now. While the account check is on, the answer is recorded exactly like the regular
- * check's (ban, early expiry, a miss) and the regular check then waits a full interval for this
+ * check's (ban, early expiry, a miss) and the regular check then waits about an interval for this
  * account; removing it stays with the regular check and its safety rules.
  */
 export async function checkAccountNow(accountId: string, actor: AuditActor): Promise<AccountCheckAnswer> {

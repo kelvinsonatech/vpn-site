@@ -129,6 +129,46 @@ describe("account check (accounts the server deleted itself)", () => {
     expect(lookups(node, gone!.remoteAccountId!)).toBe(3);
   });
 
+  it("looks each account up once per interval, also when a run starts a little late", async () => {
+    await setSettings({ health: { ...DEFAULT_SITE_SETTINGS.health, accountCheckMinutes: 1 } });
+    const { node, serverId } = await fleet();
+    const [gone, ...rest] = await many(serverId, "check_tick", 3);
+    const runAt = (minutes: number, ms: number) => checkAccounts({ now: new Date(at(minutes).getTime() + ms) });
+    await runAt(0, 800); // a run that started late: all found
+    node.state.accounts.delete(gone!.remoteAccountId!);
+
+    await runAt(1, 0); // the next one, on time, 59.2 s later: due all the same
+    expect(lookups(node, gone!.remoteAccountId!)).toBe(2);
+    expect(await row(gone!.id)).toMatchObject({ status: "active", missingSince: at(1) });
+    await runAt(1, 40_000); // 40 s on: not due yet
+    expect(lookups(node, gone!.remoteAccountId!)).toBe(2);
+    await runAt(2, 0); // a minute after the first miss: missed again, removed
+    expect(await row(gone!.id)).toMatchObject({ status: "removed", revokedAt: at(2) });
+    expect(await statuses(rest.map((a) => a.id))).toEqual(["active", "active"]);
+
+    // At 5 minutes: due only in the last 15 seconds of the interval.
+    await setSettings({ health: { ...DEFAULT_SITE_SETTINGS.health, accountCheckMinutes: 5 } });
+    const [keep] = rest;
+    await runAt(7, -20_000);
+    expect(lookups(node, keep!.remoteAccountId!)).toBe(3);
+    await runAt(7, -10_000);
+    expect(lookups(node, keep!.remoteAccountId!)).toBe(4);
+  });
+
+  it("never runs twice at once: a run that starts while the last one is still going leaves it alone", async () => {
+    await setSettings({ health: { ...DEFAULT_SITE_SETTINGS.health, accountCheckMinutes: 1 } });
+    const { node, serverId } = await fleet();
+    const accounts = await many(serverId, "check_overlap", 2);
+    node.state.latencyMs = 300; // a slow server: the first run is still asking when the next one starts
+    const [, second] = await Promise.all([run(0), new Promise((r) => setTimeout(r, 200)).then(() => run(1))]);
+    node.state.latencyMs = 0;
+    expect(second!.checked).toBe(0); // its accounts were due again, but it left them to the running one
+    for (const a of accounts) expect(lookups(node, a.remoteAccountId!)).toBe(1);
+    expect(await redis().get("account-check:run")).toBeNull(); // released at the end
+    await run(2);
+    for (const a of accounts) expect(lookups(node, a.remoteAccountId!)).toBe(2);
+  });
+
   it("still deletes a removed account on the server at its expiry date, unless its name is in use again", async () => {
     const { node, serverId } = await fleet();
     const [a, b, c] = await many(serverId, "check_exp", 3);
