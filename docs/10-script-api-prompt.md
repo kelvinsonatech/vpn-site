@@ -206,6 +206,21 @@ then marks each account expired at its `expires_at` and sends `DELETE /api/v1/ac
 for it within about a minute (failures are retried with backoff for several hours). The delete must
 use the same live, no-restart method as above.
 
+### Accounts banned by the server (multi-login limiter)
+
+If the multi-login limiter **bans** an account instead of deleting it (locks the Linux user, disables
+the Xray client...), `GET /api/v1/accounts/{account_id}` must keep returning the account, with:
+
+```json
+{ "status": "disabled", "disabled_reason": "multi_login", "disabled_until": "2026-10-22T13:00:00Z" }
+```
+
+`disabled_until` is optional (leave it out if the ban does not end on its own). When the ban is
+lifted, return `"status": "active"` again. If the account has expired on the server (for example the
+Linux account expiry date has passed), return `"status": "expired"`. The website looks every active
+account up every few minutes and shows "Banned for multi-login" / "Expired on server" on its admin
+panel and on the visitor's My accounts page, and clears it when the account is active again.
+
 ### Accounts removed by the server itself (multi-login limiter and similar)
 
 If anything on the server deletes an account outside the API (a multi-login limiter, a cleanup

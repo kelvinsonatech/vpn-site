@@ -31,6 +31,7 @@ import { CopyAction } from "./copy-action";
 import { DetailRow } from "./detail-row";
 import { readSavedAccounts, removeSavedAccounts, restoreSavedAccounts, useSavedAccounts, clearSavedAccounts } from "./saved-accounts";
 import { ExpiryCountdown, LocalDateTime } from "./time";
+import { SUSPENSION } from "./suspension";
 import { useRefreshSavedStatuses } from "./use-saved-statuses";
 
 /**
@@ -150,13 +151,16 @@ function ProfileCard({ account: a, now, removal, onRemove }: { account: SavedAcc
   const expired = Date.parse(a.expiresAt) <= now;
   const removed = !expired && !!removal;
   const ended = expired || removed;
+  /** Still running here, but the server blocks it (e.g. banned for multi-login). */
+  const blocked = !ended && a.suspended ? a.suspended : null;
+  const block = blocked ? SUSPENSION[blocked.reason] : null;
   const left = removed ? 0 : lifeLeft(a, now);
   const name = displayName(a);
-  const tone = ended ? "bg-muted-foreground/40" : left <= 0.15 ? "bg-warning" : "bg-primary";
+  const tone = ended ? "bg-muted-foreground/40" : blocked ? "bg-destructive/60" : left <= 0.15 ? "bg-warning" : "bg-primary";
 
   return (
     <article
-      aria-label={`${name}, ${a.protocol.name} on ${a.server.name}${expired ? ", expired" : removed ? ", removed by the server" : ""}`}
+      aria-label={`${name}, ${a.protocol.name} on ${a.server.name}${expired ? ", expired" : removed ? ", removed by the server" : block ? `, ${block.title.toLowerCase()}` : ""}`}
       className={cn(
         "group relative flex flex-col overflow-hidden rounded-2xl border bg-card shadow-xs transition-[transform,box-shadow,border-color] duration-300 animate-in fade-in-0 slide-in-from-bottom-1 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg hover:shadow-primary/5 motion-reduce:animate-none motion-reduce:transition-none motion-reduce:hover:translate-y-0",
         ended && "bg-card/70",
@@ -185,22 +189,22 @@ function ProfileCard({ account: a, now, removal, onRemove }: { account: SavedAcc
             aria-hidden
             className={cn(
               "absolute -right-1 -bottom-1 size-4 rounded-full ring-4 ring-card",
-              removed ? "bg-destructive" : expired ? "bg-muted-foreground/50" : "bg-success",
+              removed || blocked ? "bg-destructive" : expired ? "bg-muted-foreground/50" : "bg-success",
             )}
           />
         </div>
         <span
           className={cn(
             "mb-1 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium",
-            removed ? "bg-destructive/10 text-destructive" : expired ? "bg-muted text-muted-foreground" : "bg-success-soft text-success",
+            removed || blocked ? "bg-destructive/10 text-destructive" : expired ? "bg-muted text-muted-foreground" : "bg-success-soft text-success",
           )}
         >
-          {removed ? (
+          {removed || blocked ? (
             <BanIcon className="size-3" aria-hidden />
           ) : (
             <span className={cn("size-1.5 rounded-full", expired ? "bg-muted-foreground/60" : "bg-success")} aria-hidden />
           )}
-          {removed ? "Removed" : expired ? "Expired" : "Valid"}
+          {removed ? "Removed" : expired ? "Expired" : block ? block.badge : "Valid"}
         </span>
       </div>
 
@@ -246,9 +250,13 @@ function ProfileCard({ account: a, now, removal, onRemove }: { account: SavedAcc
 
       <div className="px-5 py-4">
         <div className="flex items-baseline justify-between gap-2 text-xs">
-          <span className="text-muted-foreground">{removed ? "Removed by the server" : expired ? "This account has ended" : "Time left"}</span>
+          <span className={cn("text-muted-foreground", block && "font-medium text-destructive")}>
+            {removed ? "Removed by the server" : expired ? "This account has ended" : block ? block.title : "Time left"}
+          </span>
           {removed && removal ? (
             <RelativeTime iso={removal.removedAt} className="text-muted-foreground" />
+          ) : blocked?.since ? (
+            <RelativeTime iso={blocked.since} className="text-muted-foreground" />
           ) : expired ? (
             <RelativeTime iso={a.expiresAt} className="text-muted-foreground" />
           ) : (
@@ -261,6 +269,17 @@ function ProfileCard({ account: a, now, removal, onRemove }: { account: SavedAcc
         {removed ? (
           <p className="mt-2.5 text-xs text-pretty text-muted-foreground">
             It stopped working before its expiry date, for example because it was used on more devices at once than the server allows.
+          </p>
+        ) : block && blocked ? (
+          <p className="mt-2.5 text-xs text-pretty text-muted-foreground">
+            {block.text}{" "}
+            {blocked.until ? (
+              <>
+                The ban ends <LocalDateTime iso={blocked.until} />.
+              </>
+            ) : blocked.reason === "expired" ? null : (
+              "It works again only if the server lifts it."
+            )}
           </p>
         ) : null}
       </div>
@@ -399,6 +418,7 @@ export function MyAccountsList() {
   }
 
   const active = accounts.filter((a) => Date.parse(a.expiresAt) > now && !removalOf(a));
+  const blockedCount = active.filter((a) => a.suspended).length;
   const ended = accounts.filter((a) => Date.parse(a.expiresAt) <= now || removalOf(a));
   const removedCount = ended.filter((a) => Date.parse(a.expiresAt) > now).length;
   const expiredCount = ended.length - removedCount;
@@ -413,12 +433,18 @@ export function MyAccountsList() {
         <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
           <span className="inline-flex items-center gap-1.5 font-medium">
             <span className="size-2 rounded-full bg-success" aria-hidden />
-            <span className="tabular-nums">{active.length}</span> active
+            <span className="tabular-nums">{active.length - blockedCount}</span> active
           </span>
           <span className="inline-flex items-center gap-1.5 text-muted-foreground">
             <span className="size-2 rounded-full bg-muted-foreground/50" aria-hidden />
             <span className="tabular-nums">{expiredCount}</span> expired
           </span>
+          {blockedCount ? (
+            <span className="inline-flex items-center gap-1.5 text-destructive">
+              <span className="size-2 rounded-full bg-destructive" aria-hidden />
+              <span className="tabular-nums">{blockedCount}</span> blocked by the server
+            </span>
+          ) : null}
           {removedCount ? (
             <span className="inline-flex items-center gap-1.5 text-destructive">
               <span className="size-2 rounded-full bg-destructive" aria-hidden />

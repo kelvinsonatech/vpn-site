@@ -10,14 +10,15 @@ import { Flag } from "./flag";
 import { Countdown, useNow } from "./live-time";
 import { navItemClass } from "./nav";
 import { useSavedAccounts } from "./account/saved-accounts";
+import { SUSPENSION } from "./account/suspension";
 
 const NONE: SavedAccountSummary[] = [];
 
-/** Accounts on this device that have not expired or been removed (all but removed ones until the clock is known). */
+/** Accounts on this device that work: not expired, removed or blocked by the server (expiry unknown until the clock is). */
 export function useActiveAccounts(): { all: SavedAccountSummary[]; active: SavedAccountSummary[] } {
   const all = useSavedAccounts() ?? NONE;
   const now = useNow();
-  const active = all.filter((a) => !a.removedAt && (now === null || Date.parse(a.expiresAt) > now));
+  const active = all.filter((a) => !a.removedAt && !a.suspended && (now === null || Date.parse(a.expiresAt) > now));
   return { all, active };
 }
 
@@ -97,11 +98,12 @@ function AccountRow({ account: a }: { account: SavedAccountSummary }) {
   const now = useNow();
   const expired = now !== null && Date.parse(a.expiresAt) <= now;
   const removed = !expired && !!a.removedAt;
+  const block = !expired && !removed && a.suspended ? SUSPENSION[a.suspended.reason] : null;
   return (
     <DropdownMenuItem asChild className="gap-3 rounded-xl p-2">
       <Link href="/my-accounts">
         {a.avatar ? (
-          <UserAvatar src={a.avatar} size={36} className={cn((expired || removed) && "opacity-50 grayscale")} />
+          <UserAvatar src={a.avatar} size={36} className={cn((expired || removed || block) && "opacity-50 grayscale")} />
         ) : (
           <span className="flex size-9 items-center justify-center rounded-full bg-muted">
             <UserRoundIcon />
@@ -116,8 +118,8 @@ function AccountRow({ account: a }: { account: SavedAccountSummary }) {
             </span>
           </span>
         </span>
-        <span className={cn("shrink-0 text-[11px] font-medium", removed ? "text-destructive" : expired ? "text-muted-foreground" : "text-success")}>
-          {removed ? "Removed" : expired ? "Expired" : <Countdown iso={a.expiresAt} doneText="Expired" />}
+        <span className={cn("shrink-0 text-[11px] font-medium", removed || block ? "text-destructive" : expired ? "text-muted-foreground" : "text-success")}>
+          {removed ? "Removed" : expired ? "Expired" : block ? block.badge : <Countdown iso={a.expiresAt} doneText="Expired" />}
         </span>
       </Link>
     </DropdownMenuItem>

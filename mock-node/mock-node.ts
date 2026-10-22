@@ -47,7 +47,10 @@ interface MockAccount {
   protocol: string;
   username?: string;
   password?: string;
-  status: "active" | "revoked" | "expired";
+  status: "active" | "revoked" | "expired" | "disabled";
+  /** For `disabled`: why (e.g. "multi_login") and until when, like a multi-login limiter's ban. */
+  disabledReason?: string;
+  disabledUntil?: Date;
   createdAt: Date;
   expiresAt: Date;
   config: Record<string, unknown>;
@@ -292,6 +295,8 @@ function view(a: MockAccount, withConfig: boolean) {
     protocol: a.protocol,
     username: a.username,
     status: a.status,
+    ...(a.status === "disabled" && a.disabledReason ? { disabled_reason: a.disabledReason } : {}),
+    ...(a.status === "disabled" && a.disabledUntil ? { disabled_until: a.disabledUntil.toISOString() } : {}),
     created_at: a.createdAt.toISOString(),
     expires_at: a.expiresAt.toISOString(),
     config: withConfig ? a.config : {},

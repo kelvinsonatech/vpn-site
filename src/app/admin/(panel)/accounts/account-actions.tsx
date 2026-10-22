@@ -21,7 +21,7 @@ import { Flag } from "@/components/public/flag";
 import { UserAvatar } from "@/components/user-avatar";
 import { cn } from "@/lib/utils";
 import { revokeAccountAction } from "./actions";
-import { ACCOUNT_STATUS, type AccountStatusName } from "./status";
+import { ACCOUNT_STATUS, serverStateLabel, type AccountStatusName } from "./status";
 
 /** Serializable, non-secret view of one account (built by the accounts page on the server). */
 export interface AccountView {
@@ -39,6 +39,8 @@ export interface AccountView {
   revokedByEmail: string | null;
   /** Active, but its server answered "not found" (account check); not marked removed yet. */
   missingSince: string | null;
+  /** What its server reports about a block (banned for multi-login, expired early); null when none. */
+  serverState: { state: "disabled" | "expired"; reason: string | null; since: string | null; until: string | null } | null;
   durationDays: number;
   remoteAccountId: string | null;
   failureCode: string | null;
@@ -96,6 +98,11 @@ export function AccountDetailsDialog({ account, open, onOpenChange }: { account:
             <DialogTitle className="flex flex-wrap items-center gap-2 text-xl">
               <span className="truncate">{account.username ?? "Unnamed account"}</span>
               <Badge variant={status.variant}>{status.label}</Badge>
+              {account.status === "active" && account.serverState ? (
+                <Badge variant={serverStateLabel(account.serverState.state, account.serverState.reason).variant}>
+                  {serverStateLabel(account.serverState.state, account.serverState.reason).label}
+                </Badge>
+              ) : null}
             </DialogTitle>
             <DialogDescription className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className="inline-flex items-center gap-1.5">
@@ -111,6 +118,26 @@ export function AccountDetailsDialog({ account, open, onOpenChange }: { account:
           </div>
         </DialogHeader>
 
+        {account.status === "active" && account.serverState ? (
+          <p className="rounded-lg border border-destructive/30 bg-danger-soft px-3 py-2 text-sm text-destructive">
+            {account.serverState.state === "expired"
+              ? "The server reports this account as expired, before its expiry date here."
+              : account.serverState.reason === "multi_login"
+                ? "The server banned this account for multi-login."
+                : `The server blocks this account${account.serverState.reason ? ` (${account.serverState.reason.replace(/_/g, " ")})` : ""}.`}{" "}
+            {account.serverState.since ? (
+              <>
+                Since <When iso={account.serverState.since} />.
+              </>
+            ) : null}{" "}
+            {account.serverState.until ? (
+              <>
+                Until <When iso={account.serverState.until} />.
+              </>
+            ) : null}{" "}
+            It still exists on the server and keeps its slot; this clears when the server reports it active again.
+          </p>
+        ) : null}
         {account.status === "active" && account.missingSince ? (
           <p className="rounded-lg border border-warning/30 bg-warning-soft px-3 py-2 text-sm text-warning-strong">
             Missing on server since <When iso={account.missingSince} />. The account check has not marked it removed yet (or held it back: see Admin → Logs). If

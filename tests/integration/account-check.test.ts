@@ -8,6 +8,7 @@ import { checkAccounts } from "@/server/provisioning/account-check";
 import { expireAccounts, processExpiredRevokes } from "@/server/provisioning/expiry";
 import { executeCreate, requestAccount } from "@/server/provisioning/service";
 import { getSavedAccountStatuses } from "@/server/public/saved-status";
+import { countBlockedAccounts, listAccounts, parseAccountFilters } from "@/server/accounts/queries";
 import { publishServer, updateServerConnection } from "@/server/servers/service";
 import { syncServer } from "@/server/servers/sync";
 import { POST as savedStatusRoute } from "@/app/api/public/accounts/status/route";
@@ -496,6 +497,78 @@ describe("account check (accounts the server deleted itself)", () => {
     const r = await run(0, { limit: 42 });
     expect(r.checked).toBe(42);
     for (const a of tiny) expect(lookups(small.node, a.remoteAccountId!)).toBe(1);
+  });
+
+  it("shows an account the server banned for multi-login, keeps its slot, and clears it when the ban ends", async () => {
+    const { node, serverId } = await fleet();
+    const [banned, other] = await many(serverId, "check_ban", 2);
+    await run(0);
+    const before = await current(serverId);
+    const na = node.state.accounts.get(banned!.remoteAccountId!)!;
+    na.status = "disabled";
+    na.disabledReason = "multi_login";
+    na.disabledUntil = at(65);
+    await run(5);
+    expect(await row(banned!.id)).toMatchObject({
+      status: "active",
+      holdsCapacity: true,
+      missingSince: null,
+      serverState: "disabled",
+      serverStateReason: "multi_login",
+      serverStateSince: at(5),
+      serverStateUntil: at(65),
+    });
+    expect(await current(serverId)).toBe(before);
+    expect(await getSavedAccountStatuses([banned!.requestId, other!.requestId])).toEqual({
+      [banned!.requestId]: { status: "suspended", reason: "multi_login", since: at(5).toISOString(), until: at(65).toISOString() },
+      [other!.requestId]: { status: "active" },
+    });
+    const logged = async () =>
+      (
+        await db()
+          .select()
+          .from(provisioningLogs)
+          .where(and(eq(provisioningLogs.accountId, banned!.id), eq(provisioningLogs.event, "account.server_state")))
+      ).map((l) => l.message);
+    expect((await logged()).some((m) => m.includes("banned by the server for multi-login"))).toBe(true);
+
+    // Still banned at the next check: same "since", no new event.
+    await run(10);
+    expect((await row(banned!.id)).serverStateSince).toEqual(at(5));
+    expect(await logged()).toHaveLength(1);
+
+    // Admin → Accounts → "Blocked on server".
+    const blocked = await listAccounts(parseAccountFilters({ blocked: "1", server: serverId }));
+    expect(blocked.rows.map((r) => r.id)).toEqual([banned!.id]);
+    expect(await countBlockedAccounts(parseAccountFilters({ server: serverId }))).toBe(1);
+
+    // Ban lifted on the server.
+    na.status = "active";
+    delete na.disabledReason;
+    delete na.disabledUntil;
+    await run(15);
+    expect(await row(banned!.id)).toMatchObject({
+      status: "active",
+      serverState: null,
+      serverStateReason: null,
+      serverStateSince: null,
+      serverStateUntil: null,
+    });
+    expect(await getSavedAccountStatuses([banned!.requestId])).toEqual({ [banned!.requestId]: { status: "active" } });
+    expect((await logged()).some((m) => m.includes("no longer blocked"))).toBe(true);
+  });
+
+  it("shows an account the server already expired before the expiry date here, without removing it", async () => {
+    const { node, serverId } = await fleet();
+    const [early] = await many(serverId, "check_early", 2);
+    await run(0);
+    node.state.accounts.get(early!.remoteAccountId!)!.status = "expired";
+    await run(5);
+    await run(10);
+    expect(await row(early!.id)).toMatchObject({ status: "active", holdsCapacity: true, serverState: "expired", missingSince: null });
+    expect(await getSavedAccountStatuses([early!.requestId])).toEqual({
+      [early!.requestId]: { status: "suspended", reason: "expired", since: at(5).toISOString(), until: null },
+    });
   });
 
   it("POST /api/public/accounts/status answers only the status of known accounts, for this site only", async () => {

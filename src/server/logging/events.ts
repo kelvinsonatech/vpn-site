@@ -28,6 +28,7 @@ export type ProvisioningEvent =
   | "account.revoked"
   | "account.expired"
   | "account.removed"
+  | "account.server_state"
   | "account.renewed";
 
 export interface LogEventInput {

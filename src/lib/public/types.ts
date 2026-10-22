@@ -242,12 +242,27 @@ export type AccountStatusResponse =
   | { status: "failed"; error: { code: string; message: string } }
   | { status: "active"; account: PublicAccountResult | null };
 
+/** Why the server blocks an account it still has: banned by its multi-login limiter, otherwise blocked, or expired early. */
+export type SuspensionReason = "multi_login" | "disabled" | "expired";
+
+/** A server block as reported by the website (`since`: first seen; `until`: when it ends, if known). */
+export interface AccountSuspension {
+  reason: SuspensionReason;
+  since: string | null;
+  until: string | null;
+}
+
 /**
  * POST /api/public/accounts/status `{ ids: [requestId…] }` (at most 50) → what became of accounts
  * saved in My accounts. Only ids of created accounts appear; `removed` covers accounts the server
- * deleted early (e.g. its multi-login limiter) and accounts an administrator revoked.
+ * deleted early (e.g. its multi-login limiter) and accounts an administrator revoked; `suspended` an
+ * account the server still has but blocks (e.g. banned for multi-login), which may end.
  */
-export type SavedAccountServerStatus = { status: "active" } | { status: "expired" } | { status: "removed"; removedAt: string | null };
+export type SavedAccountServerStatus =
+  | { status: "active" }
+  | { status: "expired" }
+  | { status: "removed"; removedAt: string | null }
+  | ({ status: "suspended" } & AccountSuspension);
 
 export interface SavedAccountStatusResponse {
   accounts: Record<string, SavedAccountServerStatus>;
@@ -285,6 +300,8 @@ export interface SavedAccountSummary {
    * multi-login limiter). A removal is final, so it is kept here and every "My accounts" view agrees.
    */
   removedAt?: string;
+  /** Set while the website reports that the server blocks the account (e.g. banned for multi-login). */
+  suspended?: AccountSuspension;
   /** Non-secret connection details (host, IP, ports, SNI, payload...) in display order. Never secrets. */
   details?: { label: string; value: string }[];
 }

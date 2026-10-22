@@ -412,6 +412,19 @@ export const vpnAccounts = pgTable(
     missingSince: timestamp("missing_since", { withTimezone: true }),
     /** Last time its server answered the account check with "found" or "not found" (errors do not count). */
     answeredAt: timestamp("answered_at", { withTimezone: true }),
+    /**
+     * What its server last said about an account it still has but does not let connect: `disabled`
+     * (e.g. banned by its multi-login limiter, see server_state_reason) or `expired` (before the
+     * website's own expiry). Null when the server says it is active. Display only: the account stays
+     * active here, keeps its slot and is cleared as soon as the server reports it active again.
+     */
+    serverState: text("server_state"),
+    /** The server's reason for `disabled`, e.g. "multi_login". */
+    serverStateReason: text("server_state_reason"),
+    /** When the account check first saw the current server state. */
+    serverStateSince: timestamp("server_state_since", { withTimezone: true }),
+    /** When the server says a temporary block ends, if it said. */
+    serverStateUntil: timestamp("server_state_until", { withTimezone: true }),
     /** Safe (non-secret) connection metadata: host, ports, transport, SNI, path... */
     metadata: jsonb("metadata").$type<JsonObject>().notNull().default({}),
     failureCode: text("failure_code"),

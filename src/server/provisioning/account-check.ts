@@ -4,6 +4,7 @@ import { protocols, serverProtocols, servers, vpnAccounts } from "@/server/db/sc
 import { logEvent } from "@/server/logging/events";
 import { errorSummary, logger } from "@/server/logging/logger";
 import { getNodeDriver } from "@/server/nodes/connection";
+import type { NodeAccount } from "@/server/nodes/contract";
 import { isNodeError, type NodeError } from "@/server/nodes/errors";
 import { redis } from "@/server/redis";
 import { getSiteSettings } from "@/server/settings/service";
@@ -20,6 +21,11 @@ import { releaseCapacity } from "./capacity";
  * - Missing = the server answers `ACCOUNT_NOT_FOUND` or reports the account `revoked`; found = it
  *   returns the account. Only these answers count (`answered_at`). A bare 404, a timeout or any other
  *   error is no answer.
+ * - A found account the server does not let connect (`"status": "disabled"`, e.g. with
+ *   `"disabled_reason": "multi_login"` when its multi-login limiter banned it, or `"expired"` before
+ *   the expiry date here) is mirrored in `server_state*` for display: Admin → Accounts and My accounts
+ *   show it as banned or blocked, an event is logged when it starts and ends. Nothing else changes
+ *   (it stays active and keeps its slot), and it clears as soon as the server reports it active.
  * - The first miss only records `missing_since`. The account is removed (status `removed`, slot
  *   released, event logged) when its next regular lookup, one interval later, misses again and every
  *   safety check below passes. Found again → the miss is forgotten.
@@ -91,6 +97,9 @@ type Claimed = {
   remoteAccountId: string | null;
   username: string | null;
   missingSince: Date | null;
+  /** What the server said last time about a blocked account (see vpn_accounts.server_state). */
+  serverState: string | null;
+  serverStateReason: string | null;
   /** checked_at before this run claimed it, to put it back in line if it is not looked up. */
   prevCheckedAt: Date | null;
 };
@@ -154,6 +163,8 @@ export async function checkAccounts(opts: { now?: Date; limit?: number; timeBudg
         remoteAccountId: vpnAccounts.remoteAccountId,
         username: vpnAccounts.username,
         missingSince: vpnAccounts.missingSince,
+        serverState: vpnAccounts.serverState,
+        serverStateReason: vpnAccounts.serverStateReason,
         prevCheckedAt: vpnAccounts.checkedAt,
       })
       .from(vpnAccounts)
@@ -206,6 +217,8 @@ async function checkServer(serverId: string, accounts: Claimed[], ctx: Ctx, outc
   let unsupported: { code: string; message: string } | null = null;
   /** First error message per protocol in this run. */
   const errors = new Map<string, string>();
+  /** Accounts whose server state (banned, expired early, active again) changed in this run. */
+  const changed: { account: Claimed; state: ServerState | null }[] = [];
   for (const a of accounts) {
     if (Date.now() - ctx.started > ctx.budget) break;
     try {
@@ -213,10 +226,26 @@ async function checkServer(serverId: string, accounts: Claimed[], ctx: Ctx, outc
       const found = !!remote && remote.status !== "revoked";
       outcomes.set(a.id, found ? "found" : "missing");
       ctx.result.checked++;
+      // A found account may still be blocked on the server (banned by its multi-login limiter, expired
+      // early): mirror that for display, and clear it once the server reports it active again.
+      const state = remote && found ? serverStateOf(remote) : null;
+      const sameState = !!state && state.state === a.serverState && state.reason === a.serverStateReason;
       await db()
         .update(vpnAccounts)
-        .set(found ? { answeredAt: ctx.now, missingSince: null } : { answeredAt: ctx.now, missingSince: a.missingSince ?? ctx.now })
+        .set(
+          found
+            ? {
+                answeredAt: ctx.now,
+                missingSince: null,
+                serverState: state?.state ?? null,
+                serverStateReason: state?.reason ?? null,
+                serverStateUntil: state?.until ?? null,
+                ...(sameState ? {} : { serverStateSince: state ? ctx.now : null }),
+              }
+            : { answeredAt: ctx.now, missingSince: a.missingSince ?? ctx.now },
+        )
         .where(and(eq(vpnAccounts.id, a.id), eq(vpnAccounts.status, "active")));
+      if (found && !sameState && (state || a.serverState)) changed.push({ account: a, state });
     } catch (e) {
       ctx.result.failed++;
       // Asked but no answer: it waits for the next interval (so one account that always times out does
@@ -229,6 +258,7 @@ async function checkServer(serverId: string, accounts: Claimed[], ctx: Ctx, outc
   }
   const found = accounts.filter((a) => outcomes.get(a.id) === "found");
   const missing = accounts.filter((a) => outcomes.get(a.id) === "missing");
+  for (const c of changed) await logServerState(c.account, c.state, server.name);
 
   if (found.length || missing.length) await clearFailing(serverId);
   else if (unsupported && (await countFailing(serverId)) >= PAUSE_AFTER_RUNS) {
@@ -384,6 +414,38 @@ async function checkServer(serverId: string, accounts: Claimed[], ctx: Ctx, outc
       { reason: "rate", cap, accounts: later.map((a) => a.id) },
     );
   }
+}
+
+type ServerState = { state: "disabled" | "expired"; reason: string | null; until: Date | null };
+
+/** A found account the server does not let connect, or null when it says the account is active. */
+function serverStateOf(remote: NodeAccount): ServerState | null {
+  if (remote.status === "disabled") return { state: "disabled", reason: remote.disabledReason ?? null, until: remote.disabledUntil ?? null };
+  // Only accounts that are still running here are looked up, so "expired" there means expired early.
+  if (remote.status === "expired") return { state: "expired", reason: null, until: null };
+  return null;
+}
+
+async function logServerState(account: Claimed, state: ServerState | null, serverName: string): Promise<void> {
+  const [p] = await db().select({ name: protocols.name }).from(protocols).where(eq(protocols.id, account.protocolId)).limit(1);
+  const what = `${p?.name ?? "VPN"} account${account.username ? ` ${account.username}` : ""} on ${serverName}`;
+  const message = !state
+    ? `${what} is no longer blocked by the server.`
+    : state.state === "expired"
+      ? `${what} has expired on the server before its expiry date here; it shows as "Expired on server" until it expires here too.`
+      : state.reason === "multi_login"
+        ? `${what} was banned by the server for multi-login${state.until ? ` until ${state.until.toISOString()}` : ""}.`
+        : `${what} was blocked by the server${state.reason ? ` (${state.reason})` : ""}${state.until ? ` until ${state.until.toISOString()}` : ""}.`;
+  await logEvent({
+    event: "account.server_state",
+    status: "info",
+    level: state ? "warning" : "info",
+    serverId: account.serverId,
+    protocolId: account.protocolId,
+    accountId: account.id,
+    message,
+    details: { state: state?.state ?? "active", reason: state?.reason ?? null },
+  });
 }
 
 /** Errors that mean the server cannot answer the lookup at all (not a passing hiccup such as a 5xx). */

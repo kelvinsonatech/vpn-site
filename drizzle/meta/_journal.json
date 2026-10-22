@@ -71,6 +71,13 @@
       "when": 1792634353835,
       "tag": "0009_account_status_expiry_index",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792689776216,
+      "tag": "0010_account_server_state",
+      "breakpoints": true
     }
   ]
 }

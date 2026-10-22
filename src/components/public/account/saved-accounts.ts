@@ -1,7 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import type { SavedAccountSummary } from "@/lib/public/types";
+import type { AccountSuspension, SavedAccountServerStatus, SavedAccountSummary } from "@/lib/public/types";
 
 /**
  * "My accounts": non-secret summaries of accounts created in this browser, kept only in
@@ -19,6 +19,16 @@ const MAX_ITEMS = 50;
 const isStr = (v: unknown, max = 200): v is string => typeof v === "string" && v.length > 0 && v.length <= max;
 const isDate = (v: unknown): v is string => isStr(v, 64) && !Number.isNaN(Date.parse(v));
 const MAX_DETAILS = 30;
+
+function isSuspension(v: unknown): v is AccountSuspension {
+  if (!v || typeof v !== "object") return false;
+  const o = v as Record<string, unknown>;
+  return (
+    (o.reason === "multi_login" || o.reason === "disabled" || o.reason === "expired") &&
+    (o.since === null || isDate(o.since)) &&
+    (o.until === null || isDate(o.until))
+  );
+}
 
 function isDetails(v: unknown): v is { label: string; value: string }[] {
   return (
@@ -49,6 +59,7 @@ function isSummary(x: unknown): x is SavedAccountSummary {
     isDate(o.createdAt) &&
     isDate(o.expiresAt) &&
     (o.removedAt === undefined || isDate(o.removedAt)) &&
+    (o.suspended === undefined || isSuspension(o.suspended)) &&
     (o.details === undefined || isDetails(o.details))
   );
 }
@@ -64,6 +75,7 @@ function pick(s: SavedAccountSummary): SavedAccountSummary {
     createdAt: s.createdAt,
     expiresAt: s.expiresAt,
     ...(s.removedAt ? { removedAt: s.removedAt } : {}),
+    ...(s.suspended ? { suspended: { reason: s.suspended.reason, since: s.suspended.since, until: s.suspended.until } } : {}),
     ...(s.details?.length ? { details: s.details.map((d) => ({ label: d.label, value: d.value })) } : {}),
   };
 }
@@ -131,14 +143,36 @@ export function clearSavedAccounts() {
   write([]);
 }
 
-/** Records that the server removed these accounts (id → when). Writes only when something changes. */
-export function markSavedAccountsRemoved(removals: ReadonlyMap<string, string>) {
+function withoutSuspension(s: SavedAccountSummary): SavedAccountSummary {
+  const copy = { ...s };
+  delete copy.suspended;
+  return copy;
+}
+
+/**
+ * Records what the website reported about these accounts (id → status): a removal (final), a server
+ * block (kept while it lasts) or active again (clears the block). Writes only when something changes.
+ */
+export function applySavedStatuses(statuses: ReadonlyMap<string, SavedAccountServerStatus>) {
   let changed = false;
   const items = readSavedAccounts().map((s) => {
-    const at = removals.get(s.id);
-    if (!at || s.removedAt || !isDate(at)) return s;
-    changed = true;
-    return { ...s, removedAt: at };
+    const st = statuses.get(s.id);
+    if (!st || s.removedAt) return s;
+    if (st.status === "removed") {
+      changed = true;
+      return { ...withoutSuspension(s), removedAt: st.removedAt && isDate(st.removedAt) ? st.removedAt : new Date().toISOString() };
+    }
+    if (st.status === "suspended") {
+      const next: AccountSuspension = { reason: st.reason, since: st.since, until: st.until };
+      if (!isSuspension(next) || JSON.stringify(next) === JSON.stringify(s.suspended ?? null)) return s;
+      changed = true;
+      return { ...s, suspended: next };
+    }
+    if (s.suspended) {
+      changed = true;
+      return withoutSuspension(s);
+    }
+    return s;
   });
   if (changed) write(items);
 }

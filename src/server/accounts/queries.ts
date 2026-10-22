@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, ilike, lte, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, isNotNull, lte, sql, type SQL } from "drizzle-orm";
 import { db } from "@/server/db";
 import { accountStatus, admins, protocols, servers, vpnAccounts, type AccountStatus } from "@/server/db/schema";
 import { redactObject } from "@/server/logging/redact";
@@ -14,6 +14,8 @@ export interface AccountFilters {
   createdFrom?: Date;
   createdTo?: Date;
   expiresBefore?: Date;
+  /** Only active accounts their server blocks (banned for multi-login, expired early...). */
+  blocked?: boolean;
   page: number;
 }
 
@@ -38,6 +40,7 @@ export function parseAccountFilters(sp: Record<string, string | string[] | undef
     createdFrom: date("from"),
     createdTo: date("to"),
     expiresBefore: date("expires"),
+    blocked: s("blocked") === "1" || undefined,
     page: Math.max(1, Math.min(1000, Number(s("page") ?? 1) || 1)),
   };
 }
@@ -52,6 +55,7 @@ function filterConditions(f: AccountFilters, opts: { status: boolean }): SQL[] {
   if (f.createdFrom) conds.push(gte(vpnAccounts.createdAt, f.createdFrom));
   if (f.createdTo) conds.push(lte(vpnAccounts.createdAt, new Date(f.createdTo.getTime() + 86_400_000)));
   if (f.expiresBefore) conds.push(lte(vpnAccounts.expiresAt, f.expiresBefore));
+  if (f.blocked) conds.push(eq(vpnAccounts.status, "active"), isNotNull(vpnAccounts.serverState));
   return conds;
 }
 
@@ -70,6 +74,10 @@ export async function listAccounts(f: AccountFilters) {
       revokedAt: vpnAccounts.revokedAt,
       revokedByEmail: admins.email,
       missingSince: vpnAccounts.missingSince,
+      serverState: vpnAccounts.serverState,
+      serverStateReason: vpnAccounts.serverStateReason,
+      serverStateSince: vpnAccounts.serverStateSince,
+      serverStateUntil: vpnAccounts.serverStateUntil,
       remoteAccountId: vpnAccounts.remoteAccountId,
       failureCode: vpnAccounts.failureCode,
       failureMessage: vpnAccounts.failureMessage,
@@ -113,6 +121,18 @@ export async function countAccountsByStatus(f: AccountFilters): Promise<Record<A
   const out = Object.fromEntries(accountStatus.enumValues.map((s) => [s, 0])) as Record<AccountStatus, number>;
   for (const r of rows) out[r.status] = r.count;
   return out;
+}
+
+/** Active accounts their server blocks, with every other filter applied (for the "Blocked on server" chip). */
+export async function countBlockedAccounts(f: AccountFilters): Promise<number> {
+  const conds = filterConditions({ ...f, status: undefined, blocked: true }, { status: false });
+  const [row] = await db()
+    .select({ count: sql<number>`count(*)::int` })
+    .from(vpnAccounts)
+    .innerJoin(servers, eq(servers.id, vpnAccounts.serverId))
+    .innerJoin(protocols, eq(protocols.id, vpnAccounts.protocolId))
+    .where(and(...conds));
+  return row?.count ?? 0;
 }
 
 /** Status and node id of one account (for the revoke action's pre-checks). */

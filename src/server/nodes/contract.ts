@@ -269,6 +269,17 @@ export const nodeAccountWire = z.object({
   protocol: identifier,
   username: z.string().max(64).optional(),
   status: z.enum(["active", "expired", "revoked", "disabled"]).catch("active"),
+  /**
+   * Why a `disabled` account is blocked, e.g. "multi_login" when the server's multi-login limiter banned
+   * it. Free-form lowercase word; anything else is ignored rather than failing the whole answer.
+   */
+  disabled_reason: z
+    .string()
+    .regex(/^[a-z0-9_]{1,32}$/)
+    .optional()
+    .catch(undefined),
+  /** When a temporary block ends, if the server knows. */
+  disabled_until: isoDate.optional().catch(undefined),
   created_at: isoDate.optional(),
   expires_at: isoDate.optional(),
   /** Protocol-specific values; validated by the protocol adapter. */
@@ -287,6 +298,8 @@ export type NodeAccount = {
   protocol: string;
   username?: string;
   status: "active" | "expired" | "revoked" | "disabled";
+  disabledReason?: string;
+  disabledUntil?: Date;
   createdAt?: Date;
   expiresAt?: Date;
   config: Record<string, unknown>;
@@ -300,6 +313,8 @@ export function toNodeAccount(w: z.infer<typeof nodeAccountWire>, replayed?: boo
     protocol: w.protocol,
     username: w.username,
     status: w.status,
+    disabledReason: w.disabled_reason,
+    disabledUntil: w.disabled_until,
     createdAt: w.created_at,
     expiresAt: w.expires_at,
     config: w.config,

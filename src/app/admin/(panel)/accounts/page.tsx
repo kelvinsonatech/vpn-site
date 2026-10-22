@@ -18,10 +18,10 @@ import { requirePermission } from "@/server/auth/guards";
 import { can } from "@/server/auth/rbac";
 import { db } from "@/server/db";
 import { accountStatus, protocols, servers } from "@/server/db/schema";
-import { countAccountsByStatus, listAccounts, parseAccountFilters, type AdminAccountRow } from "@/server/accounts/queries";
+import { countAccountsByStatus, countBlockedAccounts, listAccounts, parseAccountFilters, type AdminAccountRow } from "@/server/accounts/queries";
 import { getSiteSettings } from "@/server/settings/service";
 import { AccountActions, AccountName, type AccountView } from "./account-actions";
-import { ACCOUNT_STATUS } from "./status";
+import { ACCOUNT_STATUS, serverStateLabel } from "./status";
 
 export const metadata = { title: "Accounts" };
 
@@ -39,6 +39,15 @@ function toView(a: AdminAccountRow, avatarStyle: string): AccountView {
     revokedAt: a.revokedAt?.toISOString() ?? null,
     revokedByEmail: a.revokedByEmail,
     missingSince: a.missingSince?.toISOString() ?? null,
+    serverState:
+      a.serverState === "disabled" || a.serverState === "expired"
+        ? {
+            state: a.serverState,
+            reason: a.serverStateReason,
+            since: a.serverStateSince?.toISOString() ?? null,
+            until: a.serverStateUntil?.toISOString() ?? null,
+          }
+        : null,
     durationDays: a.durationDays,
     remoteAccountId: a.remoteAccountId,
     failureCode: a.failureCode,
@@ -47,13 +56,16 @@ function toView(a: AdminAccountRow, avatarStyle: string): AccountView {
   };
 }
 
-function StatusBadge({ status, missing }: { status: AccountView["status"]; missing?: boolean }) {
+function StatusBadge({ status, missing, server }: { status: AccountView["status"]; missing?: boolean; server?: AccountView["serverState"] }) {
   const s = ACCOUNT_STATUS[status];
+  const block = status === "active" && server ? serverStateLabel(server.state, server.reason) : null;
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
       <Badge variant={s.variant}>{s.label}</Badge>
       {/* The account check found it missing on its server but has not marked it removed (yet). */}
       {missing && status === "active" ? <Badge variant="warning">Missing on server</Badge> : null}
+      {/* Its server still has it but blocks it (banned by the multi-login limiter, expired early). */}
+      {block ? <Badge variant={block.variant}>{block.label}</Badge> : null}
     </span>
   );
 }
@@ -80,9 +92,10 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
   const { admin } = await requirePermission("accounts:view");
   const sp = await searchParams;
   const f = parseAccountFilters(sp);
-  const [{ rows, hasMore }, counts, serverOptions, protocolOptions, settings] = await Promise.all([
+  const [{ rows, hasMore }, counts, blockedCount, serverOptions, protocolOptions, settings] = await Promise.all([
     listAccounts(f),
-    countAccountsByStatus(f),
+    countAccountsByStatus({ ...f, blocked: undefined }), // the status chips count every account, blocked or not
+    countBlockedAccounts(f),
     db().select({ id: servers.id, name: servers.name }).from(servers).where(isNull(servers.deletedAt)).orderBy(asc(servers.name)),
     db().select({ slug: protocols.slug, name: protocols.name }).from(protocols).orderBy(asc(protocols.displayOrder)),
     getSiteSettings(),
@@ -99,15 +112,21 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
     from: iso(f.createdFrom),
     to: iso(f.createdTo),
     expires: iso(f.expiresBefore),
+    blocked: f.blocked ? "1" : undefined,
   };
   const total = Object.values(counts).reduce((a, n) => a + n, 0);
   const statusHref = (status?: string) => {
     const q = new URLSearchParams();
-    for (const [k, v] of Object.entries({ ...params, status })) if (v) q.set(k, v);
+    for (const [k, v] of Object.entries({ ...params, status, blocked: undefined })) if (v) q.set(k, v);
     const s = q.toString();
     return s ? `/admin/accounts?${s}` : "/admin/accounts";
   };
-  const filtered = Object.entries(params).some(([k, v]) => k !== "status" && v);
+  const blockedHref = (() => {
+    const q = new URLSearchParams();
+    for (const [k, v] of Object.entries({ ...params, status: undefined, blocked: "1" })) if (v) q.set(k, v);
+    return `/admin/accounts?${q.toString()}`;
+  })();
+  const filtered = Object.entries(params).some(([k, v]) => k !== "status" && k !== "blocked" && v);
 
   return (
     <>
@@ -118,7 +137,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
 
       <nav aria-label="Account status" className="mb-4 flex flex-wrap gap-1.5">
         {[{ key: undefined, label: "All", n: total }, ...accountStatus.enumValues.map((s) => ({ key: s, label: ACCOUNT_STATUS[s].label, n: counts[s] }))].map((t) => {
-          const active = f.status === t.key;
+          const active = !f.blocked && f.status === t.key;
           return (
             <Link
               key={t.label}
@@ -134,6 +153,19 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
             </Link>
           );
         })}
+        {blockedCount || f.blocked ? (
+          <Link
+            href={blockedHref}
+            aria-current={f.blocked ? "page" : undefined}
+            className={cn(
+              "inline-flex h-8 items-center gap-1.5 rounded-full border border-destructive/30 px-3 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10",
+              f.blocked && "border-destructive/60 bg-destructive/10",
+            )}
+          >
+            Blocked on server
+            <span className="text-xs tabular-nums">{formatNumber(blockedCount)}</span>
+          </Link>
+        ) : null}
       </nav>
 
       <details className="group mb-4 rounded-xl border bg-card" open={filtered || undefined}>
@@ -145,6 +177,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
         </summary>
         <form method="get" className="grid gap-3 border-t p-4 sm:grid-cols-2 lg:grid-cols-4">
           {f.status ? <input type="hidden" name="status" value={f.status} /> : null}
+          {f.blocked ? <input type="hidden" name="blocked" value="1" /> : null}
           <label className="grid gap-1 text-xs text-muted-foreground">
             Username
             <Input name="q" defaultValue={f.q ?? ""} placeholder="e.g. cedar" />
@@ -251,7 +284,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <StatusBadge status={a.status} missing={!!a.missingSince} />
+                      <StatusBadge status={a.status} missing={!!a.missingSince} server={a.serverState} />
                     </TableCell>
                     <TableCell className="text-sm">
                       <RelativeTime date={a.createdAt} />
@@ -278,7 +311,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
                     <AccountActions account={a} canManage={manage} className="-mr-1.5 shrink-0" />
                   </div>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
-                    <StatusBadge status={a.status} missing={!!a.missingSince} />
+                    <StatusBadge status={a.status} missing={!!a.missingSince} server={a.serverState} />
                     <span className="flex items-center gap-1.5">
                       <ProtocolIcon name={a.protocol.icon} className="size-3.5 text-muted-foreground" />
                       {a.protocol.name}
