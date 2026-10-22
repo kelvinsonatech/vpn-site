@@ -315,10 +315,11 @@ export type NodeAccount = {
   wire?: { status: string | null; disabledReason: string | null };
 };
 
-/** One wire word for display: a string, without control characters, at most 40 characters; else null. */
+/** One wire word for display: a string, without control characters, cut at 40 characters (with "…"); else null. */
 export function wireWord(v: unknown): string | null {
   if (typeof v !== "string") return null;
-  return v.replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 40);
+  const w = v.replace(/[\u0000-\u001f\u007f]/g, "");
+  return w.length > 40 ? `${w.slice(0, 40)}…` : w;
 }
 
 export function toNodeAccount(w: z.infer<typeof nodeAccountWire>, replayed?: boolean): NodeAccount {

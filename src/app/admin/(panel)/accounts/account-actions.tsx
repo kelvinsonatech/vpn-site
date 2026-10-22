@@ -127,9 +127,10 @@ function AnswerText({ answer }: { answer: AccountCheckAnswer }) {
         <>
           , reason <span className="font-mono">{answer.disabledReason}</span>
         </>
-      ) : answer.wire.disabledReason !== null ? (
+      ) : answer.wire.disabledReason?.trim() ? (
         <>
-          , reason <span className="font-mono">&quot;{answer.wire.disabledReason}&quot;</span> (ignored: not a lowercase word such as multi_login)
+          , reason <span className="font-mono">&quot;{answer.wire.disabledReason}&quot;</span> (ignored: a reason is 1 to 32 of a-z, 0-9 and _, such as
+          multi_login)
         </>
       ) : null}
       {answer.disabledUntil ? (
@@ -148,30 +149,43 @@ function AnswerText({ answer }: { answer: AccountCheckAnswer }) {
   );
 }
 
+/** A server's answer (found or not found) in one or two words, like the account list's badges. */
+function answerLabel(a: Exclude<AccountCheckAnswer, { outcome: "error" }>): string {
+  if (a.outcome === "missing") return a.revoked ? "Revoked" : "Not found";
+  return a.status === "disabled" || a.status === "expired" ? serverStateLabel(a.status, a.disabledReason).label : "Active";
+}
+
+/** The latest answer the server did give in this dialog (a later failed check does not undo it), and when. */
+type Fresh = { answer: Exclude<AccountCheckAnswer, { outcome: "error" }>; at: string };
+
 /** The account check's last answer and (with accounts:manage) an immediate re-check. */
 function AccountCheck({
   account,
   canManage,
   answer,
+  fresh,
   onAnswer,
 }: {
   account: AccountView;
   canManage: boolean;
   answer: AccountCheckAnswer | null;
+  fresh: Fresh | null;
   onAnswer: (a: AccountCheckAnswer | null) => void;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const checked = useRef(false);
+  const alive = useRef(false);
   // The list is refreshed when the dialog closes, not right away: in a filtered list ("Blocked on
   // server") the row could otherwise vanish, closing the dialog before the answer is read.
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
       if (checked.current) router.refresh();
-    },
-    [router],
-  );
+    };
+  }, [router]);
   if (account.status !== "active" || !account.remoteAccountId) return null;
   const last = account.serverState
     ? serverStateLabel(account.serverState.state, account.serverState.reason).label
@@ -183,18 +197,23 @@ function AccountCheck({
       setError(null);
       const res = await checkAccountNowAction(account.id);
       checked.current = true;
+      // Closed while the server was being asked: the refresh on close has passed, so refresh now.
+      if (!alive.current) return router.refresh();
       if (res.error) setError(res.error);
       onAnswer((res.data?.answer as AccountCheckAnswer | undefined) ?? null);
     });
-  const answered = answer !== null && answer.outcome !== "error";
   return (
     <section aria-label="Account check" className="relative grid gap-2 rounded-lg border bg-muted/30 p-3 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-muted-foreground">
           {!account.accountCheckOn ? (
             "The automatic account check is off (Settings → Health monitor)."
-          ) : answered ? (
+          ) : fresh && fresh.answer === answer ? (
             "The server's answer just now:"
+          ) : fresh ? (
+            <>
+              Server&apos;s last answer: <span className="font-medium text-foreground">{answerLabel(fresh.answer)}</span> · <When iso={fresh.at} />
+            </>
           ) : account.answeredAt ? (
             <>
               Server&apos;s last answer: <span className="font-medium text-foreground">{last}</span> · <When iso={account.answeredAt} />
@@ -246,8 +265,13 @@ export function AccountDetailsDialog({
 /** The dialog's content; mounted only while it is open, so a "Check on server now" answer lasts until it closes. */
 function AccountDetails({ account, canManage }: { account: AccountView; canManage: boolean }) {
   const [answer, setAnswer] = useState<AccountCheckAnswer | null>(null);
+  const [fresh, setFresh] = useState<Fresh | null>(null);
+  const onAnswer = (a: AccountCheckAnswer | null) => {
+    setAnswer(a);
+    if (a && a.outcome !== "error") setFresh({ answer: a, at: new Date().toISOString() });
+  };
   // A fresh answer replaces what the page knew when it loaded (until it is refreshed on close).
-  const stale = answer !== null && answer.outcome !== "error";
+  const stale = fresh !== null;
   const status = ACCOUNT_STATUS[account.status];
   const meta = Object.entries(account.metadata);
   return (
@@ -304,7 +328,7 @@ function AccountDetails({ account, canManage }: { account: AccountView; canManag
           the server really deleted it, revoke it.
         </p>
       ) : null}
-      <AccountCheck account={account} canManage={canManage} answer={answer} onAnswer={setAnswer} />
+      <AccountCheck account={account} canManage={canManage} answer={answer} fresh={fresh} onAnswer={onAnswer} />
       {account.failureMessage ? (
         <p className="rounded-md border border-destructive/30 bg-danger-soft p-3 text-sm text-destructive">
           {account.failureCode ? <span className="mr-1 font-mono text-xs">{account.failureCode}</span> : null}
