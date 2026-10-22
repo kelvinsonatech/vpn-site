@@ -428,6 +428,7 @@ export const vpnAccounts = pgTable(
     index("vpn_accounts_server_status_idx").on(t.serverId, t.status),
     index("vpn_accounts_protocol_status_idx").on(t.protocolId, t.status),
     index("vpn_accounts_expires_idx").on(t.expiresAt).where(sql`${t.status} = 'active'`),
+    index("vpn_accounts_status_expires_idx").on(t.status, t.expiresAt),
     index("vpn_accounts_username_idx").on(t.username),
     index("vpn_accounts_created_idx").on(t.createdAt),
     index("vpn_accounts_remote_idx").on(t.serverId, t.remoteAccountId),

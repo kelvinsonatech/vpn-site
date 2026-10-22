@@ -161,7 +161,7 @@ docker compose up -d --build
 `migrate` runs again on every `up` and applies new migrations before `web` and `worker` start.
 Migration `0005` (lockable durations) locks the 7, 14 and 30 day durations on a site that already has saved
 settings; unlock them in **Admin → Site settings → Account durations**.
-Migrations `0006` to `0008` (account check) add the `removed` account status and the columns the check
+Migrations `0006` to `0009` (account check) add the `removed` account status and the columns the check
 uses; the worker then starts looking active accounts up on their servers every 5 minutes (change or
 turn off in **Admin → Site settings → Health monitor → Account check**). For accounts your servers
 delete themselves (multi-login limiter) to show up, each server's node agent must answer

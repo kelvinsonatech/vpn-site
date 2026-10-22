@@ -70,6 +70,8 @@ export interface MockNodeState {
   noAccountLookup: boolean;
   /** Answer the next N GET /accounts/{id} with 500 INTERNAL (a transient server error). */
   failLookups: number;
+  /** Answer GET /accounts/{id} for accounts of these protocols with 501 NOT_SUPPORTED. */
+  failLookupProtocols: string[];
 }
 
 const SSH_FAMILY = new Set(["ssh", "ssh-ws", "ssh-websocket", "stunnel", "ssh-ssl", "slowdns", "udp-custom", "openvpn", "noobzvpn"]);
@@ -312,6 +314,7 @@ export async function startMockNode(opts: MockNodeOptions) {
     maintenance: false,
     noAccountLookup: false,
     failLookups: 0,
+    failLookupProtocols: [],
     latencyMs: Math.max(0, opts.latencyMs ?? 0),
   };
   const secrets: NodeSecrets = {
@@ -494,6 +497,7 @@ export async function startMockNode(opts: MockNodeOptions) {
     if (one) {
       const a = state.accounts.get(decodeURIComponent(one[1]!));
       if (method === "GET" && state.noAccountLookup) return fail(res, 404, "NOT_FOUND", "Unknown path");
+      if (method === "GET" && a && state.failLookupProtocols.includes(a.protocol)) return fail(res, 501, "NOT_SUPPORTED", "Lookup not supported");
       if (method === "GET" && state.failLookups > 0) {
         state.failLookups -= 1;
         return fail(res, 500, "INTERNAL", "Temporary failure");

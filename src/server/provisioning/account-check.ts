@@ -26,8 +26,8 @@ import { releaseCapacity } from "./capacity";
  *
  * Safety checks, per server and protocol (a lookup can break for one protocol only). The population
  * is the protocol's accounts that existed before the misses started and were answered since:
- * - Known good: at least one of them must have been found since, otherwise a broken lookup cannot
- *   be ruled out and nothing is removed.
+ * - Known good: at least one of them must have been found in a later check than the misses,
+ *   otherwise a broken lookup cannot be ruled out and nothing is removed.
  * - Share: when at least 3 and at least half of them are missing, nothing is removed, and that
  *   verdict sticks (`server_protocols.account_lookup_suspect_at`): accounts that went missing before
  *   it are never removed automatically, only found again or revoked by an administrator.
@@ -42,9 +42,11 @@ import { releaseCapacity } from "./capacity";
  * most 40 lookups per server and 200 in total per run, servers marked offline are skipped, the first
  * connection failure stops a server's lookups for the run, and a server that cannot answer the lookup
  * at all (no such route, answers outside the contract, refused credentials) in two runs in a row is
- * paused for an hour with a warning. Accounts are claimed by moving `checked_at` forward (FOR UPDATE
- * SKIP LOCKED), so several workers never check the same account twice; accounts a run did not get to
- * are put back in line. Nothing secret is sent or logged.
+ * paused for an hour with a warning; a protocol whose lookups only fail for three runs in a row while
+ * the server answers others gets a warning. Accounts are claimed by moving `checked_at` forward (FOR
+ * UPDATE SKIP LOCKED), so several workers never check the same account twice; accounts a run did not
+ * get to are put back in line, while an account whose lookup failed waits for the next interval.
+ * Nothing secret is sent or logged.
  */
 
 /** Lookups per run (one run a minute) across all servers… */
@@ -71,6 +73,8 @@ const PAUSE_SECONDS = 3600;
 const PAUSED_KEY = "account-check:paused";
 /** Runs in a row in which a server could not answer any lookup, before it is paused. */
 const PAUSE_AFTER_RUNS = 2;
+/** Runs in a row in which one protocol's lookups only failed (others answering), before the admin is told. */
+const PROTOCOL_WARN_AFTER_RUNS = 3;
 
 export interface AccountCheckResult {
   checked: number;
@@ -200,6 +204,8 @@ export async function checkAccounts(opts: { now?: Date; limit?: number; timeBudg
 async function checkServer(serverId: string, accounts: Claimed[], ctx: Ctx, outcomes: Map<string, Outcome>): Promise<void> {
   const { driver, server } = await getNodeDriver(serverId);
   let unsupported: { code: string; message: string } | null = null;
+  /** First error message per protocol in this run. */
+  const errors = new Map<string, string>();
   for (const a of accounts) {
     if (Date.now() - ctx.started > ctx.budget) break;
     try {
@@ -213,8 +219,11 @@ async function checkServer(serverId: string, accounts: Claimed[], ctx: Ctx, outc
         .where(and(eq(vpnAccounts.id, a.id), eq(vpnAccounts.status, "active")));
     } catch (e) {
       ctx.result.failed++;
-      if (isNodeError(e) && (e.kind === "connect" || e.kind === "timeout")) break; // the health monitor deals with that
+      // Asked but no answer: it waits for the next interval (so one account that always times out does
+      // not block its server every minute); the ones not asked yet go back in line.
       outcomes.set(a.id, "error");
+      errors.set(a.protocolId, errors.get(a.protocolId) ?? (isNodeError(e) ? e.safeMessage : "Unexpected error."));
+      if (isNodeError(e) && (e.kind === "connect" || e.kind === "timeout")) break; // the health monitor deals with the server
       if (isNodeError(e) && lookupUnsupported(e)) unsupported ??= { code: e.code, message: e.safeMessage };
     }
   }
@@ -232,6 +241,22 @@ async function checkServer(serverId: string, accounts: Claimed[], ctx: Ctx, outc
       { code: unsupported.code },
     );
     return;
+  }
+
+  // A protocol whose lookups only fail while the server answers others: its deletions go unnoticed.
+  for (const protocolId of new Set(accounts.filter((a) => outcomes.has(a.id)).map((a) => a.protocolId))) {
+    const key = `${serverId}:${protocolId}`;
+    if (accounts.some((a) => a.protocolId === protocolId && (outcomes.get(a.id) === "found" || outcomes.get(a.id) === "missing"))) {
+      await clearFailing(key);
+    } else if ((await countFailing(key)) >= PROTOCOL_WARN_AFTER_RUNS) {
+      const [p] = await db().select({ name: protocols.name }).from(protocols).where(eq(protocols.id, protocolId)).limit(1);
+      await warn(
+        serverId,
+        `protocol_failing:${protocolId}`,
+        `${server.name} could not answer its ${p?.name ?? "VPN"} account lookups in ${PROTOCOL_WARN_AFTER_RUNS} checks in a row (${errors.get(protocolId) ?? "no answer"}), so ${p?.name ?? "those"} accounts it deletes itself are not noticed. Check GET /accounts/{id} for them on the server (node-selftest.py or npm run node:check).`,
+        { reason: "protocol_failing", protocolId },
+      );
+    }
   }
 
   // Found again after a miss: this protocol's lookup is unreliable on this server for now.
@@ -293,7 +318,8 @@ async function checkServer(serverId: string, accounts: Claimed[], ctx: Ctx, outc
     const [c] = await db()
       .select({
         answered: sql<number>`count(*)::int`,
-        found: sql<number>`(count(*) filter (where ${vpnAccounts.missingSince} is null))::int`,
+        // Found in a later run than the misses (a "found" from the same run may predate the breakage).
+        found: sql<number>`(count(*) filter (where ${vpnAccounts.missingSince} is null and ${vpnAccounts.answeredAt} > ${since.toISOString()}::timestamptz))::int`,
       })
       .from(vpnAccounts)
       .where(
@@ -425,10 +451,10 @@ async function warn(serverId: string, reason: string, message: string, details: 
   await logEvent({ event: "account.removed", status: "failure", level: "warning", serverId, message, details });
 }
 
-/** Runs in a row in which the server answered no lookup (this one included). */
-async function countFailing(serverId: string): Promise<number> {
+/** Runs in a row in which a server (or "server:protocol") answered no lookup, this one included. */
+async function countFailing(scope: string): Promise<number> {
   try {
-    const key = `account-check:failing:${serverId}`;
+    const key = `account-check:failing:${scope}`;
     const n = await redis().incr(key);
     await redis().expire(key, 2 * PAUSE_SECONDS);
     return n;
@@ -437,9 +463,9 @@ async function countFailing(serverId: string): Promise<number> {
   }
 }
 
-async function clearFailing(serverId: string): Promise<void> {
+async function clearFailing(scope: string): Promise<void> {
   try {
-    await redis().del(`account-check:failing:${serverId}`);
+    await redis().del(`account-check:failing:${scope}`);
   } catch {
     // Nothing to do: the counter expires on its own.
   }

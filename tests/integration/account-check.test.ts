@@ -151,7 +151,14 @@ describe("account check (accounts the server deleted itself)", () => {
     expect(queued.map((r) => r.accountId)).toEqual([a!.id]);
     await processExpiredRevokes();
     expect(node.state.requestLog.some((l) => l.method === "DELETE" && l.path === `/api/v1/accounts/${a!.remoteAccountId}`)).toBe(true);
-    expect((await db().select().from(provisioningRequests).where(eq(provisioningRequests.accountId, a!.id)))[0]!.state).toBe("succeeded");
+    expect(
+      (
+        await db()
+          .select()
+          .from(provisioningRequests)
+          .where(and(eq(provisioningRequests.accountId, a!.id), eq(provisioningRequests.operation, "revoke")))
+      )[0]!.state,
+    ).toBe("succeeded");
     expect((await expireAccounts()).revokesQueued).toBe(0); // queued once
     expect(await statuses([reused.id, c!.id])).toEqual(["active", "active"]);
 
@@ -173,6 +180,29 @@ describe("account check (accounts the server deleted itself)", () => {
       .where(eq(vpnAccounts.id, m1!.id));
     expect((await expireAccounts()).revokesQueued).toBe(0);
     expect(mRest).toHaveLength(2);
+
+    // The name is taken again after the removal was queued for its expiry: nothing is sent.
+    const late = await fleet();
+    const [r, keep] = await many(late.serverId, "check_snd", 2);
+    await run(40);
+    late.node.state.accounts.delete(r!.remoteAccountId!);
+    await run(45);
+    await run(50);
+    expect((await row(r!.id)).status).toBe("removed");
+    await db()
+      .update(vpnAccounts)
+      .set({ expiresAt: new Date(Date.now() - MINUTE) })
+      .where(eq(vpnAccounts.id, r!.id));
+    expect((await expireAccounts()).revokesQueued).toBe(1);
+    const again = await create(late.serverId, "check_snd0");
+    await processExpiredRevokes();
+    expect(late.node.state.requestLog.some((l) => l.method === "DELETE")).toBe(false);
+    const [req] = await db()
+      .select()
+      .from(provisioningRequests)
+      .where(and(eq(provisioningRequests.accountId, r!.id), eq(provisioningRequests.operation, "revoke")));
+    expect(req).toMatchObject({ state: "succeeded", errorCode: "REUSED" });
+    expect(await statuses([again.id, keep!.id])).toEqual(["active", "active"]);
   });
 
   it("counts an account the server reports as revoked as missing", async () => {
@@ -385,6 +415,37 @@ describe("account check (accounts the server deleted itself)", () => {
     await setSettings({ health: { ...DEFAULT_SITE_SETTINGS.health, accountCheckMinutes: 0 } });
     await run(6);
     expect(await row(gone!.id)).toMatchObject({ status: "active", missingSince: null });
+  });
+
+  it("does not take a 'found' answer from the same check as the first miss as proof that the lookup works", async () => {
+    const { node, serverId } = await fleet();
+    const [gone, b, c] = await many(serverId, "check_same", 3);
+    await run(0);
+    node.state.accounts.delete(gone!.remoteAccountId!);
+    await run(5); // gone: first miss; b and c found in the same check
+    // b and c are not looked up again before gone's second lookup (e.g. that check was cut short).
+    await db()
+      .update(vpnAccounts)
+      .set({ checkedAt: at(9) })
+      .where(inArray(vpnAccounts.id, [b!.id, c!.id]));
+    await run(10);
+    expect((await row(gone!.id)).status).toBe("active");
+    await run(14); // b and c found after the miss
+    await run(15);
+    expect((await row(gone!.id)).status).toBe("removed");
+  });
+
+  it("tells the admin when one protocol's lookups keep failing while the server answers the others", async () => {
+    const { node, serverId } = await fleet(["ssh", "vless"]);
+    const ssh = await many(serverId, "check_pf_ssh", 2);
+    const [vl] = await many(serverId, "check_pf_vl", 1, "vless");
+    node.state.failLookupProtocols = [vl!.remoteAccountId ? node.state.accounts.get(vl!.remoteAccountId)!.protocol : "vless"];
+    await run(0);
+    await run(5);
+    expect(await warnings(serverId)).toHaveLength(0);
+    await run(10);
+    expect((await warnings(serverId)).some((w) => w.message.includes("could not answer its VLESS account lookups in 3 checks in a row"))).toBe(true);
+    expect(lookups(node, ssh[0]!.remoteAccountId!)).toBe(3); // the server itself is not paused
   });
 
   it("removes at most max(10, 20 %) accounts per server and hour, and the rest later", async () => {

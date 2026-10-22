@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { db } from "@/server/db";
 import { protocols, provisioningRequests, servers, vpnAccounts } from "@/server/db/schema";
 import { sha256Hex } from "@/server/crypto/hashing";
@@ -37,6 +37,8 @@ const MAX_BATCHES = 20;
 const WARN_AFTER_ATTEMPTS = 12;
 /** One run stops sending after this long so it never holds a maintenance slot for minutes. */
 const REVOKE_TIME_BUDGET_MS = 40_000;
+/** Removed accounts that expired longer ago than this are no longer looked at by the expiry job. */
+const REMOVED_REVOKE_WINDOW_MS = 7 * 24 * 3_600_000;
 /** A revoke claimed by a worker that died is resent after this long (revoke is idempotent). */
 const REVOKE_STALE_MS = 5 * 60_000;
 
@@ -132,6 +134,8 @@ async function queueRemovedAccountRevokes(now: Date, limit: number): Promise<num
       and(
         eq(vpnAccounts.status, "removed"),
         lte(vpnAccounts.expiresAt, now),
+        // Handled within a minute of expiring; the window keeps this query small (index on status, expires_at).
+        gt(vpnAccounts.expiresAt, new Date(now.getTime() - REMOVED_REVOKE_WINDOW_MS)),
         isNotNull(vpnAccounts.remoteAccountId),
         isNull(servers.deletedAt),
         // Filtered here, not after the LIMIT, so servers that expire accounts themselves never crowd out the rest.
@@ -220,7 +224,16 @@ export async function processExpiredRevokes(
       continue;
     }
     const [acc] = await db()
-      .select({ remoteAccountId: vpnAccounts.remoteAccountId, username: vpnAccounts.username, serverDeletedAt: servers.deletedAt })
+      .select({
+        remoteAccountId: vpnAccounts.remoteAccountId,
+        username: vpnAccounts.username,
+        status: vpnAccounts.status,
+        serverDeletedAt: servers.deletedAt,
+        reused: sql<boolean>`exists (
+          select 1 from ${vpnAccounts} o
+          where o.server_id = ${vpnAccounts.serverId} and o.id <> ${vpnAccounts.id} and o.status in ('pending', 'active')
+            and (o.remote_account_id = ${vpnAccounts.remoteAccountId} or (o.username is not null and o.username = ${vpnAccounts.username})))`,
+      })
       .from(vpnAccounts)
       .innerJoin(servers, eq(servers.id, vpnAccounts.serverId))
       .where(eq(vpnAccounts.id, req.accountId ?? ""))
@@ -232,6 +245,12 @@ export async function processExpiredRevokes(
         .where(eq(provisioningRequests.id, req.id));
     if (!acc) {
       await done("succeeded", null, null);
+      result.removed++;
+      continue;
+    }
+    if (acc.status === "removed" && acc.reused) {
+      // The server already deleted this one and a live account now uses its id or name: leave that alone.
+      await done("succeeded", "REUSED", "A live account uses the same id or username; nothing was sent.");
       result.removed++;
       continue;
     }
