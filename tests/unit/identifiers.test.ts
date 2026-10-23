@@ -19,6 +19,18 @@ describe("protocol identifier matching", () => {
     expect(matches.get("3")?.identifier).toBe("XRAY_VLESS");
     expect(unmapped).toEqual(["hysteria2"]);
   });
+  it("gives FastDNS SlowDNS's node protocol, unless the node reports fastdns itself", () => {
+    const withDns = [...protocols, { id: "4", slug: "slowdns", nodeIdentifiers: ["dnstt"] }, { id: "5", slug: "fastdns", nodeIdentifiers: [] }];
+    // Whichever order the rows come in.
+    for (const list of [withDns, [...withDns].reverse()]) {
+      const { matches, unmapped } = matchProtocols(["DNSTT", "ssh"], list);
+      expect(matches.get("4")?.identifier).toBe("DNSTT");
+      expect(matches.get("5")?.identifier).toBe("DNSTT");
+      expect(unmapped).toEqual([]);
+    }
+    expect(matchProtocols(["ssh"], withDns).matches.has("5")).toBe(false); // no SlowDNS, no FastDNS
+    expect(matchProtocols(["slowdns", "fastdns"], withDns).matches.get("5")?.identifier).toBe("fastdns");
+  });
   it("prefers the exact slug when a node reports two identifiers for one protocol", () => {
     const { matches } = matchProtocols(["openssh", "ssh"], protocols);
     expect(matches.get("1")?.identifier).toBe("ssh");

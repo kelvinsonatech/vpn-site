@@ -58,6 +58,7 @@ describe("protocol guides", () => {
       ssh: "ssh",
       "ssh-ssl": "ssh-ssl",
       slowdns: "slowdns",
+      fastdns: "fastdns",
       vmess: "v2ray",
       vless: "v2ray",
       trojan: "trojan",
@@ -71,9 +72,11 @@ describe("protocol guides", () => {
     expect(guideFamily("my-hy2", "Hysteria 2 fast")).toBe("hysteria2");
     expect(guideFamily("x-ray", "VLESS Reality")).toBe("v2ray");
     expect(guideFamily("mystery", "Mystery tunnel")).toBe("generic");
+    expect(guideFamily("fast-dns-2", "Fast DNS")).toBe("fastdns");
+    expect(guideFor("fastdns").summary).not.toMatch(/slower/i);
   });
   it("only links to https pages and has 3-5 steps", () => {
-    for (const slug of ["ssh", "ssh-ssl", "slowdns", "vless", "trojan", "hysteria", "hysteria2", "zivpn", "wireguard", "openvpn", "shadowsocks", "noobzvpn", "x"]) {
+    for (const slug of ["ssh", "ssh-ssl", "slowdns", "fastdns", "vless", "trojan", "hysteria", "hysteria2", "zivpn", "wireguard", "openvpn", "shadowsocks", "noobzvpn", "x"]) {
       const g = guideFor(slug);
       expect(g.steps.length, slug).toBeGreaterThanOrEqual(3);
       expect(g.steps.length, slug).toBeLessThanOrEqual(5);

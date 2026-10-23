@@ -10,6 +10,7 @@ export const PROTOCOL_ICON_NAMES = [
   "globe",
   "radar",
   "slowdns-badge",
+  "fastdns-badge",
   "zap",
   "shield",
   "shield-check",
@@ -31,7 +32,7 @@ export const PROTOCOL_ICON_NAMES = [
 export type ProtocolIconName = (typeof PROTOCOL_ICON_NAMES)[number];
 
 /** Icons that are full-colour pictures rather than line icons (they fill their tile instead of sitting on a coloured one). */
-export const PROTOCOL_IMAGE_ICONS: ReadonlySet<string> = new Set(["ssh-badge", "ssh-ssl-badge", "slowdns-badge"]);
+export const PROTOCOL_IMAGE_ICONS: ReadonlySet<string> = new Set(["ssh-badge", "ssh-ssl-badge", "slowdns-badge", "fastdns-badge"]);
 
 /** Picture icons that are circles: their tile is round too. */
 export const ROUND_PROTOCOL_ICONS: ReadonlySet<string> = new Set(["ssh-ssl-badge"]);

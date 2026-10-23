@@ -26,15 +26,17 @@ import { cn } from "@/lib/utils";
 import sshBadge from "@/assets/ssh-flaticon.webp";
 import sshSslBadge from "@/assets/ssh-ssl-badge.webp";
 import slowdnsBadge from "@/assets/slowdns-badge.webp";
+import fastdnsBadge from "@/assets/fastdns-badge.webp";
 
 /** Full-colour picture icons (see PROTOCOL_IMAGE_ICONS); everything else is a lucide line icon. */
 const IMAGES: Partial<Record<ProtocolIconName, string>> = {
   "ssh-badge": sshBadge.src,
   "ssh-ssl-badge": sshSslBadge.src,
   "slowdns-badge": slowdnsBadge.src,
+  "fastdns-badge": fastdnsBadge.src,
 };
 
-type LineIconName = Exclude<ProtocolIconName, "ssh-badge" | "ssh-ssl-badge" | "slowdns-badge">;
+type LineIconName = Exclude<ProtocolIconName, "ssh-badge" | "ssh-ssl-badge" | "slowdns-badge" | "fastdns-badge">;
 
 const MAP: Record<LineIconName, LucideIcon> = {
   terminal: TerminalIcon,

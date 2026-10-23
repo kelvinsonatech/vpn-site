@@ -104,7 +104,7 @@ export type SiteSettingsInput = z.input<typeof siteSettingsSchema>;
 export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   siteName: process.env.NEXT_PUBLIC_SITE_NAME || "LitronSSH",
   tagline: "Private tunnels, provisioned in seconds.",
-  seoDescription: "Free SSH, SSH SSL, SlowDNS, VMess, VLESS, Trojan, Hysteria and ZIVPN UDP accounts on fast servers worldwide.",
+  seoDescription: "Free SSH, SSH SSL, SlowDNS, FastDNS, VMess, VLESS, Trojan, Hysteria and ZIVPN UDP accounts on fast servers worldwide.",
   announcement: { enabled: false, text: "", tone: "info", linkLabel: null, linkUrl: null },
   quota: { resetTimes: ["00:00", "12:00"], timezone: "UTC", defaultLimit: null },
   health: { intervalSeconds: 60, failureThreshold: 3, accountCheckMinutes: 5 },

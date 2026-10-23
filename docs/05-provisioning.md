@@ -41,7 +41,7 @@ interface ProtocolAdapter {
 
 | Adapter key | Protocols | Output |
 | --- | --- | --- |
-| `ssh`, `ssh-ssl`, `ssh-websocket`, `slowdns`, `udp-custom` | SSH family (one system account, different emphasis) | Host, IP, username, password, OpenSSH/Dropbear/SSL/WS/WS-TLS/UDP/SlowDNS ports, SlowDNS NS + key, WS payload, UDP Custom string |
+| `ssh`, `ssh-ssl`, `ssh-websocket`, `slowdns`, `fastdns`, `udp-custom` | SSH family (one system account, different emphasis) | Host, IP, username, password, OpenSSH/Dropbear/SSL/WS/WS-TLS/UDP/SlowDNS ports, SlowDNS NS + key, WS payload, UDP Custom string |
 | `vmess`, `vless`, `trojan` | Xray/V2Ray | Domain, UUID/password, alter id, flow, TLS/non-TLS ports, network, path, gRPC service, SNI, optional bug host (links only), **share links + QR** |
 | `hysteria`, `hysteria2` | Hysteria 1 / Hysteria 2 | Server, port (or range), auth string / password, obfuscation, SNI, ALPN, bandwidth (Hysteria 1), certificate pin (Hysteria 2), **hysteria:// / hysteria2:// link + QR** |
 | `zivpn` | ZIVPN UDP | Server, password, UDP port range, obfuscation |
@@ -123,7 +123,7 @@ Rules: errors before the request could reach the node retry with exponential bac
 ## Phase 11 checklist (done with the owner's node API)
 
 * Predefined operations: implemented by the owner's node API on top of the script ([10-script-api-prompt.md](10-script-api-prompt.md)).
-* Adapter `config` parsing: aligned with section 8 of that prompt; protocol ids `ssh`, `ssh-ssl`, `slowdns`, `vmess`, `vless`, `trojan`, `hysteria`, `hysteria2`, `zivpn` match the built-in protocols.
+* Adapter `config` parsing: aligned with section 8 of that prompt; protocol ids `ssh`, `ssh-ssl`, `slowdns`, `vmess`, `vless`, `trojan`, `hysteria`, `hysteria2`, `zivpn` match the built-in protocols. The built-in FastDNS has no id of its own: it uses `slowdns` (see [Admin panel → Protocol detection rules](03-admin-panel.md#protocol-detection-rules)).
 * Expiry ownership: the nodes report `expiry_managed_by_node=false`, so the worker's expiry job removes expired accounts with `DELETE /accounts/{id}` ([09-public-site.md](09-public-site.md#account-expiry)).
 * Accounts the server deletes itself (e.g. a multi-login limiter): the worker's account check looks every active account up with `GET /accounts/{id}` and marks it `removed` after two regular lookups in a row answer `ACCOUNT_NOT_FOUND` and the per-protocol safety checks pass (another account of that protocol found since, not too many missing, no recent false miss, hourly cap) ([09-public-site.md](09-public-site.md#account-check)). `NodeDriver.getAccount` returns `null` only for that error code.
 * Idempotency and lookup by request id: provided by the node API and checked by `scripts/node-selftest.py` and `npm run node:check`.

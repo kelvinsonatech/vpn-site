@@ -17,6 +17,7 @@ import { FormField } from "@/components/admin/form-field";
 import { ProtocolIcon } from "@/components/protocol-icon";
 import type { ActionState } from "@/lib/action-state";
 import { effectiveDefaultDuration } from "@/lib/public/durations";
+import { NODE_PROTOCOL_OF } from "@/lib/node-protocol-of";
 import { formatDays } from "@/components/public/format";
 import type { FieldOption, FieldValidation, OutputFieldDefinition, ProtocolFieldType } from "@/server/db/schema";
 
@@ -349,6 +350,13 @@ export function ProtocolEditor({
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {NODE_PROTOCOL_OF[v.slug] ? (
+              <p className="mb-3 rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                Servers report no protocol of this name: it is offered wherever a server reports{" "}
+                <span className="font-mono text-foreground">{NODE_PROTOCOL_OF[v.slug]}</span>, and its accounts are created as{" "}
+                <span className="font-mono text-foreground">{NODE_PROTOCOL_OF[v.slug]}</span> accounts on the server.
+              </p>
+            ) : null}
             <FormField id="identifiers" label="Identifiers" errors={err("nodeIdentifiers")} hint="Comma separated">
               <Input id="identifiers" value={identifiers} onChange={(e) => setIdentifiers(e.target.value)} disabled={disabled} className="font-mono" placeholder="vless, xray-vless" />
             </FormField>

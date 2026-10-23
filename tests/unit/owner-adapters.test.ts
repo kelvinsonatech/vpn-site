@@ -70,7 +70,9 @@ describe("owner's protocol ids", () => {
     const protocols = PROTOCOL_SEEDS.map((p) => ({ id: p.slug, slug: p.slug, nodeIdentifiers: p.nodeIdentifiers }));
     const { matches, unmapped } = matchProtocols(ids, protocols);
     expect(unmapped).toEqual([]);
-    expect([...matches.values()].map((m) => m.protocol.slug).sort()).toEqual([...ids].sort());
+    // FastDNS is SlowDNS under another name: it rides on the reported "slowdns".
+    expect([...matches.values()].map((m) => m.protocol.slug).sort()).toEqual([...ids, "fastdns"].sort());
+    expect(matches.get("fastdns")?.identifier).toBe("slowdns");
     // Alternative spellings map too.
     const alt = matchProtocols(["hysteria1", "hy2", "zivpn-udp", "udp_zivpn", "hy1"], protocols);
     expect([...alt.matches.values()].map((m) => m.protocol.slug).sort()).toEqual(["hysteria", "hysteria2", "zivpn"]);
@@ -129,6 +131,25 @@ describe("SSH family (real outputs)", () => {
     expect(field("slowdns_public_key")?.value).toBe("9f2c4be1a07d3e58c6b19a4d2f7e0c835b6a1d94e2f70c3b8a5d16e4f09b27c1");
     expect(field("slowdns_ports")?.value).toBe("53");
     expect(field("openssh_ports")?.value).toBe("22");
+  });
+
+  it("fastdns creates a slowdns account and shows the same details, labelled FastDNS", () => {
+    const config = {
+      host: "node1.example.com",
+      username: "chk82ed70",
+      password: "x",
+      ports: { slowdns: [53], openssh: [22] },
+      slowdns: { nameserver: "dns.example.com", public_key: "9f2c4be1a07d3e58c6b19a4d2f7e0c835b6a1d94e2f70c3b8a5d16e4f09b27c1" },
+    };
+    const c = { ...ctx("fastdns"), serverProtocol: { nodeIdentifier: "slowdns", ports: {}, transports: [], metadata: {} } };
+    expect(getAdapter("fastdns").buildSpec(input(), c).protocol).toBe("slowdns");
+    const fast = present("fastdns", config);
+    const slow = present("slowdns", config);
+    expect(fast.shown.fields.map((f) => [f.key, f.value])).toEqual(slow.shown.fields.map((f) => [f.key, f.value]));
+    expect(fast.field("slowdns_nameserver")?.label).toBe("FastDNS nameserver");
+    expect(fast.field("slowdns_public_key")?.label).toBe("FastDNS public key");
+    expect(fast.field("slowdns_ports")?.label).toBe("FastDNS port");
+    expect(fast.shown.fields.map((f) => f.label).join(" ")).not.toContain("SlowDNS");
   });
 
   it("several payload templates are shown as named blocks", () => {

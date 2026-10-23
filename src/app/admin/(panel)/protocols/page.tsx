@@ -11,6 +11,7 @@ import { can } from "@/server/auth/rbac";
 import { listProtocolsForAdmin } from "@/server/protocols/service";
 import { ProtocolToggle } from "./protocol-toggle";
 import { getSiteSettings } from "@/server/settings/service";
+import { NODE_PROTOCOL_OF } from "@/lib/node-protocol-of";
 
 export const metadata = { title: "Protocols" };
 
@@ -79,7 +80,7 @@ export default async function ProtocolsPage() {
                   </div>
                 </TableCell>
                 <TableCell className="hidden max-w-64 truncate font-mono text-xs text-muted-foreground md:table-cell">
-                  {p.nodeIdentifiers.join(", ") || "—"}
+                  {p.nodeIdentifiers.join(", ") || (NODE_PROTOCOL_OF[p.slug] ? `uses ${NODE_PROTOCOL_OF[p.slug]}` : "—")}
                 </TableCell>
                 <TableCell className="text-right text-sm tabular-nums">
                   {serversPublished}

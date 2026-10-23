@@ -18,6 +18,7 @@ const adapters: ProtocolAdapter[] = [
   createSshAdapter("ssh-ssl"),
   createSshAdapter("ssh-websocket"),
   createSshAdapter("slowdns"),
+  createSshAdapter("fastdns"),
   createSshAdapter("udp-custom"),
   openvpnAdapter,
   wireguardAdapter,

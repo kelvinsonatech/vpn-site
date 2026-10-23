@@ -1,3 +1,5 @@
+import { NODE_PROTOCOL_OF } from "@/lib/node-protocol-of";
+
 /** Normalise protocol identifiers reported by nodes: case, `_`, spaces and dots are ignored. */
 export function normalizeIdentifier(id: string): string {
   return id.trim().toLowerCase().replace(/[\s_.]+/g, "-").replace(/-+/g, "-");
@@ -35,6 +37,14 @@ export function matchProtocols<T extends ProtocolMatcher>(
     // Prefer an exact slug match if a node reports two identifiers for one protocol.
     const existing = matches.get(p.id);
     if (!existing || normalizeIdentifier(raw) === p.slug) matches.set(p.id, { protocol: p, identifier: raw });
+  }
+  // A protocol riding on another one's node protocol matches wherever that one does, with the same
+  // identifier (unless the node reports the protocol itself).
+  for (const p of protocols) {
+    const base = NODE_PROTOCOL_OF[p.slug];
+    if (!base || matches.has(p.id)) continue;
+    const baseMatch = [...matches.values()].find((m) => m.protocol.slug === base);
+    if (baseMatch) matches.set(p.id, { protocol: p, identifier: baseMatch.identifier });
   }
   return { matches, unmapped };
 }

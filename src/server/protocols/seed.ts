@@ -1,10 +1,11 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { db, type DbOrTx } from "@/server/db";
-import { protocolFields, protocols, type OutputFieldDefinition } from "@/server/db/schema";
+import { protocolFields, protocols, serverProtocols, type OutputFieldDefinition } from "@/server/db/schema";
 import { getAdapter } from "@/server/provisioning/adapters/registry";
 import { SSH_UPGRADE_OUTPUTS } from "@/server/provisioning/adapters/ssh";
 import { V2RAY_UPGRADE_FIELDS, V2RAY_UPGRADE_OUTPUTS } from "@/server/provisioning/adapters/v2ray";
 import type { SeedField } from "@/server/provisioning/types";
+import { NODE_PROTOCOL_OF } from "@/lib/node-protocol-of";
 import { PROTOCOL_SEEDS } from "./seed-data";
 
 /**
@@ -18,6 +19,7 @@ const UPGRADES: Record<string, { outputs?: string[]; fields?: string[]; renamedO
   "ssh-ssl": { outputs: SSH_UPGRADE_OUTPUTS, renamedOutputs: { ws_payload: "payload" } },
   "ssh-websocket": { outputs: SSH_UPGRADE_OUTPUTS, renamedOutputs: { ws_payload: "payload" } },
   slowdns: { outputs: SSH_UPGRADE_OUTPUTS, renamedOutputs: { ws_payload: "payload" } },
+  fastdns: { outputs: SSH_UPGRADE_OUTPUTS },
   "udp-custom": { outputs: SSH_UPGRADE_OUTPUTS, renamedOutputs: { ws_payload: "payload" } },
   vmess: { outputs: V2RAY_UPGRADE_OUTPUTS, fields: V2RAY_UPGRADE_FIELDS },
   vless: { outputs: V2RAY_UPGRADE_OUTPUTS, fields: V2RAY_UPGRADE_FIELDS },
@@ -116,11 +118,55 @@ async function upgradeIcons(tx: DbOrTx): Promise<string[]> {
 }
 
 /**
+ * Protocols that use another protocol's node protocol (NODE_PROTOCOL_OF, e.g. FastDNS on SlowDNS) get
+ * a row on every server where that protocol was detected, with its switch, caps and detection, so they
+ * show up without a sync. Existing rows are left alone (admin changes stay); syncs keep them current.
+ */
+async function mirrorNodeProtocolRows(tx: DbOrTx): Promise<number> {
+  let added = 0;
+  for (const [slug, baseSlug] of Object.entries(NODE_PROTOCOL_OF)) {
+    const [alias] = await tx.select({ id: protocols.id }).from(protocols).where(eq(protocols.slug, slug)).limit(1);
+    const [base] = await tx.select({ id: protocols.id }).from(protocols).where(eq(protocols.slug, baseSlug)).limit(1);
+    if (!alias || !base) continue;
+    const rows = await tx
+      .select()
+      .from(serverProtocols)
+      .where(and(eq(serverProtocols.protocolId, base.id), eq(serverProtocols.detected, true)));
+    if (!rows.length) continue;
+    const now = new Date();
+    const inserted = await tx
+      .insert(serverProtocols)
+      .values(
+        rows.map((r) => ({
+          serverId: r.serverId,
+          protocolId: alias.id,
+          enabled: r.enabled,
+          detected: true,
+          serviceStatus: r.serviceStatus,
+          nodeIdentifier: r.nodeIdentifier,
+          port: r.port,
+          ports: r.ports,
+          transports: r.transports,
+          maxAccounts: r.maxAccounts,
+          quotaLimit: r.quotaLimit,
+          metadata: r.metadata,
+          firstDetectedAt: now,
+          lastDetectedAt: r.lastDetectedAt,
+        })),
+      )
+      .onConflictDoNothing()
+      .returning({ id: serverProtocols.id });
+    added += inserted.length;
+  }
+  return added;
+}
+
+/**
  * Insert the built-in protocols. Idempotent and non-destructive: missing protocols are created,
  * existing ones only receive the additions listed in UPGRADES (and a newer default icon while they
  * still use an earlier default); admin edits are never overwritten.
  */
-export async function seedProtocols(tx: DbOrTx = db()): Promise<{ created: string[]; upgraded: string[] }> {
+export async function seedProtocols(tx: DbOrTx = db()): Promise<{ created: string[]; upgraded: string[]; mirrored: number }> {
   const created: string[] = [];
   for (const p of PROTOCOL_SEEDS) {
     const [row] = await tx
@@ -147,7 +193,7 @@ export async function seedProtocols(tx: DbOrTx = db()): Promise<{ created: strin
     await tx.insert(protocolFields).values(p.fields.map((f, i) => fieldRow(row.id, f, (i + 1) * 10)));
   }
   const upgraded = [...new Set([...(await upgradeExisting(tx)), ...(await upgradeIcons(tx))])].filter((slug) => !created.includes(slug));
-  return { created, upgraded };
+  return { created, upgraded, mirrored: await mirrorNodeProtocolRows(tx) };
 }
 
 export async function protocolExists(slug: string) {

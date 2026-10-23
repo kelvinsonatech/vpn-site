@@ -81,6 +81,18 @@ export const PROTOCOL_SEEDS: ProtocolSeed[] = [
     nodeIdentifiers: ["slowdns", "dnstt", "ssh-slowdns", "slow-dns"],
     displayOrder: 40,
   }),
+  // SlowDNS under another name: servers report no "fastdns", so it uses SlowDNS's node protocol
+  // (NODE_PROTOCOL_OF in identifiers.ts) and gets the same Linux user, nameserver and public key.
+  seed({
+    slug: "fastdns",
+    name: "FastDNS",
+    description: "Fast SSH tunnel through DNS queries (DNSTT).",
+    icon: "fastdns-badge",
+    category: "ssh",
+    adapterKey: "fastdns",
+    nodeIdentifiers: [],
+    displayOrder: 45,
+  }),
   seed({
     slug: "udp-custom",
     name: "UDP Custom",

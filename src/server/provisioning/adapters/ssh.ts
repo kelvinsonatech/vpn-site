@@ -29,7 +29,8 @@ import { linuxUsernameGuard, passwordGuard } from "./guards";
  * Missing ports fall back to the ports the node advertised during capability detection.
  * Payloads keep the script's own tokens ([crlf], [host], ...) because the client apps expand them.
  */
-export type SshVariant = "ssh" | "ssh-ssl" | "ssh-websocket" | "slowdns" | "udp-custom";
+/** "fastdns" is SlowDNS under another name: the same node protocol, config and output, labelled FastDNS. */
+export type SshVariant = "ssh" | "ssh-ssl" | "ssh-websocket" | "slowdns" | "fastdns" | "udp-custom";
 
 const ALL_OUTPUTS: OutputFieldDefinition[] = [
   { key: "host", label: "Host", kind: "text", sensitive: false, copyable: true },
@@ -58,6 +59,7 @@ const VISIBLE: Record<SshVariant, string[]> = {
   "ssh-ssl": ["host", "ip", "username", "password", "ssl_ports", "ws_tls_ports", "sni", "payload"],
   "ssh-websocket": ["host", "ip", "username", "password", "ws_ports", "ws_tls_ports", "payload"],
   slowdns: ["host", "ip", "username", "password", "slowdns_nameserver", "slowdns_public_key", "slowdns_ports", "openssh_ports", "payload"],
+  fastdns: ["host", "ip", "username", "password", "slowdns_nameserver", "slowdns_public_key", "slowdns_ports", "openssh_ports", "payload"],
   "udp-custom": ["host", "ip", "username", "password", "udp_custom_ports", "udp_custom_config", "payload"],
 };
 
@@ -84,6 +86,7 @@ const LABELS: Record<SshVariant, string> = {
   "ssh-ssl": "SSH over SSL/TLS",
   "ssh-websocket": "SSH over WebSocket",
   slowdns: "SSH over SlowDNS",
+  fastdns: "SSH over FastDNS",
   "udp-custom": "UDP Custom",
 };
 
@@ -120,7 +123,11 @@ export function createSshAdapter(variant: SshVariant): ProtocolAdapter {
     inputGuards: { username: linuxUsernameGuard, password: passwordGuard },
     requiredInputs: ["username", "password"],
     supportsRenew: true,
-    outputFields: ALL_OUTPUTS.map((f) => ({ ...f, hidden: !visible.has(f.key) })),
+    outputFields: ALL_OUTPUTS.map((f) => ({
+      ...f,
+      label: variant === "fastdns" ? f.label.replace("SlowDNS", "FastDNS") : f.label,
+      hidden: !visible.has(f.key),
+    })),
     defaultFields: SSH_DEFAULT_FIELDS,
 
     buildSpec(input, ctx) {

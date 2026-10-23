@@ -43,6 +43,7 @@ export type GuideFamily =
   | "ssh-ssl"
   | "ssh-websocket"
   | "slowdns"
+  | "fastdns"
   | "udp-custom"
   | "zivpn"
   | "hysteria"
@@ -211,6 +212,35 @@ const GUIDES: Record<GuideFamily, Omit<ProtocolGuide, "family">> = {
     steps: [
       "Create an account and copy the nameserver (NS) and public key.",
       "In your app choose SlowDNS / DNSTT mode.",
+      "Enter the nameserver, public key, username and password.",
+      "Pick a DNS resolver (for example your network's own) and connect.",
+    ],
+  },
+  // SlowDNS under another name (same DNSTT server and details); apps set it up in their DNSTT mode.
+  fastdns: {
+    label: "FastDNS (DNSTT)",
+    summary: "SSH tunnelled through DNS queries with DNSTT. It can work where only DNS traffic gets through.",
+    highlights: [
+      "Tunnels SSH through DNS queries",
+      "Can work where other ports are blocked",
+      "Encrypted with the server's DNSTT public key",
+      "Supported by HTTP Custom and DNSTT clients",
+    ],
+    tips: [
+      "Apps set FastDNS up in their DNSTT (SlowDNS) mode.",
+      "Copy the nameserver and public key exactly; one wrong character breaks the tunnel.",
+      "Try a different DNS resolver in the app if the connection stalls.",
+    ],
+    apps: {
+      android: [{ name: "HTTP Custom", url: L.httpCustom, note: "DNSTT mode" }],
+      ios: [{ name: "NPV Tunnel" }],
+      windows: [{ name: "dnstt-client", url: L.dnstt, note: "Command line" }],
+      macos: [{ name: "dnstt-client", url: L.dnstt, note: "Command line" }],
+      linux: [{ name: "dnstt-client", url: L.dnstt, note: "Command line" }],
+    },
+    steps: [
+      "Create an account and copy the nameserver (NS) and public key.",
+      "In your app choose the DNSTT (SlowDNS) mode.",
       "Enter the nameserver, public key, username and password.",
       "Pick a DNS resolver (for example your network's own) and connect.",
     ],
@@ -441,6 +471,8 @@ const SLUG_FAMILY: Record<string, GuideFamily> = {
   slowdns: "slowdns",
   "ssh-dnstt": "slowdns",
   dnstt: "slowdns",
+  fastdns: "fastdns",
+  "fast-dns": "fastdns",
   "udp-custom": "udp-custom",
   "ssh-udp": "udp-custom",
   zivpn: "zivpn",
@@ -461,6 +493,7 @@ const KEYWORDS: [RegExp, GuideFamily][] = [
   [/hysteria\s*-?2|hy2/i, "hysteria2"],
   [/hysteria/i, "hysteria"],
   [/zivpn/i, "zivpn"],
+  [/fast\s*-?dns/i, "fastdns"],
   [/slow\s*-?dns|dnstt/i, "slowdns"],
   [/udp/i, "udp-custom"],
   [/ssl|tls|stunnel/i, "ssh-ssl"],
