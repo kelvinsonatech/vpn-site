@@ -4,12 +4,12 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/server/db";
 import { protocols, serverProtocols, vpnAccounts } from "@/server/db/schema";
 import { redis } from "@/server/redis";
-import { getProtocolWithFields, updateProtocol } from "@/server/protocols/service";
+import { getProtocolWithFields, setProtocolEnabled, updateProtocol } from "@/server/protocols/service";
 import { seedProtocols } from "@/server/protocols/seed";
 import { executeCreate, getRequestStatus, requestAccount } from "@/server/provisioning/service";
 import { publishServer } from "@/server/servers/service";
 import { syncServer } from "@/server/servers/sync";
-import { actor, createServer, resetDatabase, startNode, teardown } from "../helpers";
+import { actor, createServer, listedServers, resetDatabase, startNode, teardown } from "../helpers";
 import { OWNER_PROTOCOLS } from "../../mock-node/mock-node";
 
 let ipCounter = 0;
@@ -50,6 +50,36 @@ describe("FastDNS (SlowDNS under another name)", () => {
     expect(fast).toMatchObject({ detected: true, enabled: true, nodeIdentifier: "slowdns", serviceStatus: slow.serviceStatus });
     expect(fast.ports).toEqual(slow.ports);
     expect(fast.id).not.toBe(slow.id);
+  });
+
+  it("starts with SlowDNS's switch, durations and per-IP limit, so a SlowDNS that is off stays off", async () => {
+    // As before FastDNS existed (no accounts yet, so its rows can go): SlowDNS turned off and tuned.
+    await db().delete(protocols).where(eq(protocols.slug, "fastdns"));
+    await db()
+      .update(protocols)
+      .set({ durationOptions: [1, 3], defaultDurationDays: 3, maxAccountsPerIpPerDay: 2 })
+      .where(eq(protocols.slug, "slowdns"));
+    await setProtocolEnabled(await protocolId("slowdns"), false, actor);
+    try {
+      const seeded = await seedProtocols();
+      expect(seeded.created).toEqual(["fastdns"]);
+      const [fast] = await db().select().from(protocols).where(eq(protocols.slug, "fastdns"));
+      expect(fast).toMatchObject({ enabled: false, durationOptions: [1, 3], defaultDurationDays: 3, maxAccountsPerIpPerDay: 2 });
+      expect(await listedServers("slowdns")).toEqual([]);
+      expect(await listedServers("fastdns")).toEqual([]);
+    } finally {
+      await db()
+        .update(protocols)
+        .set({ durationOptions: [3, 7, 14, 30], defaultDurationDays: 7, maxAccountsPerIpPerDay: 3 })
+        .where(eq(protocols.slug, "slowdns"));
+      await setProtocolEnabled(await protocolId("slowdns"), true, actor);
+    }
+    await db()
+      .update(protocols)
+      .set({ durationOptions: [3, 7, 14, 30], defaultDurationDays: 7 })
+      .where(eq(protocols.slug, "fastdns"));
+    await setProtocolEnabled(await protocolId("fastdns"), true, actor);
+    expect((await listedServers("fastdns")).length).toBe(1);
   });
 
   it("creates its accounts as slowdns accounts on the server, labelled FastDNS, with its own slots", async () => {

@@ -161,8 +161,9 @@ docker compose up -d --build
 `migrate` runs again on every `up` and applies new migrations before `web` and `worker` start.
 It also adds new built-in protocols. **FastDNS** (SlowDNS under another name, created as `slowdns`
 accounts on your servers) appears with that update on every server that offers SlowDNS, with the
-same switch, caps and quota as SlowDNS there; change it in **Admin → Servers → (server)** like any
-other protocol, or turn it off everywhere in **Admin → Protocols**.
+same switch, caps and quota as SlowDNS there, and SlowDNS's on/off switch, durations and per-IP
+limit in **Admin → Protocols** (so if SlowDNS is off, FastDNS starts off too). After that the two
+are independent: change FastDNS in **Admin → Servers → (server)** or **Admin → Protocols**.
 Migration `0005` (lockable durations) locks the 7, 14 and 30 day durations on a site that already has saved
 settings; unlock them in **Admin → Site settings → Account durations**.
 Migrations `0006` to `0010` (account check, server bans) add the `removed` account status and the columns the check

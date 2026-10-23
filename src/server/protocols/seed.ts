@@ -169,6 +169,21 @@ async function mirrorNodeProtocolRows(tx: DbOrTx): Promise<number> {
 export async function seedProtocols(tx: DbOrTx = db()): Promise<{ created: string[]; upgraded: string[]; mirrored: number }> {
   const created: string[] = [];
   for (const p of PROTOCOL_SEEDS) {
+    // A protocol using another one's node protocol starts with that protocol's switch, durations and
+    // per-IP limit: a SlowDNS the owner turned off or tuned must not come back as FastDNS.
+    const baseSlug = NODE_PROTOCOL_OF[p.slug];
+    const [base] = baseSlug
+      ? await tx
+          .select({
+            enabled: protocols.enabled,
+            durationOptions: protocols.durationOptions,
+            defaultDurationDays: protocols.defaultDurationDays,
+            maxAccountsPerIpPerDay: protocols.maxAccountsPerIpPerDay,
+          })
+          .from(protocols)
+          .where(eq(protocols.slug, baseSlug))
+          .limit(1)
+      : [];
     const [row] = await tx
       .insert(protocols)
       .values({
@@ -179,11 +194,12 @@ export async function seedProtocols(tx: DbOrTx = db()): Promise<{ created: strin
         category: p.category,
         adapterKey: p.adapterKey,
         nodeIdentifiers: p.nodeIdentifiers,
-        enabled: true,
+        enabled: base?.enabled ?? true,
         isSystem: true,
         displayOrder: p.displayOrder,
-        durationOptions: p.durationOptions,
-        defaultDurationDays: p.defaultDurationDays,
+        durationOptions: base?.durationOptions ?? p.durationOptions,
+        defaultDurationDays: base?.defaultDurationDays ?? p.defaultDurationDays,
+        ...(base ? { maxAccountsPerIpPerDay: base.maxAccountsPerIpPerDay } : {}),
         outputFields: p.outputFields,
       })
       .onConflictDoNothing({ target: protocols.slug })
