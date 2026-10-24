@@ -40,6 +40,7 @@ import profilesBandImage from "@/assets/profiles-band.webp";
 import serversOnlineImage from "@/assets/servers-online.webp";
 import v2rayToJsonImage from "@/assets/v2ray-to-json.webp";
 import { openDurations } from "@/lib/public/durations";
+import { AdsenseScript } from "@/components/public/adsense-script";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
@@ -156,6 +157,7 @@ export default async function HomePage() {
 
   return (
     <>
+      <AdsenseScript />
       <JsonLd data={jsonLd} nonce={nonce} />
 
       {/* Hero */}

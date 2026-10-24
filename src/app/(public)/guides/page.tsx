@@ -7,6 +7,7 @@ import { Container } from "@/components/public/section";
 import { GUIDE_CATEGORIES, GUIDES, readingMinutes } from "@/lib/guides";
 import { pageMetadata } from "@/lib/seo";
 import { loadSettings } from "../_lib/data";
+import { AdsenseScript } from "@/components/public/adsense-script";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
@@ -23,6 +24,7 @@ export default async function GuidesPage() {
   const settings = await loadSettings();
   return (
     <>
+      <AdsenseScript />
       <PageHeader
         crumbs={[
           { label: "Home", href: "/" },

@@ -20,6 +20,7 @@ import type { PublicServerCard } from "@/lib/public/types";
 import { getCountryPage } from "@/server/public/catalog";
 import { loadServerPage as loadServer, loadSettings, resetSchedule } from "@/app/(public)/_lib/data";
 import { openDurations } from "@/lib/public/durations";
+import { AdsenseScript } from "@/components/public/adsense-script";
 
 type Params = { protocol: string; country: string; server: string };
 
@@ -95,6 +96,7 @@ export default async function ServerPage({ params }: { params: Promise<Params> }
 
   return (
     <>
+      <AdsenseScript />
       <PageHeader
         crumbs={crumbs}
         icon={<ProtocolIcon name={protocol.icon} />}

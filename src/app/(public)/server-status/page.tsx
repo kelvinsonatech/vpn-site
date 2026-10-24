@@ -7,6 +7,7 @@ import { StatusBoard } from "@/components/public/status/status-board";
 import { pageMetadata } from "@/lib/seo";
 import { loadSettings, loadStatus, resetSchedule } from "@/app/(public)/_lib/data";
 import statusIcon from "@/assets/server-status.webp";
+import { AdsenseScript } from "@/components/public/adsense-script";
 
 export async function generateMetadata(): Promise<Metadata> {
   await connection();
@@ -29,6 +30,7 @@ export default async function ServerStatusPage({ searchParams }: { searchParams:
 
   return (
     <>
+      <AdsenseScript />
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "Server status" }]}
         icon={

@@ -8,6 +8,7 @@ import { mailtoHref, pageMetadata } from "@/lib/seo";
 import { LEGAL_UPDATED, SHOW_REVIEW_NOTICE } from "@/app/(public)/_lib/legal";
 import { loadSettings } from "@/app/(public)/_lib/data";
 import { adsenseClientId } from "@/lib/adsense";
+import { AdsenseScript } from "@/components/public/adsense-script";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
@@ -261,6 +262,7 @@ export default async function PrivacyPage() {
 
   return (
     <>
+      <AdsenseScript />
       <PageHeader
         crumbs={[
           { label: "Home", href: "/" },

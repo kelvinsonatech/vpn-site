@@ -3,9 +3,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "@/server/db";
 import { protocolFields, protocols } from "@/server/db/schema";
 import { seedProtocols } from "@/server/protocols/seed";
+import { PROTOCOL_SEEDS } from "@/server/protocols/seed-data";
 import { resetDatabase, teardown } from "../helpers";
 
-describe("seed: reworded default labels", () => {
+describe("seed: reworded default labels and descriptions", () => {
   beforeAll(async () => {
     await resetDatabase();
   });
@@ -48,6 +49,24 @@ describe("seed: reworded default labels", () => {
     expect((await field("trojan", "sni_bug")).field.label).toBe("Host override");
 
     // Running it again changes nothing.
+    expect((await seedProtocols()).upgraded).toEqual([]);
+  });
+
+  it("moves built-in protocols off an earlier default description and keeps an admin's own text", async () => {
+    const reworded = PROTOCOL_SEEDS.filter((p) => p.previousDescriptions?.length);
+    expect(reworded.map((p) => p.slug).sort()).toEqual(["fastdns", "hysteria2", "ssh-ssl", "trojan"]);
+    // A site seeded before the rewording, where an admin has already written their own Trojan text.
+    for (const p of reworded) {
+      const description = p.slug === "trojan" ? "Our Trojan servers." : p.previousDescriptions![0]!;
+      await db().update(protocols).set({ description }).where(eq(protocols.slug, p.slug));
+    }
+
+    const { upgraded } = await seedProtocols();
+    expect(upgraded.sort()).toEqual(["fastdns", "hysteria2", "ssh-ssl"]);
+    for (const p of reworded) {
+      const [row] = await db().select().from(protocols).where(eq(protocols.slug, p.slug));
+      expect(row!.description).toBe(p.slug === "trojan" ? "Our Trojan servers." : p.description);
+    }
     expect((await seedProtocols()).upgraded).toEqual([]);
   });
 });

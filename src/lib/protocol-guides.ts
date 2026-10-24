@@ -307,7 +307,7 @@ const GUIDES: Record<GuideFamily, Omit<ProtocolGuide, "family">> = {
   },
   hysteria2: {
     label: "Hysteria 2",
-    summary: "Hysteria 2 runs over QUIC and masquerades as HTTP/3. Very fast, especially on mobile and long-distance links.",
+    summary: "Hysteria 2 runs over QUIC, which encrypts everything with TLS 1.3. Very fast, especially on mobile and long-distance links.",
     highlights: [
       "QUIC / HTTP/3 transport",
       "Excellent speed on lossy networks",
@@ -363,7 +363,7 @@ const GUIDES: Record<GuideFamily, Omit<ProtocolGuide, "family">> = {
   },
   trojan: {
     label: "Trojan",
-    summary: "Trojan imitates normal HTTPS traffic, which makes it hard to tell apart from regular browsing. Runs on Xray with TLS.",
+    summary: "Trojan runs on Xray inside TLS, so your connection is encrypted the same way as an HTTPS website. Import it with a share link or QR code.",
     highlights: [
       "Runs inside TLS, like HTTPS",
       "TLS on port 443 with WebSocket or gRPC",

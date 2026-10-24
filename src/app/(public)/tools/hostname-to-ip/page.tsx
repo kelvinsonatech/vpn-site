@@ -8,6 +8,7 @@ import { HostnameToIp } from "@/components/public/tools/hostname-to-ip";
 import { pageMetadata } from "@/lib/seo";
 import { loadSettings } from "../../_lib/data";
 import toolImage from "@/assets/hostname-to-ip.webp";
+import { AdsenseScript } from "@/components/public/adsense-script";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
@@ -26,6 +27,7 @@ export default async function HostnameToIpPage({ searchParams }: { searchParams:
   const host = (await searchParams).host;
   return (
     <>
+      <AdsenseScript />
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "Tools", href: "/tools" }, { label: "Hostname to IP" }]}
         icon={

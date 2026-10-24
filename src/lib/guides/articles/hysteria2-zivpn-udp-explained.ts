@@ -58,7 +58,7 @@ export const article: GuideArticle = {
       blocks: [
         {
           type: "p",
-          text: "Hysteria 2 is an open-source proxy built on QUIC. QUIC always encrypts with TLS 1.3, so the tunnel between your device and the server is encrypted by design. Your app proves which account it belongs to with a **password**; to anything else that connects, the server is designed to look like an ordinary HTTP/3 web server.",
+          text: "Hysteria 2 is an open-source proxy built on QUIC. QUIC always encrypts with TLS 1.3, so the tunnel between your device and the server is encrypted by design. Your app proves which account it belongs to with a **password**, which comes inside the share link.",
         },
         {
           type: "p",

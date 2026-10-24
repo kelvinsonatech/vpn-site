@@ -157,6 +157,21 @@ async function upgradeIcons(tx: DbOrTx): Promise<string[]> {
   return upgraded;
 }
 
+/** Move built-in protocols still showing an earlier default description to the current one (an admin's text is kept). */
+async function upgradeDescriptions(tx: DbOrTx): Promise<string[]> {
+  const upgraded: string[] = [];
+  for (const p of PROTOCOL_SEEDS) {
+    if (!p.previousDescriptions?.length) continue;
+    const rows = await tx
+      .update(protocols)
+      .set({ description: p.description })
+      .where(and(eq(protocols.slug, p.slug), eq(protocols.isSystem, true), inArray(protocols.description, p.previousDescriptions)))
+      .returning({ slug: protocols.slug });
+    upgraded.push(...rows.map((r) => r.slug));
+  }
+  return upgraded;
+}
+
 /**
  * Protocols that use another protocol's node protocol (NODE_PROTOCOL_OF, e.g. FastDNS on SlowDNS) get
  * a row on every server where that protocol was detected, with its switch, caps and detection, so they
@@ -203,8 +218,8 @@ async function mirrorNodeProtocolRows(tx: DbOrTx): Promise<number> {
 
 /**
  * Insert the built-in protocols. Idempotent and non-destructive: missing protocols are created,
- * existing ones only receive the additions listed in UPGRADES (and a newer default icon while they
- * still use an earlier default); admin edits are never overwritten.
+ * existing ones only receive the additions listed in UPGRADES (and a newer default icon, description
+ * or label while they still show an earlier default); admin edits are never overwritten.
  */
 export async function seedProtocols(tx: DbOrTx = db()): Promise<{ created: string[]; upgraded: string[]; mirrored: number }> {
   const created: string[] = [];
@@ -248,9 +263,9 @@ export async function seedProtocols(tx: DbOrTx = db()): Promise<{ created: strin
     created.push(p.slug);
     await tx.insert(protocolFields).values(p.fields.map((f, i) => fieldRow(row.id, f, (i + 1) * 10)));
   }
-  const upgraded = [...new Set([...(await upgradeExisting(tx)), ...(await upgradeIcons(tx)), ...(await relabelExisting(tx))])].filter(
-    (slug) => !created.includes(slug),
-  );
+  const upgraded = [
+    ...new Set([...(await upgradeExisting(tx)), ...(await upgradeIcons(tx)), ...(await upgradeDescriptions(tx)), ...(await relabelExisting(tx))]),
+  ].filter((slug) => !created.includes(slug));
   return { created, upgraded, mirrored: await mirrorNodeProtocolRows(tx) };
 }
 

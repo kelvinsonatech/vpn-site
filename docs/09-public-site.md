@@ -193,7 +193,7 @@ With `turnstile`, the form renders the Cloudflare Turnstile widget and the serve
 
 Off by default. With `ADSENSE_CLIENT_ID=ca-pub-…` (or `pub-…`) in `.env` (`src/lib/adsense.ts`):
 
-* the public layout loads Google's Auto ads script (`adsbygoogle.js?client=…`, with the CSP nonce); the admin panel never loads it;
+* each content page loads Google's Auto ads script (`<AdsenseScript />` from `src/components/public/adsense-script.tsx`: `adsbygoogle.js?client=…`, with the CSP nonce). It is not in the public layout, so the 404 and error screens never load it (Google allows no ads on screens without publisher content), nor does My accounts or the admin panel. Add it to any new content page;
 * `/ads.txt` answers Google's line (`google.com, pub-…, DIRECT, f08c47fec0942fa0`); without the variable it is a 404;
 * the CSP of public pages follows Google's strict-CSP guidance (scripts still need the nonce or a nonced loader; `'unsafe-eval'`; `https:` for frames, images and requests, because Google's ad hosts change); admin pages keep the strict policy;
 * the privacy page gains an Advertising section (Google's cookies, opt-out links, consent in the EEA, UK and Switzerland) and its summary no longer says "no advertising".

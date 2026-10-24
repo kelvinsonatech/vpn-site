@@ -7,6 +7,7 @@ import { HeroChip, PageHeader } from "@/components/public/page-header";
 import { pageMetadata } from "@/lib/seo";
 import { LEGAL_UPDATED, SHOW_REVIEW_NOTICE } from "@/app/(public)/_lib/legal";
 import { joinTimes, loadSettings, zoneLabel } from "@/app/(public)/_lib/data";
+import { AdsenseScript } from "@/components/public/adsense-script";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
@@ -130,6 +131,7 @@ export default async function TermsPage() {
 
   return (
     <>
+      <AdsenseScript />
       <PageHeader
         crumbs={[
           { label: "Home", href: "/" },

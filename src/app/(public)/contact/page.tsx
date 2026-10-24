@@ -10,6 +10,7 @@ import { loadSettings } from "@/app/(public)/_lib/data";
 import mailImage from "@/assets/contact-mail.webp";
 import supportImage from "@/assets/contact-support.webp";
 import questionsImage from "@/assets/contact-questions.webp";
+import { AdsenseScript } from "@/components/public/adsense-script";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
@@ -42,6 +43,7 @@ export default async function ContactPage() {
 
   return (
     <>
+      <AdsenseScript />
       <PageHeader
         crumbs={[
           { label: "Home", href: "/" },

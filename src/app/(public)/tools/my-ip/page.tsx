@@ -16,6 +16,7 @@ import { loadSettings } from "../../_lib/data";
 import { MyIpDetailsPanel, MyIpDetailsSkeleton } from "./details";
 import toolImage from "@/assets/my-ip.webp";
 import bandImage from "@/assets/my-ip-band.webp";
+import { AdsenseScript } from "@/components/public/adsense-script";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
@@ -46,6 +47,7 @@ export default async function MyIpPage() {
   const v6 = parsed.ok && parsed.ip.includes(":");
   return (
     <>
+      <AdsenseScript />
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "Tools", href: "/tools" }, { label: "Check My IP" }]}
         icon={

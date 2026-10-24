@@ -21,6 +21,7 @@ import { initialTarget, reportOptionsFromStatus, targetLabel } from "@/component
 import { Container } from "@/components/public/section";
 import { mailtoHref, pageMetadata, safeHref } from "@/lib/seo";
 import { loadSettings, loadStatus } from "@/app/(public)/_lib/data";
+import { AdsenseScript } from "@/components/public/adsense-script";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SLUG = /^[a-z0-9][a-z0-9-]{0,63}$/;
@@ -62,6 +63,7 @@ export default async function ReportPage({ searchParams }: { searchParams: Searc
 
   return (
     <>
+      <AdsenseScript />
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "Report a problem" }]}
         icon={<LifeBuoyIcon />}

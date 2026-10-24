@@ -10,6 +10,7 @@ import { Container, SectionHeading } from "@/components/public/section";
 import { pageMetadata } from "@/lib/seo";
 import { avatarDataUri } from "@/server/avatar";
 import { loadProtocols, loadSettings, loadStats } from "../_lib/data";
+import { AdsenseScript } from "@/components/public/adsense-script";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
@@ -51,6 +52,7 @@ export default async function AboutPage() {
 
   return (
     <>
+      <AdsenseScript />
       <PageHeader
         crumbs={[
           { label: "Home", href: "/" },

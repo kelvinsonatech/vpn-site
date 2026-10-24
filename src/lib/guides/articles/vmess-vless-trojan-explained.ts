@@ -38,11 +38,11 @@ export const article: GuideArticle = {
       blocks: [
         {
           type: "p",
-          text: 'VMess is the protocol V2Ray started with. Your account is identified by a **UUID**, a long random ID that works like a password. The app uses it to prove who it is, and VMess then encrypts the traffic itself. The links here set the cipher to "auto", which picks a modern one that suits your device.',
+          text: 'VMess is the protocol V2Ray started with. Your account is identified by a **UUID**, a long random ID that works like a password. The app uses it to prove who it is, and VMess then encrypts the traffic itself, with a cipher named in the share link (usually "auto", which picks a modern one that suits your device).',
         },
         {
           type: "p",
-          text: "So VMess traffic stays encrypted even on a link without TLS. TLS still matters: the server's certificate proves that you reached the real server.",
+          text: "So VMess normally keeps traffic encrypted even without TLS, but still use the TLS link whenever your account has one: the server's certificate proves that you reached the real server.",
         },
         {
           type: "ul",
@@ -58,7 +58,7 @@ export const article: GuideArticle = {
       blocks: [
         {
           type: "p",
-          text: "VLESS is a newer, simpler design. It also identifies your account with a UUID, but in the usual setup it adds no encryption of its own: the vless:// links here even contain the setting encryption=none. After the UUID check it passes your data through with very little extra work. It sends no timestamp either, so a clock that is a few minutes off does not break it.",
+          text: "VLESS is a newer, simpler design. It also identifies your account with a UUID, but in the usual setup it adds no encryption of its own (vless:// links normally contain the setting encryption=none). After the UUID check it passes your data through with very little extra work. It sends no timestamp either, so a clock that is a few minutes off does not break it.",
         },
         {
           type: "p",
@@ -79,7 +79,7 @@ export const article: GuideArticle = {
         },
         {
           type: "p",
-          text: "If a connection does not carry the right password, the server can answer it the way an ordinary website would. For you, the result is privacy: anyone watching the local network, such as other people on a public Wi-Fi, sees an encrypted HTTPS-style connection, not what you do inside it.",
+          text: "The result is privacy: anyone watching the local network, such as other people on a public Wi-Fi, sees an encrypted TLS connection, not what you do inside it.",
         },
         {
           type: "p",
@@ -158,7 +158,7 @@ export const article: GuideArticle = {
             "**Not sure? Start with VLESS on a TLS link over WebSocket.** It is light, ignores small clock errors and works in every app listed in the questions below.",
             "**Choose VMess** if your app or an existing config only supports VMess, and keep your device's clock set automatically.",
             "**Choose Trojan** if you prefer a password to a UUID. It is as light as VLESS and also needs TLS.",
-            "**Connection drops often over WebSocket?** Try an account with the gRPC transport and compare.",
+            "**Connection drops often over WebSocket?** Try the gRPC link if your result has one, or else an account with the gRPC transport, and compare.",
           ],
         },
         {
@@ -179,7 +179,7 @@ export const article: GuideArticle = {
     },
     {
       q: "Can I switch protocol or transport on the same account?",
-      a: "No. Each account is created for one protocol on one server, with the transport you chose on the form. To try another combination, create an account for it.",
+      a: "You cannot change the protocol or the transport an account was created with. If your result already lists a link for another transport (for example gRPC next to WebSocket), it belongs to the same account: import that link and switch between them in your app. If it only lists the transport you chose, create an account with the other one.",
     },
   ],
   related: ["import-v2ray-links", "choose-a-protocol", "fix-connection-problems"],

@@ -19,6 +19,8 @@ const defaults: Record<string, string> = {
   NODE_AGENT_LATEST_VERSION: "1.0.0",
   PROVISION_MAX_ATTEMPTS: "3",
   LOGIN_MAX_FAILURES: "3",
+  // Ads off unless a test turns them on (vi.stubEnv): an ID in the development .env relaxes the CSP.
+  ADSENSE_CLIENT_ID: "",
 };
 const env = process.env as Record<string, string | undefined>;
 // Every test value is forced, so running vitest with the development .env loaded gives the same

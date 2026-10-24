@@ -15,6 +15,7 @@ import { ServerCard } from "@/components/public/server-card";
 import { absoluteUrl, pageMetadata, siteOrigin } from "@/lib/seo";
 import { loadCountryPage, loadSettings } from "@/app/(public)/_lib/data";
 import { openDurations } from "@/lib/public/durations";
+import { AdsenseScript } from "@/components/public/adsense-script";
 
 type Props = { params: Promise<{ protocol: string; country: string }> };
 
@@ -69,6 +70,7 @@ export default async function CountryPage({ params }: Props) {
 
   return (
     <>
+      <AdsenseScript />
       <JsonLd data={jsonLd} nonce={nonce} />
       <PageHeader
         crumbs={crumbs}

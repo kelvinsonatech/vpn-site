@@ -8,6 +8,7 @@ import { TOOLS } from "@/components/public/tools/registry";
 import { pageMetadata } from "@/lib/seo";
 import { loadSettings } from "../_lib/data";
 import toolsImage from "@/assets/tools.webp";
+import { AdsenseScript } from "@/components/public/adsense-script";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
@@ -23,6 +24,7 @@ export default async function ToolsPage() {
   await connection();
   return (
     <>
+      <AdsenseScript />
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "Tools" }]}
         icon={

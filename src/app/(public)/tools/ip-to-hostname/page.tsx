@@ -11,6 +11,7 @@ import { clientIpFromHeaders } from "@/server/auth/request-context";
 import { parseIpInput } from "@/server/tools/reverse";
 import { loadSettings } from "../../_lib/data";
 import toolImage from "@/assets/ip-to-hostname.webp";
+import { AdsenseScript } from "@/components/public/adsense-script";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
@@ -31,6 +32,7 @@ export default async function IpToHostnamePage({ searchParams }: { searchParams:
   const mine = parseIpInput(clientIpFromHeaders(await headers()) ?? "");
   return (
     <>
+      <AdsenseScript />
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "Tools", href: "/tools" }, { label: "IP to Hostname" }]}
         icon={

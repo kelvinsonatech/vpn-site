@@ -14,6 +14,7 @@ import { ProtocolIcon } from "@/components/protocol-icon";
 import { getGuide, plainText, readingMinutes } from "@/lib/guides";
 import { absoluteUrl, pageMetadata } from "@/lib/seo";
 import { loadProtocols, loadSettings } from "../../_lib/data";
+import { AdsenseScript } from "@/components/public/adsense-script";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -46,6 +47,7 @@ export default async function GuidePage({ params }: Props) {
 
   return (
     <>
+      <AdsenseScript />
       <JsonLd
         nonce={nonce}
         data={{

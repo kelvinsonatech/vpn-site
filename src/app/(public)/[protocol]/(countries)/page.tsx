@@ -19,6 +19,7 @@ import { absoluteUrl, pageMetadata, siteOrigin } from "@/lib/seo";
 import { loadProtocolPage, loadSettings } from "@/app/(public)/_lib/data";
 import { CountriesGrid } from "./countries-client";
 import { openDurations } from "@/lib/public/durations";
+import { AdsenseScript } from "@/components/public/adsense-script";
 
 type Props = { params: Promise<{ protocol: string }> };
 
@@ -68,6 +69,7 @@ export default async function ProtocolPage({ params }: Props) {
 
   return (
     <>
+      <AdsenseScript />
       <JsonLd data={jsonLd} nonce={nonce} />
       <PageHeader
         crumbs={crumbs}

@@ -9,6 +9,8 @@ export interface ProtocolSeed {
   icon: string;
   /** Earlier default icons: an existing built-in protocol still using one of them gets `icon`. */
   previousIcons?: string[];
+  /** Earlier default descriptions: an existing built-in protocol still showing one of them gets `description`. */
+  previousDescriptions?: string[];
   category: "ssh" | "v2ray" | "vpn" | "proxy";
   adapterKey: string;
   nodeIdentifiers: string[];
@@ -52,7 +54,8 @@ export const PROTOCOL_SEEDS: ProtocolSeed[] = [
   seed({
     slug: "ssh-ssl",
     name: "SSH SSL",
-    description: "SSH wrapped in SSL/TLS (stunnel) for networks that only allow HTTPS-like traffic.",
+    description: "SSH wrapped in SSL/TLS (stunnel): an extra encrypted layer on its own port.",
+    previousDescriptions: ["SSH wrapped in SSL/TLS (stunnel) for networks that only allow HTTPS-like traffic."],
     icon: "ssh-ssl-badge",
     previousIcons: ["lock"],
     category: "ssh",
@@ -86,7 +89,8 @@ export const PROTOCOL_SEEDS: ProtocolSeed[] = [
   seed({
     slug: "fastdns",
     name: "FastDNS",
-    description: "Fast SSH tunnel through DNS queries (DNSTT).",
+    description: "SSH tunnelled through DNS queries (DNSTT), set up the same way as SlowDNS.",
+    previousDescriptions: ["Fast SSH tunnel through DNS queries (DNSTT)."],
     icon: "fastdns-badge",
     category: "ssh",
     adapterKey: "fastdns",
@@ -156,7 +160,8 @@ export const PROTOCOL_SEEDS: ProtocolSeed[] = [
   seed({
     slug: "trojan",
     name: "Trojan",
-    description: "Trojan protocol that blends in with regular HTTPS traffic.",
+    description: "Trojan over TLS on Xray, with share links and QR codes.",
+    previousDescriptions: ["Trojan protocol that blends in with regular HTTPS traffic."],
     icon: "swords",
     category: "v2ray",
     adapterKey: "trojan",
@@ -176,7 +181,8 @@ export const PROTOCOL_SEEDS: ProtocolSeed[] = [
   seed({
     slug: "hysteria2",
     name: "Hysteria 2",
-    description: "Hysteria 2 over QUIC: high speed on lossy networks, disguised as HTTP/3.",
+    description: "Hysteria 2 over QUIC: high speed on lossy and mobile networks.",
+    previousDescriptions: ["Hysteria 2 over QUIC: high speed on lossy networks, disguised as HTTP/3."],
     icon: "zap",
     category: "proxy",
     adapterKey: "hysteria2",

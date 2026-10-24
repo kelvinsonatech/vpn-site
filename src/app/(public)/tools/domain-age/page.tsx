@@ -7,6 +7,7 @@ import { DomainAgeChecker } from "@/components/public/tools/domain-age";
 import { pageMetadata } from "@/lib/seo";
 import { loadSettings } from "../../_lib/data";
 import toolImage from "@/assets/domain-age.webp";
+import { AdsenseScript } from "@/components/public/adsense-script";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
@@ -25,6 +26,7 @@ export default async function DomainAgePage({ searchParams }: { searchParams: Se
   const domain = (await searchParams).domain;
   return (
     <>
+      <AdsenseScript />
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "Tools", href: "/tools" }, { label: "Domain Age Checker" }]}
         icon={

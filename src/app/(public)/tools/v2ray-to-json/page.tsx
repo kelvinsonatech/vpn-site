@@ -6,6 +6,7 @@ import { V2rayToJson } from "@/components/public/tools/v2ray-to-json";
 import { pageMetadata } from "@/lib/seo";
 import { loadSettings } from "../../_lib/data";
 import toolImage from "@/assets/v2ray-to-json.webp";
+import { AdsenseScript } from "@/components/public/adsense-script";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
@@ -20,6 +21,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default function V2rayToJsonPage() {
   return (
     <>
+      <AdsenseScript />
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "Tools", href: "/tools" }, { label: "V2Ray to JSON" }]}
         icon={
