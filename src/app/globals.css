@@ -367,49 +367,77 @@
 }
 
 /*
- * Guide cards and article photos (/guides). Each effect uses its own property so they combine:
- * the card lifts with `translate` (Tailwind hover classes) and tilts toward the pointer with
- * `transform` (CardPointerFx sets --vl-rx/--vl-ry and the spotlight position --vl-mx/--vl-my), the
- * photo zooms with `scale`, and list items rise into view with a scroll-driven animation where the
- * browser supports one. Everything below is motion only: without it the cards are simply there.
+ * Guide cards and article photos (/guides). Every effect animates only what the GPU can do without the
+ * main thread (transform/translate/scale and opacity), so scrolling and hovering stay light on cheap
+ * phones: the card lifts with `translate` (Tailwind hover classes) and tilts with an inline
+ * `transform` (CardPointerFx, which also slides the spotlight with `transform`), its bigger shadow
+ * fades in with `opacity`, the photo zooms with `scale`, the light sweep slides with `transform`, and
+ * list items rise into view with a scroll-driven animation where the browser supports one. Without
+ * motion the cards are simply there.
  */
 @layer components {
   .vl-guide-card {
-    transform: perspective(1100px) rotateX(var(--vl-rx, 0deg)) rotateY(var(--vl-ry, 0deg));
+    isolation: isolate;
     transition:
       transform 700ms cubic-bezier(0.22, 1, 0.36, 1),
-      translate 500ms cubic-bezier(0.22, 1, 0.36, 1),
-      box-shadow 500ms ease,
-      border-color 300ms ease;
+      translate 500ms cubic-bezier(0.22, 1, 0.36, 1);
   }
-  /* Follow the pointer closely while it moves; ease back when it leaves. */
+  /* Only the card under the pointer gets its own GPU layer, so tilting it never repaints it. */
+  .vl-guide-card:hover {
+    will-change: transform;
+  }
+  /* CardPointerFx eases the tilt itself while the pointer is on the card; CSS eases it back after. */
   .vl-guide-card[data-tilting] {
-    transition-duration: 150ms, 500ms, 500ms, 300ms;
+    transition-duration: 0s, 500ms;
   }
-  /* Soft light that follows the pointer across the card. */
-  .vl-guide-card::after {
+  /* The card is one link: only it takes the pointer, so moving across its photo and text never
+     changes :hover on (and restyles) the elements inside. */
+  .vl-guide-card * {
+    pointer-events: none;
+  }
+  /* The bigger hover shadow is drawn once and faded in: animating box-shadow repaints every frame. */
+  .vl-guide-card::before {
     content: "";
     position: absolute;
     inset: 0;
+    z-index: -1;
     border-radius: inherit;
     pointer-events: none;
+    box-shadow: 0 26px 50px -14px color-mix(in oklch, var(--primary) 26%, transparent);
+    opacity: 0;
+    transition: opacity 500ms ease;
+  }
+  .vl-guide-card:hover::before,
+  .vl-guide-card:focus-visible::before {
+    opacity: 1;
+  }
+  /* Soft light that follows the pointer (moved with transform by CardPointerFx). */
+  .vl-guide-spot {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 28rem;
+    height: 28rem;
+    border-radius: 9999px;
+    pointer-events: none;
+    background: radial-gradient(closest-side, color-mix(in oklch, var(--primary) 16%, transparent), transparent);
+    transform: translate(-50%, -50%);
     opacity: 0;
     transition: opacity 400ms ease;
-    background: radial-gradient(28rem circle at var(--vl-mx, 50%) var(--vl-my, 30%), color-mix(in oklch, var(--primary) 16%, transparent), transparent 60%);
   }
-  .vl-guide-card:hover::after,
-  .vl-guide-card:focus-visible::after {
+  .vl-guide-card:hover .vl-guide-spot {
     opacity: 1;
+    will-change: transform;
   }
   /* A streak of light that sweeps across the photo once on hover. */
   .vl-guide-shine {
     position: absolute;
     inset-block: 0;
-    left: -60%;
+    left: 0;
     width: 40%;
     pointer-events: none;
-    transform: skewX(-20deg);
     background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.35), transparent);
+    transform: translateX(-160%) skewX(-20deg);
     opacity: 0;
   }
   .group:hover .vl-guide-shine,
@@ -417,11 +445,13 @@
     animation: vl-shine 1100ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
-  /* Article photo: settles in from a closer zoom, then drifts slowly; moves a little against the scroll. */
+  /* Article photo: settles in from a closer zoom, drifts slowly out and back (then rests, so it never
+     keeps a phone busy), and moves a little against the scroll. Scale only: an animated filter here
+     would pull both animations off the GPU. */
   .vl-guide-hero-img {
     animation:
       vl-settle 1800ms cubic-bezier(0.22, 1, 0.36, 1) both,
-      vl-drift 24s ease-in-out 1800ms infinite alternate;
+      vl-drift 24s ease-in-out 1800ms 2 alternate;
   }
 }
 
@@ -455,22 +485,20 @@
 }
 @keyframes vl-shine {
   from {
-    left: -60%;
+    transform: translateX(-160%) skewX(-20deg);
     opacity: 1;
   }
   to {
-    left: 130%;
+    transform: translateX(360%) skewX(-20deg);
     opacity: 1;
   }
 }
 @keyframes vl-settle {
   from {
     scale: 1.18;
-    filter: saturate(0.6) blur(3px);
   }
   to {
     scale: 1.05;
-    filter: none;
   }
 }
 @keyframes vl-drift {

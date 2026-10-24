@@ -12,16 +12,17 @@ const STAGGER = ["[--vl-i:0]", "[--vl-i:1]", "[--vl-i:2]"];
 /**
  * Guide card with its cover photo: lifts and tilts toward the pointer, the photo zooms and a light
  * sweeps across it on hover. Render inside an <li> given `revealClass(column)` so it also rises
- * into view while scrolling. `compact` is the smaller card for "Related guides".
+ * into view while scrolling. `compact` is the smaller card for "Related guides". Hover effects only
+ * animate transform and opacity (see .vl-guide-card in globals.css), so they never repaint the card.
  */
 export function GuideCard({ guide, cover, compact = false }: { guide: GuideArticle; cover?: GuideCover; compact?: boolean }) {
   return (
     <Link
       href={`/guides/${guide.slug}`}
-      className="vl-guide-card group relative flex h-full flex-col overflow-hidden rounded-3xl border bg-card shadow-sm outline-none hover:-translate-y-2 hover:border-primary/40 hover:shadow-2xl hover:shadow-primary/15 focus-visible:-translate-y-2 focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      className="vl-guide-card group relative flex h-full flex-col rounded-3xl border bg-card shadow-sm outline-none hover:-translate-y-2 hover:border-primary/40 focus-visible:-translate-y-2 focus-visible:ring-[3px] focus-visible:ring-ring/50"
     >
       <CardPointerFx />
-      <span className={cn("relative block overflow-hidden bg-muted", compact ? "aspect-[2/1]" : "aspect-[16/9]")}>
+      <span className={cn("relative block overflow-hidden rounded-t-[calc(1.5rem-1px)] bg-muted", compact ? "aspect-[2/1]" : "aspect-[16/9]")}>
         {cover ? (
           // eslint-disable-next-line @next/next/no-img-element -- bundled picture, two sizes
           <img
@@ -34,7 +35,7 @@ export function GuideCard({ guide, cover, compact = false }: { guide: GuideArtic
             loading="lazy"
             decoding="async"
             draggable={false}
-            className="size-full object-cover transition-[scale,filter] duration-[1200ms] ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-110 group-hover:saturate-[1.15] group-focus-visible:scale-110"
+            className="size-full object-cover transition-[scale] duration-[1200ms] ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-110 group-focus-visible:scale-110"
           />
         ) : (
           <span aria-hidden className="block size-full bg-gradient-to-br from-primary/30 via-primary/10 to-transparent" />
@@ -44,14 +45,12 @@ export function GuideCard({ guide, cover, compact = false }: { guide: GuideArtic
           className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/5 to-transparent opacity-70 transition-opacity duration-500 group-hover:opacity-100"
         />
         <span aria-hidden className="vl-guide-shine" />
-        <span className="absolute top-3 left-3 rounded-full bg-black/45 px-2.5 py-1 text-[0.7rem] font-semibold tracking-wide text-white uppercase backdrop-blur-md">
+        <span className="absolute top-3 left-3 rounded-full bg-black/60 px-2.5 py-1 text-[0.7rem] font-semibold tracking-wide text-white uppercase">
           {guide.category}
         </span>
       </span>
       <span className={cn("flex flex-1 flex-col", compact ? "p-4 sm:p-5" : "p-5 sm:p-6")}>
-        <span className={cn("font-bold tracking-tight text-balance transition-colors group-hover:text-primary", compact ? "text-base" : "text-lg")}>
-          {guide.title}
-        </span>
+        <span className={cn("font-bold tracking-tight text-balance group-hover:text-primary", compact ? "text-base" : "text-lg")}>{guide.title}</span>
         <span className={cn("mt-2 flex-1 text-sm text-muted-foreground", compact && "line-clamp-2")}>{guide.description}</span>
         <span className="mt-5 flex items-center justify-between gap-3 text-sm">
           <span className="inline-flex items-center gap-1.5 text-muted-foreground">
@@ -63,6 +62,9 @@ export function GuideCard({ guide, cover, compact = false }: { guide: GuideArtic
             <ArrowRightIcon className="size-4 transition-transform duration-300 group-hover:translate-x-1.5" aria-hidden />
           </span>
         </span>
+      </span>
+      <span aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]">
+        <span className="vl-guide-spot" />
       </span>
     </Link>
   );
