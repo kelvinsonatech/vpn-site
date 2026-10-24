@@ -6,12 +6,14 @@ import { connection } from "next/server";
 import { ArrowRightIcon, BookOpenIcon, CalendarIcon, ClockIcon } from "lucide-react";
 import { Faq, faqJsonLd } from "@/components/public/faq";
 import { GuideBlockView } from "@/components/public/guides/guide-blocks";
+import { GuideCard, revealClass } from "@/components/public/guides/guide-card";
 import { RichText } from "@/components/public/guides/rich-text";
 import { JsonLd } from "@/components/public/json-ld";
 import { HeroChip, PageHeader } from "@/components/public/page-header";
 import { Container } from "@/components/public/section";
 import { ProtocolIcon } from "@/components/protocol-icon";
 import { getGuide, plainText, readingMinutes } from "@/lib/guides";
+import { guideCover } from "@/lib/guides/covers";
 import { absoluteUrl, pageMetadata } from "@/lib/seo";
 import { loadProtocols, loadSettings } from "../../_lib/data";
 import { AdsenseScript } from "@/components/public/adsense-script";
@@ -22,7 +24,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const guide = getGuide((await params).slug);
   if (!guide) return {};
   const settings = await loadSettings();
-  return pageMetadata({ title: guide.title, description: guide.description, path: `/guides/${guide.slug}`, siteName: settings.siteName });
+  const cover = guideCover(guide.slug);
+  return pageMetadata({
+    title: guide.title,
+    description: guide.description,
+    path: `/guides/${guide.slug}`,
+    siteName: settings.siteName,
+    image: cover ? { url: cover.full.src, width: cover.full.width, height: cover.full.height, alt: cover.alt } : undefined,
+  });
 }
 
 const sectionId = (heading: string) =>
@@ -44,6 +53,7 @@ export default async function GuidePage({ params }: Props) {
   const related = guide.related.map(getGuide).filter((g) => g !== undefined);
   const faq = (guide.faq ?? []).map((f) => ({ q: f.q, a: plainText(f.a) }));
   const sections = guide.sections.map((s) => ({ ...s, id: sectionId(s.heading) }));
+  const cover = guideCover(guide.slug);
 
   return (
     <>
@@ -56,6 +66,7 @@ export default async function GuidePage({ params }: Props) {
           headline: guide.title,
           description: guide.description,
           dateModified: guide.updated,
+          ...(cover ? { image: absoluteUrl(cover.full.src) } : {}),
           mainEntityOfPage: absoluteUrl(`/guides/${guide.slug}`),
           publisher: { "@type": "Organization", name: settings.siteName },
         }}
@@ -106,6 +117,40 @@ export default async function GuidePage({ params }: Props) {
         </aside>
 
         <div className="grid min-w-0 gap-8">
+          {cover ? (
+            <figure className="overflow-hidden rounded-3xl border bg-card shadow-sm">
+              <div className="relative aspect-[16/9] overflow-hidden bg-muted sm:aspect-[2/1]">
+                {/* Parallax on the frame, zoom on the photo (globals.css): separate properties, so they combine. */}
+                <div className="vl-guide-hero-frame absolute inset-0">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- bundled picture, two sizes */}
+                  <img
+                    src={cover.full.src}
+                    srcSet={`${cover.card.src} ${cover.card.width}w, ${cover.full.src} ${cover.full.width}w`}
+                    sizes="(min-width: 1024px) 860px, 100vw"
+                    width={cover.full.width}
+                    height={cover.full.height}
+                    alt={cover.alt}
+                    fetchPriority="high"
+                    decoding="async"
+                    draggable={false}
+                    className="vl-guide-hero-img size-full object-cover"
+                  />
+                </div>
+                <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/25 to-transparent" />
+              </div>
+              <figcaption className="px-5 py-2.5 text-xs text-muted-foreground">
+                Photo:{" "}
+                <a
+                  href={cover.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline decoration-muted-foreground/40 underline-offset-2 hover:text-foreground"
+                >
+                  {cover.photographer ? `${cover.photographer} on Pexels` : "Pexels"}
+                </a>
+              </figcaption>
+            </figure>
+          ) : null}
           <article className="min-w-0 rounded-3xl border bg-card p-6 shadow-sm sm:p-10">
             <div className="prose-vl">
               {guide.intro.map((p) => (
@@ -168,17 +213,10 @@ export default async function GuidePage({ params }: Props) {
               <h2 id="related-title" className="mb-4 text-xl font-bold tracking-tight">
                 Related guides
               </h2>
-              <ul className="grid gap-4 sm:grid-cols-2">
-                {related.map((g) => (
-                  <li key={g.slug}>
-                    <Link
-                      href={`/guides/${g.slug}`}
-                      className="group flex h-full flex-col rounded-2xl border bg-card p-5 shadow-sm outline-none transition-colors hover:border-primary/30 focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                    >
-                      <span className="text-xs font-semibold tracking-wide text-primary uppercase">{g.category}</span>
-                      <span className="mt-1 font-semibold text-balance">{g.title}</span>
-                      <span className="mt-1 text-sm text-muted-foreground">{g.description}</span>
-                    </Link>
+              <ul className="grid gap-5 sm:grid-cols-2">
+                {related.map((g, i) => (
+                  <li key={g.slug} className={revealClass(i)}>
+                    <GuideCard guide={g} cover={guideCover(g.slug)} compact />
                   </li>
                 ))}
               </ul>

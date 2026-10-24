@@ -34,12 +34,15 @@ export function pageMetadata({
   path,
   siteName,
   noIndex,
+  image,
 }: {
   title: string;
   description: string;
   path: string;
   siteName?: string;
   noIndex?: boolean;
+  /** Share preview picture (a site path; metadataBase makes it absolute). */
+  image?: { url: string; width: number; height: number; alt: string };
 }): Metadata {
   const fullTitle = siteName ? `${title} · ${siteName}` : title;
   return {
@@ -53,8 +56,9 @@ export function pageMetadata({
       description,
       ...(siteName ? { siteName } : {}),
       locale: "en_US",
+      ...(image ? { images: [image] } : {}),
     },
-    twitter: { card: "summary", title: fullTitle, description },
+    twitter: image ? { card: "summary_large_image", title: fullTitle, description, images: [image.url] } : { card: "summary", title: fullTitle, description },
     ...(noIndex ? { robots: { index: false, follow: true } } : {}),
   };
 }
