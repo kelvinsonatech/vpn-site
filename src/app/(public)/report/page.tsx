@@ -41,7 +41,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 const TIPS = [
   { icon: <ActivityIcon />, title: "Check the server status", body: "If the server shows Offline or Maintenance, we already know and are on it." },
-  { icon: <PlugZapIcon />, title: "Try another port or server", body: "Some networks block certain ports. Another port or location often works right away." },
+  { icon: <PlugZapIcon />, title: "Try another port or server", body: "If one port doesn't connect, another listed port or location often works right away." },
   { icon: <CalendarClockIcon />, title: "Check the expiry date", body: "Accounts stop working when they expire. My accounts shows how long yours has left." },
 ];
 

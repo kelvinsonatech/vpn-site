@@ -66,7 +66,8 @@ export const PROTOCOL_SEEDS: ProtocolSeed[] = [
   seed({
     slug: "ssh-websocket",
     name: "SSH WebSocket",
-    description: "SSH over WebSocket, with or without TLS, CDN friendly.",
+    description: "SSH over WebSocket, with or without TLS.",
+    previousDescriptions: ["SSH over WebSocket, with or without TLS, CDN friendly."],
     icon: "globe",
     category: "ssh",
     adapterKey: "ssh-websocket",
@@ -160,8 +161,8 @@ export const PROTOCOL_SEEDS: ProtocolSeed[] = [
   seed({
     slug: "trojan",
     name: "Trojan",
-    description: "Trojan over TLS on Xray, with share links and QR codes.",
-    previousDescriptions: ["Trojan protocol that blends in with regular HTTPS traffic."],
+    description: "Trojan on Xray, designed for TLS, with share links and QR codes.",
+    previousDescriptions: ["Trojan protocol that blends in with regular HTTPS traffic.", "Trojan over TLS on Xray, with share links and QR codes."],
     icon: "swords",
     category: "v2ray",
     adapterKey: "trojan",

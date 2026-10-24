@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { GUIDE_CATEGORIES, GUIDES, guideText, plainText, readingMinutes } from "@/lib/guides";
+import { guideFor } from "@/lib/protocol-guides";
+import { PROTOCOL_SEEDS } from "@/server/protocols/seed-data";
 import { RESERVED_PROTOCOL_SLUGS } from "@/server/protocols/validation";
 
 const PROTOCOLS = ["ssh", "ssh-ssl", "slowdns", "fastdns", "vmess", "vless", "trojan", "hysteria2", "zivpn"];
@@ -22,6 +24,9 @@ const STATIC = [
 ];
 /** Wording an AdSense review can read as helping people get service they have not paid for. */
 const FORBIDDEN = /free internet|bug ?host|zero[- ]?rat|whitelist|unlimited data|data bundle|bypass|unblock|\bhack|\bcrack|carrier billing|without paying/i;
+
+/** On protocol pages and cards too: selling the protocol as a way around a network's rules, or as a disguise. */
+const NETWORK_EVASION = /your network (needs|allows)|networks? that only allow|unless your setup|behind CDNs|disguis|masquerad|blends? in|hard to tell apart/i;
 
 const allText = (g: (typeof GUIDES)[number]) => [
   g.title,
@@ -83,4 +88,48 @@ describe("guides", () => {
       });
     });
   }
+});
+
+describe("protocol page copy", () => {
+  // One slug per guide family, plus an unknown one for the generic guide.
+  const SLUGS = [
+    "ssh",
+    "ssh-ssl",
+    "ssh-websocket",
+    "slowdns",
+    "fastdns",
+    "udp-custom",
+    "zivpn",
+    "hysteria",
+    "hysteria2",
+    "vmess",
+    "trojan",
+    "shadowsocks",
+    "wireguard",
+    "openvpn",
+    "noobzvpn",
+    "something-else",
+  ];
+  const guides = SLUGS.map((slug) => guideFor(slug));
+
+  it("covers every guide family", () => {
+    expect(new Set(guides.map((g) => g.family)).size).toBe(guides.length);
+  });
+
+  it("uses no wording that reads as getting service without paying or getting around a network's rules", () => {
+    for (const g of guides) {
+      for (const text of [g.label, g.summary, ...g.highlights, ...g.tips, ...g.steps]) {
+        expect(text, g.family).not.toMatch(FORBIDDEN);
+        expect(text, g.family).not.toMatch(NETWORK_EVASION);
+      }
+    }
+    for (const p of PROTOCOL_SEEDS) {
+      expect(p.description, p.slug).not.toMatch(FORBIDDEN);
+      expect(p.description, p.slug).not.toMatch(NETWORK_EVASION);
+    }
+  });
+
+  it("keeps guide articles clear of the same wording", () => {
+    for (const g of GUIDES) for (const text of allText(g)) expect(text, g.slug).not.toMatch(NETWORK_EVASION);
+  });
 });

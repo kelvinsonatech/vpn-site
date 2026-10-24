@@ -52,20 +52,23 @@ describe("seed: reworded default labels and descriptions", () => {
     expect((await seedProtocols()).upgraded).toEqual([]);
   });
 
-  it("moves built-in protocols off an earlier default description and keeps an admin's own text", async () => {
+  it("moves built-in protocols off every earlier default description and keeps an admin's own text", async () => {
     const reworded = PROTOCOL_SEEDS.filter((p) => p.previousDescriptions?.length);
-    expect(reworded.map((p) => p.slug).sort()).toEqual(["fastdns", "hysteria2", "ssh-ssl", "trojan"]);
-    // A site seeded before the rewording, where an admin has already written their own Trojan text.
-    for (const p of reworded) {
-      const description = p.slug === "trojan" ? "Our Trojan servers." : p.previousDescriptions![0]!;
-      await db().update(protocols).set({ description }).where(eq(protocols.slug, p.slug));
-    }
+    expect(reworded.map((p) => p.slug).sort()).toEqual(["fastdns", "hysteria2", "ssh-ssl", "ssh-websocket", "trojan"]);
+    const setDescription = (slug: string, description: string) => db().update(protocols).set({ description }).where(eq(protocols.slug, slug));
+    const current = async (slug: string) => (await db().select().from(protocols).where(eq(protocols.slug, slug)))[0]!.description;
 
+    // A site seeded before the rewording (newest old default), where an admin has already written their own SSH SSL text.
+    for (const p of reworded) await setDescription(p.slug, p.slug === "ssh-ssl" ? "Our SSL servers." : p.previousDescriptions!.at(-1)!);
     const { upgraded } = await seedProtocols();
-    expect(upgraded.sort()).toEqual(["fastdns", "hysteria2", "ssh-ssl"]);
-    for (const p of reworded) {
-      const [row] = await db().select().from(protocols).where(eq(protocols.slug, p.slug));
-      expect(row!.description).toBe(p.slug === "trojan" ? "Our Trojan servers." : p.description);
+    expect(upgraded.sort()).toEqual(["fastdns", "hysteria2", "ssh-websocket", "trojan"]);
+    for (const p of reworded) expect(await current(p.slug)).toBe(p.slug === "ssh-ssl" ? "Our SSL servers." : p.description);
+
+    // Every older default moves too (Trojan has two), and a second run changes nothing.
+    for (const old of PROTOCOL_SEEDS.find((p) => p.slug === "trojan")!.previousDescriptions!) {
+      await setDescription("trojan", old);
+      expect((await seedProtocols()).upgraded).toEqual(["trojan"]);
+      expect(await current("trojan")).toBe(PROTOCOL_SEEDS.find((p) => p.slug === "trojan")!.description);
     }
     expect((await seedProtocols()).upgraded).toEqual([]);
   });

@@ -29,7 +29,7 @@ export interface ProtocolGuide {
   label: string;
   /** One or two sentences: what the protocol is good for. */
   summary: string;
-  /** Four short selling points for cards and the "What is …" panel. */
+  /** Three or four short selling points for the "What is …" panel; cards show the first three. */
   highlights: string[];
   /** Practical tips shown next to the highlights. */
   tips: string[];
@@ -121,8 +121,7 @@ const tunnelApps: ProtocolGuide["apps"] = {
 const GUIDES: Record<GuideFamily, Omit<ProtocolGuide, "family">> = {
   ssh: {
     label: "SSH tunnel",
-    summary:
-      "A classic encrypted SSH tunnel. Works with OpenSSH, Dropbear and WebSocket ports, so it fits almost any network and the most popular tunnelling apps.",
+    summary: "A classic encrypted SSH tunnel with OpenSSH, Dropbear and WebSocket ports, supported by the most popular tunnelling apps.",
     highlights: [
       "Encrypted end to end with standard SSH",
       "OpenSSH, Dropbear and WebSocket ports",
@@ -139,7 +138,7 @@ const GUIDES: Record<GuideFamily, Omit<ProtocolGuide, "family">> = {
       "Create an account on a server near you and keep the page open.",
       "Open your tunnelling app and choose SSH (or SSH + WebSocket).",
       "Enter host, port, username and password from your account card.",
-      "Paste the payload if your network needs one, then connect.",
+      "If your account shows a payload for the port you chose, paste it exactly as shown, then connect.",
     ],
   },
   "ssh-ssl": {
@@ -148,7 +147,7 @@ const GUIDES: Record<GuideFamily, Omit<ProtocolGuide, "family">> = {
       "SSH wrapped in a TLS layer (stunnel), with an optional HTTP payload and SNI: an extra layer of encryption on its own port.",
     highlights: [
       "SSH inside an extra TLS layer",
-      "Custom SNI and HTTP payload support",
+      "Optional HTTP payload support",
       "Uses standard TLS ports such as 443",
       "Works with HTTP Custom and HTTP Injector",
     ],
@@ -167,13 +166,8 @@ const GUIDES: Record<GuideFamily, Omit<ProtocolGuide, "family">> = {
   },
   "ssh-websocket": {
     label: "SSH over WebSocket",
-    summary: "SSH carried inside a WebSocket connection, with or without TLS. Friendly to CDNs and HTTP proxies.",
-    highlights: [
-      "SSH inside WebSocket, plain or TLS",
-      "Passes through CDNs and HTTP proxies",
-      "Optional HTTP payload support",
-      "Works with popular tunnelling apps",
-    ],
+    summary: "SSH carried inside a WebSocket connection, with or without TLS, set up with a payload in the popular tunnelling apps.",
+    highlights: ["SSH inside WebSocket, plain or TLS", "Optional HTTP payload support", "Works with popular tunnelling apps"],
     tips: [
       "Use port 80 for plain WebSocket and 443 for WebSocket over TLS.",
       "The payload must include the Upgrade: websocket header.",
@@ -342,16 +336,11 @@ const GUIDES: Record<GuideFamily, Omit<ProtocolGuide, "family">> = {
     label: "V2Ray / Xray",
     summary:
       "VMess and VLESS run on Xray with WebSocket, gRPC and TLS transports. Flexible, fast and supported by many free apps on every platform.",
-    highlights: [
-      "WebSocket, gRPC and TLS transports",
-      "Works behind CDNs with a custom SNI",
-      "Share links and QR codes for one-tap import",
-      "Free apps on every platform",
-    ],
+    highlights: ["WebSocket, gRPC and TLS transports", "Share links and QR codes for one-tap import", "Free apps on every platform"],
     tips: [
       "VLESS is lighter than VMess; both are equally easy to set up.",
-      "Use the TLS link (port 443) unless your network needs plain WebSocket.",
-      "Keep the SNI as the server's host unless your setup needs a different one.",
+      "Use the TLS link (port 443) unless you have a reason not to.",
+      "Keep the SNI as the server's host.",
     ],
     apps: xrayApps,
     steps: [
@@ -363,14 +352,14 @@ const GUIDES: Record<GuideFamily, Omit<ProtocolGuide, "family">> = {
   },
   trojan: {
     label: "Trojan",
-    summary: "Trojan runs on Xray inside TLS, so your connection is encrypted the same way as an HTTPS website. Import it with a share link or QR code.",
-    highlights: [
-      "Runs inside TLS, like HTTPS",
-      "TLS on port 443 with WebSocket or gRPC",
-      "Custom SNI / host",
-      "Share links and QR codes",
+    summary:
+      "Trojan runs on Xray and is designed to run inside TLS: with the TLS link, your connection is encrypted the same way as an HTTPS website. Import it with a share link or QR code.",
+    highlights: ["Designed to run inside TLS, like HTTPS", "TLS on port 443 with WebSocket or gRPC", "Share links and QR codes", "Free apps on every platform"],
+    tips: [
+      "Use the TLS link: a Trojan link without TLS is not encrypted.",
+      "Keep the SNI equal to the server host.",
+      "Import the trojan:// link instead of typing it.",
     ],
-    tips: ["Keep the SNI equal to the server host unless your setup needs a different one.", "Import the trojan:// link instead of typing it."],
     apps: xrayApps,
     steps: [
       "Create an account and copy the trojan:// link.",
