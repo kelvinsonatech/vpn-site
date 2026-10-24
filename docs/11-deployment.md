@@ -126,13 +126,19 @@ asks.
    Cloudflare dashboard for your domain, then in `.env` set `CAPTCHA_PROVIDER=turnstile`,
    `TURNSTILE_SITE_KEY=…` and `TURNSTILE_SECRET_KEY=…`, and run `docker compose up -d`. Without it
    the public forms are protected by rate limits only.
-3. **Admin → Servers → Add server**, for each VPN server: the node API URL, key ID, API secret and
+3. **Google AdSense (optional):** sign up at adsense.google.com, add your domain, and put your
+   publisher ID in `.env` as `ADSENSE_CLIENT_ID=ca-pub-…`; run `docker compose up -d --force-recreate`.
+   The site then loads the AdSense code on public pages, serves `/ads.txt` and shows the Advertising
+   section in the privacy policy. In AdSense, turn on Auto ads and, under Privacy & messaging, the
+   consent message for the EEA, UK and Switzerland, then request the review. Read the Privacy, Terms
+   and Acceptable use pages first: they are what the review sees.
+4. **Admin → Servers → Add server**, for each VPN server: the node API URL, key ID, API secret and
    certificate fingerprint. Then **Test connection**, enable the protocols, set slots (quota) and
    **Publish**.
-4. **On each VPN server:** set the API's allowed website IPv4 to this VPS's IP and remove any
+5. **On each VPN server:** set the API's allowed website IPv4 to this VPS's IP and remove any
    temporary test allowance. If an API secret was ever shared in a chat, generate a new one first
    and enter the new one in the admin panel.
-5. Create one test account per protocol on the public site and connect with an app.
+6. Create one test account per protocol on the public site and connect with an app.
 
 ## 9. Optional: Cloudflare in front
 

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidAdsenseClientId } from "@/lib/adsense";
 
 /**
  * Server-side configuration. Validated lazily on first use so `next build`
@@ -62,6 +63,12 @@ const schema = z.object({
   TURNSTILE_SITE_KEY: z.string().trim().optional(),
   /** Turnstile secret key (server only, never sent to the browser or logged). */
   TURNSTILE_SECRET_KEY: z.string().trim().optional(),
+  /** Google AdSense publisher ID (ca-pub-… or pub-…); empty = no ads. See src/lib/adsense.ts. */
+  ADSENSE_CLIENT_ID: z
+    .string()
+    .trim()
+    .refine((v) => v === "" || isValidAdsenseClientId(v), "must look like ca-pub-1234567890123456 (your AdSense publisher ID)")
+    .optional(),
 });
 
 export type Env = z.infer<typeof schema>;

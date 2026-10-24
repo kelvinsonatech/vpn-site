@@ -102,6 +102,46 @@ async function upgradeExisting(tx: DbOrTx): Promise<string[]> {
   return upgraded;
 }
 
+/**
+ * Default labels reworded after release, as [old default, new default]: built-in protocols still
+ * showing the old default get the new one; wording an admin chose is kept.
+ */
+const V2RAY_RELABELS = {
+  fields: { sni_bug: ["SNI / bug host", "Custom SNI / host"], sni_type: ["Use the bug host as", "Use the custom host as"] },
+  outputs: { bug_host: ["Bug host", "Custom host"] },
+} satisfies { fields: Record<string, [string, string]>; outputs: Record<string, [string, string]> };
+const RELABELS: Record<string, typeof V2RAY_RELABELS> = { vmess: V2RAY_RELABELS, vless: V2RAY_RELABELS, trojan: V2RAY_RELABELS };
+
+async function relabelExisting(tx: DbOrTx): Promise<string[]> {
+  const touched: string[] = [];
+  const rows = await tx
+    .select()
+    .from(protocols)
+    .where(and(eq(protocols.isSystem, true), inArray(protocols.adapterKey, Object.keys(RELABELS))));
+  for (const row of rows) {
+    const r = RELABELS[row.adapterKey]!;
+    let changed = false;
+    for (const [key, [from, to]] of Object.entries(r.fields)) {
+      const done = await tx
+        .update(protocolFields)
+        .set({ label: to })
+        .where(and(eq(protocolFields.protocolId, row.id), eq(protocolFields.key, key), eq(protocolFields.label, from)))
+        .returning({ id: protocolFields.id });
+      if (done.length) changed = true;
+    }
+    const outputs: OutputFieldDefinition[] = row.outputFields.map((f) => {
+      const m = (r.outputs as Record<string, [string, string]>)[f.key];
+      return m && f.label === m[0] ? { ...f, label: m[1] } : f;
+    });
+    if (outputs.some((f, i) => f !== row.outputFields[i])) {
+      await tx.update(protocols).set({ outputFields: outputs }).where(eq(protocols.id, row.id));
+      changed = true;
+    }
+    if (changed) touched.push(row.slug);
+  }
+  return touched;
+}
+
 /** Move built-in protocols still on an earlier default icon to the current one (a chosen icon is kept). */
 async function upgradeIcons(tx: DbOrTx): Promise<string[]> {
   const upgraded: string[] = [];
@@ -208,7 +248,9 @@ export async function seedProtocols(tx: DbOrTx = db()): Promise<{ created: strin
     created.push(p.slug);
     await tx.insert(protocolFields).values(p.fields.map((f, i) => fieldRow(row.id, f, (i + 1) * 10)));
   }
-  const upgraded = [...new Set([...(await upgradeExisting(tx)), ...(await upgradeIcons(tx))])].filter((slug) => !created.includes(slug));
+  const upgraded = [...new Set([...(await upgradeExisting(tx)), ...(await upgradeIcons(tx)), ...(await relabelExisting(tx))])].filter(
+    (slug) => !created.includes(slug),
+  );
   return { created, upgraded, mirrored: await mirrorNodeProtocolRows(tx) };
 }
 

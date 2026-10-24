@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { adsenseClientId } from "@/lib/adsense";
 
 /**
  * Edge of the app:
@@ -8,28 +9,33 @@ import { NextResponse, type NextRequest } from "next/server";
  *  1. Content-Security-Policy with a per-request nonce for every page.
  *  2. Optimistic admin gate: requests to /admin/* without a session cookie go to the login page.
  *     Real authentication/authorization happens in the layouts, pages and actions (guards.ts).
- * The only third party ever allowed is Cloudflare Turnstile, and only when CAPTCHA_PROVIDER=turnstile.
+ * Third parties: Cloudflare Turnstile when CAPTCHA_PROVIDER=turnstile, and Google AdSense on public
+ * pages (never /admin) when ADSENSE_CLIENT_ID is set.
  */
 const SESSION_COOKIES = ["__Host-vl_admin", "vl_admin"];
 const PUBLIC_ADMIN_PATHS = ["/admin/login"];
 
 const TURNSTILE_ORIGIN = "https://challenges.cloudflare.com";
 
-function csp(nonce: string) {
+function csp(nonce: string, ads: boolean) {
   const dev = process.env.NODE_ENV === "development";
   // Read directly (not via env()): the proxy must not need the database/Redis configuration.
   const turnstile = process.env.CAPTCHA_PROVIDER === "turnstile";
   const captcha = turnstile ? ` ${TURNSTILE_ORIGIN}` : "";
+  // AdSense supports only a nonce-based strict policy and changes its hosts over time, so with ads its
+  // frames, images and requests may use any https: origin (Google's documented policy also needs
+  // 'unsafe-eval'); scripts still need the nonce or must be loaded by a nonced script.
+  const evalSrc = dev || ads ? " 'unsafe-eval'" : "";
   return [
     "default-src 'self'",
-    // The host is a CSP2 fallback; CSP3 browsers rely on the nonce + 'strict-dynamic'.
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${captcha}${dev ? " 'unsafe-eval'" : ""}`,
+    // The hosts are a CSP2 fallback; CSP3 browsers rely on the nonce + 'strict-dynamic'.
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${captcha}${ads ? " https:" : ""}${evalSrc}`,
     // Inline style attributes are used by UI primitives (positioning); scripts stay nonce-locked.
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob:",
+    `img-src 'self' data: blob:${ads ? " https:" : ""}`,
     "font-src 'self' data:",
-    `connect-src 'self'${captcha}`,
-    ...(turnstile ? [`frame-src ${TURNSTILE_ORIGIN}`] : []),
+    `connect-src 'self'${ads ? " https:" : captcha}`,
+    ...(ads ? ["frame-src https:"] : turnstile ? [`frame-src ${TURNSTILE_ORIGIN}`] : []),
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -69,7 +75,7 @@ export function proxy(request: NextRequest) {
   }
 
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
-  const policy = csp(nonce);
+  const policy = csp(nonce, adsenseClientId() !== null && !pathname.startsWith("/admin"));
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("Content-Security-Policy", policy);

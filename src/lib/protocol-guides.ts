@@ -344,14 +344,14 @@ const GUIDES: Record<GuideFamily, Omit<ProtocolGuide, "family">> = {
       "VMess and VLESS run on Xray with WebSocket, gRPC and TLS transports. Flexible, fast and supported by many free apps on every platform.",
     highlights: [
       "WebSocket, gRPC and TLS transports",
-      "Works behind CDNs with a custom SNI / bug host",
+      "Works behind CDNs with a custom SNI",
       "Share links and QR codes for one-tap import",
       "Free apps on every platform",
     ],
     tips: [
       "VLESS is lighter than VMess; both are equally easy to set up.",
       "Use the TLS link (port 443) unless your network needs plain WebSocket.",
-      "Add a bug host as SNI only if you know your network allows it.",
+      "Keep the SNI as the server's host unless your setup needs a different one.",
     ],
     apps: xrayApps,
     steps: [
@@ -367,10 +367,10 @@ const GUIDES: Record<GuideFamily, Omit<ProtocolGuide, "family">> = {
     highlights: [
       "Looks like ordinary HTTPS traffic",
       "TLS on port 443 with WebSocket or gRPC",
-      "Custom SNI / bug host",
+      "Custom SNI / host",
       "Share links and QR codes",
     ],
-    tips: ["Keep the SNI equal to the server host unless you use a bug host.", "Import the trojan:// link instead of typing it."],
+    tips: ["Keep the SNI equal to the server host unless your setup needs a different one.", "Import the trojan:// link instead of typing it."],
     apps: xrayApps,
     steps: [
       "Create an account and copy the trojan:// link.",

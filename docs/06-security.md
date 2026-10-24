@@ -32,7 +32,7 @@ Details: [09-public-site.md § Security notes](09-public-site.md#security-notes)
 * Idempotency keys; capacity and creation-quota reservation under row locks; maintenance/offline/full/quota enforced in the backend, not only the UI.
 * TTL-limited, encrypted result retrieval with an unguessable claim token; secrets are erased afterwards and never logged.
 * Client IPs stored only as keyed hashes. Admin-entered and node-provided text rendered as text; links from settings limited to site paths and `https://` URLs.
-* DiceBear avatars generated on the server; the site loads no third-party asset (Turnstile is the only exception, and only when enabled).
+* DiceBear avatars generated on the server; the site loads no third-party asset, with two opt-in exceptions: Turnstile (when the captcha is on) and Google AdSense on public pages (when `ADSENSE_CLIENT_ID` is set; never in the admin panel).
 
 ### Admin panel
 * Argon2id password hashing; password policy (12+ chars, 3 classes).
@@ -42,7 +42,7 @@ Details: [09-public-site.md § Security notes](09-public-site.md#security-notes)
 * **CSRF:** SameSite=Strict cookies, POST-only Server Actions with Next.js Origin/Host verification (`SERVER_ACTIONS_ALLOWED_ORIGINS` for proxies).
 * **RBAC** checked in every page *and* every Server Action (`authorize()`), never only in the UI.
 * **Audit log** for every admin action (with IP and user agent); **provisioning log** for operational events.
-* **Headers:** per-request CSP nonce (`script-src 'nonce-…' 'strict-dynamic'`, `frame-ancestors 'none'`, `object-src 'none'`), HSTS (HTTPS), `X-Frame-Options: DENY`, `nosniff`, strict referrer policy, permissions policy, `Cache-Control: no-store` on admin routes; admin pages are `noindex`.
+* **Headers:** per-request CSP nonce (`script-src 'nonce-…' 'strict-dynamic'`, `frame-ancestors 'none'`, `object-src 'none'`; with AdSense on, public pages also allow `'unsafe-eval'` and `https:` frames, images and requests as Google's strict-CSP guidance requires, while admin pages keep the strict policy), HSTS (HTTPS), `X-Frame-Options: DENY`, `nosniff`, strict referrer policy, permissions policy, `Cache-Control: no-store` on admin routes; admin pages are `noindex`.
 
 ### Logging hygiene
 `redact()` removes passwords, secrets, tokens, keys, UUIDs, configs, links and similar keys at any depth before anything reaches logs, audit details or `provisioning_logs`. Tests assert that no password or link appears in logs after provisioning.

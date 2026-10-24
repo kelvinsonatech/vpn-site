@@ -7,6 +7,7 @@ import { HeroChip, PageHeader } from "@/components/public/page-header";
 import { mailtoHref, pageMetadata } from "@/lib/seo";
 import { LEGAL_UPDATED, SHOW_REVIEW_NOTICE } from "@/app/(public)/_lib/legal";
 import { loadSettings } from "@/app/(public)/_lib/data";
+import { adsenseClientId } from "@/lib/adsense";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await loadSettings();
@@ -31,6 +32,9 @@ export default async function PrivacyPage() {
   const name = settings.siteName;
   const email = mailtoHref(settings.contact.email);
   const lifetime = resultLifetime();
+  // Google AdSense is on (ADSENSE_CLIENT_ID): say so, and how its cookies can be refused.
+  const ads = adsenseClientId() !== null;
+  const ext = { target: "_blank", rel: "noopener noreferrer" } as const;
 
   const sections: ArticleSection[] = [
     {
@@ -43,7 +47,14 @@ export default async function PrivacyPage() {
             Your password, keys and config files are shown to you <strong>once</strong>. We keep no copy of them.
           </li>
           <li>We never store raw IP addresses. Abuse protection uses a keyed hash that cannot be turned back into your address.</li>
-          <li>No advertising, no analytics trackers and no third-party scripts (except the optional captcha described below).</li>
+          {ads ? (
+            <li>
+              The site shows ads from Google AdSense, which uses cookies (see <a href="#advertising">Advertising</a>). No analytics trackers, and no other
+              third-party scripts except the optional captcha described below.
+            </li>
+          ) : (
+            <li>No advertising, no analytics trackers and no third-party scripts (except the optional captcha described below).</li>
+          )}
         </ul>
       ),
     },
@@ -122,7 +133,11 @@ export default async function PrivacyPage() {
             </li>
             <li>Your light or dark theme choice, and whether you dismissed the announcement bar for this session.</li>
           </ul>
-          <p>We do not use tracking or advertising cookies.</p>
+          <p>
+            {ads
+              ? "We set no tracking or advertising cookies ourselves; the advertising cookies on this site come from Google (see Advertising below)."
+              : "We do not use tracking or advertising cookies."}
+          </p>
         </>
       ),
     },
@@ -132,10 +147,62 @@ export default async function PrivacyPage() {
       body: (
         <p>
           When the captcha is switched on, the account and report forms load Cloudflare Turnstile to tell people from bots. Cloudflare then processes
-          technical data such as your IP address under its own privacy policy. It is the only third-party service your browser is sent to by our site.
+          technical data such as your IP address under its own privacy policy.{" "}
+          {ads
+            ? "Apart from Google's ad service (see Advertising), it is the only third-party service your browser is sent to by our site."
+            : "It is the only third-party service your browser is sent to by our site."}
         </p>
       ),
     },
+    ...(ads
+      ? [
+          {
+            id: "advertising",
+            title: "Advertising",
+            body: (
+              <>
+                <p>
+                  {name} is free because public pages show ads served by Google AdSense (never the admin panel). Third-party vendors, including Google, use
+                  cookies to serve ads based on your previous visits to this website or other websites. Google&apos;s use of advertising cookies enables it and
+                  its partners to serve ads to you based on your visits to this site and/or other sites on the internet.
+                </p>
+                <ul>
+                  <li>
+                    You can opt out of personalised advertising in Google&apos;s{" "}
+                    <a href="https://adssettings.google.com/" {...ext}>
+                      Ads Settings
+                    </a>
+                    , or opt out of some third-party vendors&apos; use of cookies for personalised advertising at{" "}
+                    <a href="https://www.aboutads.info/choices/" {...ext}>
+                      aboutads.info
+                    </a>{" "}
+                    (in Europe:{" "}
+                    <a href="https://www.youronlinechoices.eu/" {...ext}>
+                      youronlinechoices.eu
+                    </a>
+                    ).
+                  </li>
+                  <li>
+                    How Google uses information from sites that use its services:{" "}
+                    <a href="https://policies.google.com/technologies/partner-sites" {...ext}>
+                      policies.google.com/technologies/partner-sites
+                    </a>
+                    .
+                  </li>
+                  <li>
+                    Visitors in the European Economic Area, the United Kingdom and Switzerland are asked for consent through Google&apos;s consent message
+                    before personalised ads are shown, and can change that choice from the same message later.
+                  </li>
+                </ul>
+                <p>
+                  We do not share your account details or your traffic with advertisers. Google receives the technical data its ads need (such as your IP
+                  address and browser details) directly from your browser, under Google&apos;s own privacy policy.
+                </p>
+              </>
+            ),
+          } satisfies ArticleSection,
+        ]
+      : []),
     {
       id: "traffic",
       title: "Your traffic",

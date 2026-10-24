@@ -26,10 +26,12 @@ export const RESERVED_PROTOCOL_SLUGS: readonly string[] = [
   "server-status",
   "my-accounts",
   "tools",
+  "guides",
   "admin",
   "api",
   "sitemap.xml",
   "robots.txt",
+  "ads.txt",
   "_next",
 ];
 

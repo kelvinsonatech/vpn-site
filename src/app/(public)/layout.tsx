@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { connection } from "next/server";
+import { ADSENSE_SCRIPT_URL, adsenseClientId } from "@/lib/adsense";
 import { AnnouncementBar } from "@/components/public/announcement-bar";
 import { BackToTop } from "@/components/public/back-to-top";
 import { MobileTabBar } from "@/components/public/mobile-tab-bar";
@@ -28,7 +30,13 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export default async function PublicLayout({ children }: { children: React.ReactNode }) {
   await connection();
-  const [settings, protocols, stats] = await Promise.all([loadSettings(), loadProtocols(), loadStats()]);
+  const [settings, protocols, stats, nonce] = await Promise.all([
+    loadSettings(),
+    loadProtocols(),
+    loadStats(),
+    headers().then((h) => h.get("x-nonce") ?? undefined),
+  ]);
+  const adsClient = adsenseClientId();
   const schedule = resetSchedule(settings.quota);
   const nav: NavProtocol[] = protocols.map((p) => ({
     slug: p.slug,
@@ -43,6 +51,8 @@ export default async function PublicLayout({ children }: { children: React.React
 
   return (
     <div className="vl-public flex min-h-dvh flex-col overflow-x-clip">
+      {/* Google AdSense Auto ads (public pages only, when ADSENSE_CLIENT_ID is set); React moves it into <head>. */}
+      {adsClient ? <script async src={`${ADSENSE_SCRIPT_URL}?client=${adsClient}`} crossOrigin="anonymous" nonce={nonce} /> : null}
       <a
         href="#main"
         className="sr-only z-[60] rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground focus:not-sr-only focus:fixed focus:top-3 focus:left-3"

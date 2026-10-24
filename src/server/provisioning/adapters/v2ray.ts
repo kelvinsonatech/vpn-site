@@ -27,10 +27,10 @@ import { bugHostGuard, remarkGuard, sniTypeGuard, transportGuard } from "./guard
  * The node is authoritative: when it supplies `uri` we use it verbatim (after scheme validation);
  * otherwise a standard share link is assembled from the node-provided values.
  *
- * Optional user inputs `sni_bug` (a "bug host") and `sni_type` change only the share links shown to
+ * Optional user inputs `sni_bug` (a custom host) and `sni_type` change only the share links shown to
  * the user, never the account on the node (they are stripped from the node request):
- *  - "sni" (default): the bug host becomes the TLS SNI and the HTTP Host header;
- *  - "address": the links connect to the bug host, with SNI/Host still naming the real server.
+ *  - "sni" (default): the custom host becomes the TLS SNI and the HTTP Host header;
+ *  - "address": the links connect to the custom host, with SNI/Host still naming the real server.
  */
 export type V2rayFamily = "vmess" | "vless" | "trojan";
 
@@ -61,7 +61,7 @@ const OUTPUTS = (family: V2rayFamily): OutputFieldDefinition[] => [
   { key: "path", label: "Path", kind: "text", sensitive: false, copyable: true },
   { key: "service_name", label: "gRPC service name", kind: "text", sensitive: false, copyable: true },
   { key: "sni", label: "SNI", kind: "text", sensitive: false, copyable: true },
-  { key: "bug_host", label: "Bug host", kind: "text", sensitive: false, copyable: true },
+  { key: "bug_host", label: "Custom host", kind: "text", sensitive: false, copyable: true },
 ];
 
 /** Website-only inputs: applied to the generated links, never sent to the node. */
@@ -96,7 +96,7 @@ export const V2RAY_DEFAULT_FIELDS: SeedField[] = [
   },
   {
     key: "sni_bug",
-    label: "SNI / bug host",
+    label: "Custom SNI / host",
     type: "text",
     required: false,
     placeholder: "e.g. cdn.example.com (optional)",
@@ -106,7 +106,7 @@ export const V2RAY_DEFAULT_FIELDS: SeedField[] = [
   },
   {
     key: "sni_type",
-    label: "Use the bug host as",
+    label: "Use the custom host as",
     type: "select",
     required: false,
     options: [

@@ -63,6 +63,32 @@ describe("proxy: Content-Security-Policy", () => {
     expect(csp.get("img-src")).toEqual(["'self'", "data:", "blob:"]);
   });
 
+  it("opens what Google AdSense needs on public pages only, and only when ADSENSE_CLIENT_ID is set", () => {
+    vi.stubEnv("CAPTCHA_PROVIDER", "turnstile");
+    vi.stubEnv("ADSENSE_CLIENT_ID", "ca-pub-1234567890123456");
+    const pub = directives(run("/guides").headers.get("content-security-policy")!);
+    const nonceOf = (s: string[]) => s.find((x) => x.startsWith("'nonce-"));
+    // Scripts still need the nonce (or a nonced loader, 'strict-dynamic'); the rest follows Google's strict-CSP guidance.
+    expect(nonceOf(pub.get("script-src")!)).toBeTruthy();
+    expect(pub.get("script-src")).toEqual(expect.arrayContaining(["'strict-dynamic'", "https:", "'unsafe-eval'"]));
+    expect(pub.get("frame-src")).toEqual(["https:"]);
+    expect(pub.get("img-src")).toEqual(["'self'", "data:", "blob:", "https:"]);
+    expect(pub.get("connect-src")).toEqual(["'self'", "https:"]);
+    expect(pub.get("object-src")).toEqual(["'none'"]);
+    expect(pub.get("frame-ancestors")).toEqual(["'none'"]);
+
+    // The admin panel keeps the strict policy (only the captcha, as before).
+    const admin = directives(run("/admin/login").headers.get("content-security-policy")!);
+    expect(admin.get("script-src")).not.toContain("'unsafe-eval'");
+    expect(admin.get("script-src")).not.toContain("https:");
+    expect(admin.get("frame-src")).toEqual(["https://challenges.cloudflare.com"]);
+    expect(admin.get("img-src")).toEqual(["'self'", "data:", "blob:"]);
+
+    // A malformed ID turns ads off rather than relaxing anything.
+    vi.stubEnv("ADSENSE_CLIENT_ID", "pub-123");
+    expect(run("/").headers.get("content-security-policy")).not.toContain("unsafe-eval");
+  });
+
   it("upgrades insecure requests only for an https APP_URL outside development", () => {
     vi.stubEnv("APP_URL", "https://vpn.example.com");
     expect(run("/").headers.get("content-security-policy")).toContain("upgrade-insecure-requests");

@@ -18,11 +18,11 @@ import { generatePassword, isAdvancedField, normalizeInput } from "./form-valida
 
 export const fieldId = (key: string) => `f-${key}`;
 
-/** Friendly copy for the VMess/VLESS/Trojan "bug host" mode choice. */
+/** Friendly copy for the VMess/VLESS/Trojan custom host mode choice. */
 const SNI_TYPE_COPY: Record<string, { title: string; body: string }> = {
-  sni: { title: "Use as SNI / host", body: "Your bug host goes into the SNI and Host header; the address stays our server." },
-  host: { title: "Use as SNI / host", body: "Your bug host goes into the SNI and Host header; the address stays our server." },
-  address: { title: "Use as address", body: "Connect to your bug host as the address; SNI and Host stay our server's domain." },
+  sni: { title: "Use as SNI / host", body: "Your custom host goes into the SNI and Host header; the address stays our server." },
+  host: { title: "Use as SNI / host", body: "Your custom host goes into the SNI and Host header; the address stays our server." },
+  address: { title: "Use as address", body: "Connect to your custom host as the address; SNI and Host stay our server's domain." },
 };
 
 function FieldShell({
@@ -481,8 +481,8 @@ export function AccountFormFields({
           >
             <SlidersHorizontalIcon className="size-4 text-muted-foreground" aria-hidden />
             <span className="flex-1">
-              Advanced: SNI / bug host
-              <span className="block text-xs font-normal text-muted-foreground">Optional. Only needed for custom bug hosts.</span>
+              Advanced: custom SNI / host
+              <span className="block text-xs font-normal text-muted-foreground">Optional. Leave it empty to use the server&apos;s own host.</span>
             </span>
             <ChevronDownIcon className={cn("size-4 text-muted-foreground transition-transform motion-reduce:transition-none", expanded && "rotate-180")} aria-hidden />
           </button>
