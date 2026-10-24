@@ -19,7 +19,7 @@ export function GuideCard({ guide, cover, compact = false }: { guide: GuideArtic
   return (
     <Link
       href={`/guides/${guide.slug}`}
-      className="vl-guide-card group relative flex h-full flex-col rounded-3xl border bg-card shadow-sm outline-none hover:-translate-y-2 hover:border-primary/40 focus-visible:-translate-y-2 focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      className="vl-guide-card group relative flex h-full flex-col rounded-3xl border bg-card shadow-sm outline-none hover:-translate-y-2 hover:border-primary/40 hover:shadow-none focus-visible:-translate-y-2 focus-visible:ring-[3px] focus-visible:ring-ring/50"
     >
       <CardPointerFx />
       <span className={cn("relative block overflow-hidden rounded-t-[calc(1.5rem-1px)] bg-muted", compact ? "aspect-[2/1]" : "aspect-[16/9]")}>

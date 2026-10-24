@@ -395,15 +395,16 @@
   .vl-guide-card * {
     pointer-events: none;
   }
-  /* The bigger hover shadow is drawn once and faded in: animating box-shadow repaints every frame. */
+  /* The bigger hover shadow is drawn once and faded in: animating box-shadow repaints every frame.
+     Drawn from the border box (inset -1px), so it never tints the card's own border. */
   .vl-guide-card::before {
     content: "";
     position: absolute;
-    inset: 0;
+    inset: -1px;
     z-index: -1;
     border-radius: inherit;
     pointer-events: none;
-    box-shadow: 0 26px 50px -14px color-mix(in oklch, var(--primary) 26%, transparent);
+    box-shadow: 0 25px 50px -12px color-mix(in oklab, var(--primary) 15%, transparent);
     opacity: 0;
     transition: opacity 500ms ease;
   }
@@ -411,11 +412,12 @@
   .vl-guide-card:focus-visible::before {
     opacity: 1;
   }
-  /* Soft light that follows the pointer (moved with transform by CardPointerFx). */
+  /* Soft light that follows the pointer (moved with transform by CardPointerFx); rests 50% across and
+     30% down, where it also shows for keyboard focus. */
   .vl-guide-spot {
     position: absolute;
-    top: 0;
-    left: 0;
+    top: 30%;
+    left: 50%;
     width: 28rem;
     height: 28rem;
     border-radius: 9999px;
@@ -425,8 +427,11 @@
     opacity: 0;
     transition: opacity 400ms ease;
   }
-  .vl-guide-card:hover .vl-guide-spot {
+  .vl-guide-card:hover .vl-guide-spot,
+  .vl-guide-card:focus-visible .vl-guide-spot {
     opacity: 1;
+  }
+  .vl-guide-card:hover .vl-guide-spot {
     will-change: transform;
   }
   /* A streak of light that sweeps across the photo once on hover. */
