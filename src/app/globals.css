@@ -395,11 +395,7 @@
     pointer-events: none;
     opacity: 0;
     transition: opacity 400ms ease;
-    background: radial-gradient(
-      28rem circle at var(--vl-mx, 50%) var(--vl-my, 30%),
-      color-mix(in oklch, var(--primary) 16%, transparent),
-      transparent 60%
-    );
+    background: radial-gradient(28rem circle at var(--vl-mx, 50%) var(--vl-my, 30%), color-mix(in oklch, var(--primary) 16%, transparent), transparent 60%);
   }
   .vl-guide-card:hover::after,
   .vl-guide-card:focus-visible::after {
@@ -431,11 +427,11 @@
 
 @media (prefers-reduced-motion: no-preference) {
   @supports (animation-timeline: view()) {
-    /* Cards rise and sharpen as they scroll in; --vl-i (0-2) staggers the columns of a row. */
+    /* Cards rise in over their first ~250px on screen; --vl-i (0-2) staggers the columns of a row. */
     .vl-reveal {
       animation: vl-rise linear both;
       animation-timeline: view();
-      animation-range: entry calc(var(--vl-i, 0) * 10%) cover calc(22% + var(--vl-i, 0) * 6%);
+      animation-range: entry calc(var(--vl-i, 0) * 40px) entry calc(220px + var(--vl-i, 0) * 50px);
     }
     .vl-guide-hero-frame {
       animation: vl-parallax linear both;
@@ -444,18 +440,17 @@
   }
 }
 
+/* Opacity, translate and scale only: cheap to animate, even on low-end phones. */
 @keyframes vl-rise {
   from {
     opacity: 0;
     translate: 0 3.5rem;
     scale: 0.94;
-    filter: blur(6px);
   }
   to {
     opacity: 1;
     translate: 0 0;
     scale: 1;
-    filter: none;
   }
 }
 @keyframes vl-shine {

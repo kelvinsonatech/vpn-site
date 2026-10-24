@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GUIDE_CATEGORIES, GUIDES, guideText, plainText, readingMinutes } from "@/lib/guides";
+import { guideCover } from "@/lib/guides/covers";
 import { guideFor } from "@/lib/protocol-guides";
 import { PROTOCOL_SEEDS } from "@/server/protocols/seed-data";
 import { RESERVED_PROTOCOL_SLUGS } from "@/server/protocols/validation";
@@ -131,5 +132,23 @@ describe("protocol page copy", () => {
 
   it("keeps guide articles clear of the same wording", () => {
     for (const g of GUIDES) for (const text of allText(g)) expect(text, g.slug).not.toMatch(NETWORK_EVASION);
+  });
+});
+
+describe("guide covers", () => {
+  it("gives every guide its own Pexels photo, described and credited", () => {
+    const pages = new Set<string>();
+    for (const g of GUIDES) {
+      const cover = guideCover(g.slug);
+      expect(cover, g.slug).toBeDefined();
+      expect(cover!.full, g.slug).toBeTruthy();
+      expect(cover!.card, g.slug).toBeTruthy();
+      expect(cover!.alt.length, g.slug).toBeGreaterThanOrEqual(20);
+      expect(cover!.alt.length, g.slug).toBeLessThanOrEqual(125);
+      expect(cover!.alt, g.slug).not.toMatch(/^(image|photo|picture) of/i);
+      expect(cover!.href, g.slug).toMatch(/^https:\/\/www\.pexels\.com\/photo\/[a-z0-9-]*\d+\/$/);
+      pages.add(cover!.href);
+    }
+    expect(pages.size).toBe(GUIDES.length);
   });
 });
