@@ -119,7 +119,7 @@ export default async function HomePage() {
     },
     {
       q: "Why are my details shown only once?",
-      a: "Your password, keys and config files are generated on the server and handed to your browser as an encrypted one-time result. We keep that encrypted result for at most an hour, so reloading the page does not lose it, then erase it; it is never written to logs. Copy them or download the file before you leave the page.",
+      a: "Your password, keys and config files are generated on the server and handed to your browser as an encrypted one-time result. We keep that encrypted result for at most an hour, so reloading while your account is being created does not lose it, then erase it; it is never written to logs. Once the details are on screen, copy them or download the file: leaving or reloading the page after that shows a fresh form.",
     },
     {
       q: "Which protocol should I choose?",

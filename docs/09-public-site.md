@@ -183,7 +183,22 @@ Both public POST endpoints (accounts, reports) call `verifyCaptcha()` (`src/serv
 | `TURNSTILE_SITE_KEY` | Public site key; required when the provider is `turnstile` |
 | `TURNSTILE_SECRET_KEY` | Secret key, server only, never logged; required when the provider is `turnstile` (the environment check rejects the configuration without both keys) |
 
-With `turnstile`, the form renders the Cloudflare Turnstile widget and the server verifies each token with Cloudflare's `siteverify` endpoint (5 s timeout, sends the client IP as `remoteip`). It **fails closed**: a missing or oversized token, a missing secret, a timeout, a network error or any answer other than `success: true` refuses the request with `403 CAPTCHA_FAILED`. A rejected secret is logged as an operator error. Only then does the CSP allow `https://challenges.cloudflare.com` (`script-src`, `connect-src`, `frame-src`); it is the only third party the site ever loads. With `none`, the forms rely on the rate limits alone and production logs a warning once.
+With `turnstile`, the form renders the Cloudflare Turnstile widget and the server verifies each token with Cloudflare's `siteverify` endpoint (5 s timeout, sends the client IP as `remoteip`). It **fails closed**: a missing or oversized token, a missing secret, a timeout, a network error or any answer other than `success: true` refuses the request with `403 CAPTCHA_FAILED`. A rejected secret is logged as an operator error. Only then does the CSP allow `https://challenges.cloudflare.com` (`script-src`, `connect-src`, `frame-src`); apart from Google's ad script when AdSense is enabled (see [Advertising](#advertising-google-adsense)), it is the only third party the site loads. With `none`, the forms rely on the rate limits alone and production logs a warning once.
+
+## Guides
+
+`/guides` and `/guides/<slug>` are original help articles (setting up the apps, what each protocol does, troubleshooting, privacy and fair use), linked from the header's Support menu, the footer, the mobile menu, the sitemap and each protocol page ("More help with …"). Each article is a typed data file in `src/lib/guides/articles/` (format: `src/lib/guides/types.ts`; text supports only `**bold**` and `[label](/internal/path)`), listed in `src/lib/guides/index.ts` and rendered by one component (`src/app/(public)/guides/`), with Article and FAQ structured data. Articles never link a protocol page in their text, because those pages only exist while the protocol is listed: their `protocols` field drives "Create account" buttons for the protocols listed right now. `tests/unit/guides.test.ts` checks every article: length, links, related guides and wording that an AdSense review could read as helping people get service they have not paid for.
+
+## Advertising (Google AdSense)
+
+Off by default. With `ADSENSE_CLIENT_ID=ca-pub-…` (or `pub-…`) in `.env` (`src/lib/adsense.ts`):
+
+* the public layout loads Google's Auto ads script (`adsbygoogle.js?client=…`, with the CSP nonce); the admin panel never loads it;
+* `/ads.txt` answers Google's line (`google.com, pub-…, DIRECT, f08c47fec0942fa0`); without the variable it is a 404;
+* the CSP of public pages follows Google's strict-CSP guidance (scripts still need the nonce or a nonced loader; `'unsafe-eval'`; `https:` for frames, images and requests, because Google's ad hosts change); admin pages keep the strict policy;
+* the privacy page gains an Advertising section (Google's cookies, opt-out links, consent in the EEA, UK and Switzerland) and its summary no longer says "no advertising".
+
+Ad placement and the consent message for the EEA, UK and Switzerland are set up in the AdSense dashboard (Auto ads, Privacy & messaging). A malformed value stops the server at start-up with a clear error, like the captcha keys.
 
 ## Admin settings and reports
 
@@ -212,7 +227,7 @@ The other admin additions (server URL names, per-protocol quotas, account avatar
 * **Public POST endpoints:** same-origin check (`Origin` must be the site), `application/json` only, body size limits enforced while streaming, strict zod schemas (unknown keys rejected), adapter guards on usernames and passwords (safe character sets, reserved names), rate limits keyed by `hashClientIp()` (HMAC with `IP_HASH_SECRET`, raw IPs are never stored), captcha failing closed.
 * **No secrets at rest or in logs.** Form input and results are encrypted and erased (input when the request finishes, the result after its TTL); `vpn_accounts.metadata` holds only non-sensitive values; logs and event details pass through `redact()`. Public responses that may carry secrets are `no-store`.
 * **Text stays text.** Admin-entered and node-provided text is rendered by React (escaped). The only raw HTML is the structured-data `<script>` in `json-ld.tsx`, whose JSON escapes `<`, `>` and `&`. Links from settings are validated on save and again when rendered (`safeHref()` in `src/lib/seo.ts`: a site path or an `https://` URL, never `javascript:`).
-* **Self-hosted assets.** Fonts (`@fontsource-variable/inter`, `jetbrains-mono`), flags (`flag-icons`), QR codes (`qrcode`, in the browser) and avatars are all served from the site; CSP `font-src 'self' data:`, `img-src 'self' data: blob:`, nonce-based `script-src`.
+* **Self-hosted assets.** Fonts (`@fontsource-variable/inter`, `jetbrains-mono`), flags (`flag-icons`), QR codes (`qrcode`, in the browser) and avatars are all served from the site; CSP `font-src 'self' data:`, `img-src 'self' data: blob:`, nonce-based `script-src`. The only third-party scripts are the captcha and, when enabled, Google AdSense, which widens the public pages' CSP (see [Advertising](#advertising-google-adsense)).
 * **Client IP.** Taken from `X-Forwarded-For` counting `TRUSTED_PROXY_HOPS` from the right; keep the app behind the reverse proxy so the header cannot be forged.
 
 Tests: `tests/integration/{catalog,public-api,quota,monitoring,reports}.test.ts`, `tests/unit/{quota,reset-schedule,public-cache,public-browse,public-create,slug-avatar,captcha,proxy-csp,owner-adapters}.test.ts`.

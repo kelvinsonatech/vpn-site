@@ -12,7 +12,8 @@ describe("AdSense settings", () => {
   it("accepts the publisher ID with or without ca-, and nothing else", () => {
     expect(adsenseClientId("ca-pub-1234567890123456")).toBe("ca-pub-1234567890123456");
     expect(adsenseClientId(" pub-1234567890123456 ")).toBe("ca-pub-1234567890123456");
-    for (const bad of [undefined, "", "pub-123", "ca-pub-12345678901234567", "ca-pub-123456789012345a", "https://example.com"]) expect(adsenseClientId(bad), String(bad)).toBeNull();
+    for (const bad of [undefined, "", "pub-123", "ca-pub-12345678901234567", "ca-pub-123456789012345a", "https://example.com"])
+      expect(adsenseClientId(bad), String(bad)).toBeNull();
     expect(isValidAdsenseClientId("pub-1234567890123456")).toBe(true);
     expect(isValidAdsenseClientId("1234567890123456")).toBe(false);
   });

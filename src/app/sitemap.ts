@@ -3,6 +3,7 @@ import { connection } from "next/server";
 import { absoluteUrl } from "@/lib/seo";
 import { listSitemapEntries, STATIC_PAGES } from "@/server/public/catalog";
 import { errorSummary, logger } from "@/server/logging/logger";
+import { GUIDES } from "@/lib/guides";
 
 /** Priority by depth: home 1.0, protocol pages 0.8, countries 0.7, servers 0.6, static pages 0.4. */
 function priority(path: string): number {
@@ -32,10 +33,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     logger.warn("sitemap: catalogue unavailable, listing static pages only", errorSummary(e));
     entries = ["/", ...STATIC_PAGES].map((path) => ({ path, lastModified: null }));
   }
-  return entries.map((e) => ({
-    url: absoluteUrl(e.path),
-    ...(e.lastModified ? { lastModified: e.lastModified } : {}),
-    changeFrequency: changeFrequency(e.path),
-    priority: priority(e.path),
-  }));
+  return [
+    ...entries.map((e) => ({
+      url: absoluteUrl(e.path),
+      ...(e.lastModified ? { lastModified: e.lastModified } : {}),
+      changeFrequency: changeFrequency(e.path),
+      priority: priority(e.path),
+    })),
+    // Help articles: static content, dated by their last update.
+    ...GUIDES.map((g) => ({ url: absoluteUrl(`/guides/${g.slug}`), lastModified: g.updated, changeFrequency: "monthly" as const, priority: 0.6 })),
+  ];
 }

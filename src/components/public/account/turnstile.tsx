@@ -7,10 +7,10 @@ import { ShieldAlertIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * Cloudflare Turnstile, rendered explicitly into our own box. The script is the only third-party
- * code the site loads, and only when captcha is enabled (the page passes the site key, else
- * nothing renders). It carries the per-request CSP nonce. Call `reset()` after every submission:
- * tokens are single-use.
+ * Cloudflare Turnstile, rendered explicitly into our own box. The script loads only when captcha
+ * is enabled (the page passes the site key, else nothing renders); apart from it, the only
+ * third-party code is Google's ad script, when AdSense is enabled. It carries the per-request CSP
+ * nonce. Call `reset()` after every submission: tokens are single-use.
  */
 const SCRIPT_SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
 

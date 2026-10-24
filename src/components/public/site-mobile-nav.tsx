@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   ActivityIcon,
+  BookOpenIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   FlagIcon,
@@ -31,6 +32,7 @@ import { AvatarStack, CountBadge, useActiveAccounts } from "./my-accounts-menu";
 import type { NavProtocol } from "./nav";
 
 const SUPPORT = [
+  { href: "/guides", label: "Guides", icon: BookOpenIcon },
   { href: "/report", label: "Report a problem", icon: FlagIcon },
   { href: "/contact", label: "Contact", icon: MailIcon },
   { href: "/about", label: "About", icon: InfoIcon },

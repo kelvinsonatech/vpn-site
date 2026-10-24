@@ -3,7 +3,7 @@
 import { useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ActivityIcon, ChevronDownIcon, FlagIcon, HomeIcon, InfoIcon, LifeBuoyIcon, MailIcon, WrenchIcon } from "lucide-react";
+import { ActivityIcon, BookOpenIcon, ChevronDownIcon, FlagIcon, HomeIcon, InfoIcon, LifeBuoyIcon, MailIcon, WrenchIcon } from "lucide-react";
 import { Brand } from "@/components/brand";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -28,7 +28,7 @@ export function SiteHeader({ siteName, protocols }: { siteName: string; protocol
   const pathname = usePathname();
   const scrolled = useSyncExternalStore(subscribeScroll, scrolledSnapshot, () => false);
   const inServices = protocols.some((p) => pathname === p.href || pathname.startsWith(`${p.href}/`));
-  const inSupport = ["/report", "/contact", "/about"].some((p) => pathname.startsWith(p));
+  const inSupport = ["/guides", "/report", "/contact", "/about"].some((p) => pathname.startsWith(p));
 
   return (
     <header
@@ -76,6 +76,7 @@ export function SiteHeader({ siteName, protocols }: { siteName: string; protocol
               <ChevronDownIcon className="opacity-60 transition-transform duration-200 group-data-[state=open]:rotate-180" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" sideOffset={10} className="w-60 rounded-2xl p-2 shadow-xl">
+              <SupportItem href="/guides" icon={<BookOpenIcon />} title="Guides" text="Set up apps and fix problems" />
               <SupportItem href="/report" icon={<FlagIcon />} title="Report a problem" text="A server is down or slow" />
               <SupportItem href="/contact" icon={<MailIcon />} title="Contact" text="Questions and feedback" />
               <SupportItem href="/about" icon={<InfoIcon />} title="About" text="How the service works" />

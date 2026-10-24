@@ -131,7 +131,7 @@ const GUIDES: Record<GuideFamily, Omit<ProtocolGuide, "family">> = {
     ],
     tips: [
       "Use one account per device: logging in twice disconnects the first session.",
-      "If a port is blocked on your network, try another listed port or WebSocket.",
+      "If one port doesn't connect, try another port listed in your account details.",
       "Copy the payload exactly as shown, including the [crlf] markers.",
     ],
     apps: tunnelApps,
@@ -145,15 +145,15 @@ const GUIDES: Record<GuideFamily, Omit<ProtocolGuide, "family">> = {
   "ssh-ssl": {
     label: "SSH over SSL/TLS",
     summary:
-      "SSH wrapped in a TLS layer (stunnel) with an optional HTTP payload and SNI, so the connection looks like ordinary HTTPS traffic.",
+      "SSH wrapped in a TLS layer (stunnel), with an optional HTTP payload and SNI: an extra layer of encryption on its own port.",
     highlights: [
-      "SSH inside TLS, looks like regular HTTPS",
+      "SSH inside an extra TLS layer",
       "Custom SNI and HTTP payload support",
-      "Ideal for networks that only allow port 443",
+      "Uses standard TLS ports such as 443",
       "Works with HTTP Custom and HTTP Injector",
     ],
     tips: [
-      "Set the SNI to the server host unless you know a host your network allows.",
+      "Keep the SNI set to the server's host.",
       "Keep the [crlf] markers in the payload: the app converts them to line breaks.",
       "One device per account; a second login drops the first.",
     ],
@@ -171,7 +171,7 @@ const GUIDES: Record<GuideFamily, Omit<ProtocolGuide, "family">> = {
     highlights: [
       "SSH inside WebSocket, plain or TLS",
       "Passes through CDNs and HTTP proxies",
-      "Custom payloads for restrictive networks",
+      "Optional HTTP payload support",
       "Works with popular tunnelling apps",
     ],
     tips: [
@@ -190,10 +190,10 @@ const GUIDES: Record<GuideFamily, Omit<ProtocolGuide, "family">> = {
   slowdns: {
     label: "SlowDNS (DNSTT)",
     summary:
-      "SSH tunnelled through DNS queries with DNSTT. Slower than direct SSH, but it can work where only DNS traffic gets through.",
+      "SSH tunnelled through DNS queries with DNSTT. Slower than direct SSH, and a different way to carry the same encrypted connection.",
     highlights: [
       "Tunnels SSH through DNS queries",
-      "Can work where other ports are blocked",
+      "An alternative to connecting over SSH ports",
       "Encrypted with the server's DNSTT public key",
       "Supported by HTTP Custom and DNSTT clients",
     ],
@@ -219,10 +219,10 @@ const GUIDES: Record<GuideFamily, Omit<ProtocolGuide, "family">> = {
   // SlowDNS under another name (same DNSTT server and details); apps set it up in their DNSTT mode.
   fastdns: {
     label: "FastDNS (DNSTT)",
-    summary: "SSH tunnelled through DNS queries with DNSTT. It can work where only DNS traffic gets through.",
+    summary: "SSH tunnelled through DNS queries with DNSTT: a different way to carry the same encrypted SSH connection.",
     highlights: [
       "Tunnels SSH through DNS queries",
-      "Can work where other ports are blocked",
+      "An alternative to connecting over SSH ports",
       "Encrypted with the server's DNSTT public key",
       "Supported by HTTP Custom and DNSTT clients",
     ],
@@ -314,7 +314,7 @@ const GUIDES: Record<GuideFamily, Omit<ProtocolGuide, "family">> = {
       "Salamander obfuscation support",
       "One-tap import with a share link",
     ],
-    tips: ["Import the hysteria2:// link or scan its QR code.", "If UDP is blocked on your network, use a TCP protocol instead."],
+    tips: ["Import the hysteria2:// link or scan its QR code.", "If the UDP connection doesn't work, try a TCP-based protocol instead."],
     apps: {
       android: [
         { name: "NekoBox", url: L.nekoBox },
@@ -365,7 +365,7 @@ const GUIDES: Record<GuideFamily, Omit<ProtocolGuide, "family">> = {
     label: "Trojan",
     summary: "Trojan imitates normal HTTPS traffic, which makes it hard to tell apart from regular browsing. Runs on Xray with TLS.",
     highlights: [
-      "Looks like ordinary HTTPS traffic",
+      "Runs inside TLS, like HTTPS",
       "TLS on port 443 with WebSocket or gRPC",
       "Custom SNI / host",
       "Share links and QR codes",
@@ -423,7 +423,7 @@ const GUIDES: Record<GuideFamily, Omit<ProtocolGuide, "family">> = {
     label: "OpenVPN",
     summary: "The long-standing open-source VPN. Import the .ovpn profile and connect over TCP or UDP.",
     highlights: ["Battle-tested open-source VPN", "TCP and UDP modes", "One .ovpn profile file", "Clients for every platform"],
-    tips: ["Try the TCP profile if UDP is blocked.", "Keep your username and password ready if the profile asks for them."],
+    tips: ["Try the TCP profile if UDP doesn't connect.", "Keep your username and password ready if the profile asks for them."],
     apps: {
       android: [{ name: "OpenVPN Connect", url: L.openvpnConnect }],
       ios: [{ name: "OpenVPN Connect", url: L.openvpnConnect }],
@@ -440,7 +440,7 @@ const GUIDES: Record<GuideFamily, Omit<ProtocolGuide, "family">> = {
     label: "NoobzVPN",
     summary: "A lightweight tunnel with TCP and SSL ports, set up with a username and password in the NoobzVPN app.",
     highlights: ["Simple username and password", "TCP and SSL ports", "Light on data", "Quick to set up"],
-    tips: ["Use the SSL port on networks that only allow HTTPS."],
+    tips: ["Use the SSL port for an encrypted connection."],
     apps: { android: [{ name: "NoobzVPN app" }] },
     steps: ["Create an account and copy host, port, username and password.", "Add a new server in the NoobzVPN app.", "Connect."],
   },

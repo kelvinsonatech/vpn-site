@@ -14,6 +14,7 @@ import { HeroChip, PageHeader } from "@/components/public/page-header";
 import { Container, EmptyState, SectionHeading } from "@/components/public/section";
 import { categoryLabel } from "@/components/public/nav";
 import { guideFor } from "@/lib/protocol-guides";
+import { guidesForProtocol } from "@/lib/guides";
 import { absoluteUrl, pageMetadata, siteOrigin } from "@/lib/seo";
 import { loadProtocolPage, loadSettings } from "@/app/(public)/_lib/data";
 import { CountriesGrid } from "./countries-client";
@@ -46,6 +47,7 @@ export default async function ProtocolPage({ params }: Props) {
 
   const { protocol: p, countries } = data;
   const guide = guideFor(p.slug, p.name);
+  const moreGuides = guidesForProtocol(p.slug);
   const crumbs: Crumb[] = [{ label: "Home", href: "/" }, { label: p.name, href: p.href }];
   const open = countries.filter((c) => c.availability === "available").length;
 
@@ -184,6 +186,21 @@ export default async function ProtocolPage({ params }: Props) {
             description={`${guide.label}: the apps we recommend and the few steps it takes.`}
           />
           <GuideSection guide={guide} protocolName={p.name} />
+          {moreGuides.length ? (
+            <nav aria-label={`More ${p.name} guides`} className="mt-8 rounded-3xl border bg-card p-5 shadow-sm sm:p-6">
+              <p className="text-sm font-semibold">More help with {p.name}</p>
+              <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                {moreGuides.map((g) => (
+                  <li key={g.slug}>
+                    <Link href={`/guides/${g.slug}`} className="inline-flex items-start gap-2 text-sm font-medium text-primary hover:underline">
+                      <BookOpenIcon className="mt-0.5 size-4 shrink-0" aria-hidden />
+                      {g.title}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          ) : null}
         </Container>
       </section>
 

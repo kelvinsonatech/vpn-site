@@ -564,7 +564,7 @@ export function MyAccountsList() {
           </p>
           <p className="flex items-start gap-2 text-pretty text-muted-foreground">
             <KeyRoundIcon className="mt-0.5 size-4 shrink-0 text-warning-strong" aria-hidden />
-            Passwords, UUIDs, keys, links and config files are not saved in this list, and our encrypted copy is erased within an hour of
+            Passwords, UUIDs, private keys, links and config files are not saved in this list, and our encrypted copy is erased within an hour of
             creation. If you lost them, create a new account. An account the server removes before its expiry date, for example for being
             used on too many devices at once, shows here as Removed.
           </p>

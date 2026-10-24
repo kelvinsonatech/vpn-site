@@ -83,8 +83,9 @@ export default async function PrivacyPage() {
       body: (
         <>
           <p>
-            Right after creation, your connection details are encrypted and held for at most {lifetime}, so that your browser can fetch them (also after
-            a reload). Only your browser holds the claim token that unlocks them. When that time runs out, the encrypted copy is erased for good.
+            Right after creation, your connection details are encrypted and held for at most {lifetime}, so that your browser can fetch them (also if you reload
+            while the account is being created). Only your browser holds the claim token that unlocks them. When that time runs out, the encrypted copy is
+            erased for good.
           </p>
           <p>
             This is why we cannot show your password again or send it to you later. Copy it, scan the QR code or download the file before you leave the
@@ -127,9 +128,10 @@ export default async function PrivacyPage() {
         <>
           <ul>
             <li>
-              <strong>My accounts:</strong> a short, non-secret summary of the accounts you created on this device (protocol, server, username, avatar
-              and expiry), kept in your browser&apos;s local storage. It never contains passwords, keys, links or configs, and you can clear it at any time
-              on the <Link href="/my-accounts">My accounts</Link> page.
+              <strong>My accounts:</strong> a short, non-secret summary of the accounts you created on this device (protocol, server, username, avatar, expiry
+              and the non-secret connection details such as host, ports, SNI, DNS nameserver and public key), kept in your browser&apos;s local storage. It
+              never contains passwords, UUIDs, private keys, share links or configs, and you can clear it at any time on the{" "}
+              <Link href="/my-accounts">My accounts</Link> page.
             </li>
             <li>Your light or dark theme choice, and whether you dismissed the announcement bar for this session.</li>
           </ul>
